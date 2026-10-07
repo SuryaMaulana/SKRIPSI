@@ -207,12 +207,13 @@ def assemble(ctx: RowContext, run_id: str, wall_s: float, final_message: str | N
     verification = {"putaran": ctx.verification_round, "penolakan": ctx.rejections(), "verification_failed": False,
                     "verification_skipped": False,
                     "batas_panggilan_verifikator": sum(bool(v.get("batas_panggilan_tercapai")) for v in ctx.verdicts),
-                    "putusan": [{k: v.get(k) for k in ("putaran", "klasifikasi_ke", "lolos", "lolos_menurut_llm", "alasan")}
-                                for v in ctx.verdicts]}
+                    "putusan": [{k: v.get(k) for k in ("putaran", "klasifikasi_ke", "lolos", "lolos_menurut_llm", "skema_valid",
+                                                       "evidence_hilang", "alasan")} for v in ctx.verdicts]}
     base = {"id": ctx.row_id, "run_id": run_id, "prompt_tokens": ctx.prompt_tokens,
             "completion_tokens": ctx.completion_tokens, "cost_usd": ctx.cost_usd, "latency_s": wall_s,
             "llm_latency_s": ctx.llm_latency_s, "llm_calls": ctx.llm_calls, "tool_calls": ctx.tool_calls,
-            "klasifikasi_dipanggil": len(ctx.classifications), "verifikasi": verification,
+            "klasifikasi_dipanggil": len(ctx.classifications),
+            "riwayat_label": [c.get("label", "PARSE_ERROR") for c in ctx.classifications], "verifikasi": verification,
             "alat_dipanggil": dict(Counter(ctx.tool_names)),
             "ditahan_guard": ctx.guard_blocks, "pengingat_prosedur": ctx.reminders, "batas_panggilan_subagen": limit_hits,
             "attempts": ctx.attempt}

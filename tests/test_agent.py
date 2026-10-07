@@ -218,6 +218,7 @@ def test_assemble_uses_the_latest_valid_classification(classifications, verdicts
     assert (out["label"], out["status"], out.get("klasifikasi_dipakai")) == (label, status, used)
     assert out["verifikasi"]["penolakan"] == sum(not v["lolos"] for v in verdicts)
     assert out["verifikasi"]["verification_failed"] == (status == "verification_failed")
+    assert out["riwayat_label"] == [c.get("label", "PARSE_ERROR") for c in classifications]
 
 
 def test_assemble_keeps_label_but_records_recursion_limit():
