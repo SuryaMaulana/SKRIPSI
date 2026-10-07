@@ -204,7 +204,8 @@ def render(groups: dict[str, dict]) -> str:
     names = list(groups)
     label = {n: f"{n} (rerata {len(g['runs'])} run)" if len(g["runs"]) > 1 else n for n, g in groups.items()}
     out = ["Nilai sel: rerata atas run (min–maks bila run lebih dari satu dan nilainya berbeda). Tabel utama memakai rerata.",
-           ""]
+           "Run lama (C tanpa batas token, pilot E v1, validasi v2, E 500 tanpa batas parsial) ada di results/archive/ dan "
+           "tidak masuk tabel; lihat reports/catatan_rekayasa.md.", ""]
     out += ["Tabel 4.2 — deteksi biner (serangan vs NORMAL)", ""]
     out.append(_table(["metode", "accuracy", "precision", "recall", "F1", "FPR"],
                       [[label[n], *(_cell(groups[n]["metrics"][k]) for k in
