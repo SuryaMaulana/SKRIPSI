@@ -1,0 +1,35 @@
+{
+  "run_id": "crs_regression-20261007T153018Z-675337d",
+  "method": "crs_regression",
+  "date_utc": "2026-10-07T15:30:18+00:00",
+  "git_commit": "675337dce8b3d6b28653cde8569cc3cf9de68e2d",
+  "git_branch": "tahap-sistem",
+  "git_dirty": false,
+  "model": null,
+  "python": "3.11.13",
+  "config_file": "configs/regex_full.yaml",
+  "engine": {
+    "modsecurity": "2.9.15",
+    "httpd": "2.4.69",
+    "config": "modsecurity.conf-recommended + SecUnicodeMapFile unicode.mapping 20127; MergeSlashes On; AllowEncodedSlashes Off",
+    "request_rejection_emulated": false,
+    "unicode_mapping": {
+      "url": "https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v2.9.15/unicode.mapping",
+      "sha256": "5e4500ef82e45c49d8edd9513648939710d6c8cc2d5997513b32866dc5d9be23",
+      "codepage": 20127
+    }
+  },
+  "crs_version": "4.30.0",
+  "crs_sha256": "a4bb3688ef6205b64471a9ccbf0d7b024eb8edf39b97c6f6c0006e7a948f8550",
+  "rules_dir_sha256": "88f6690b0bbdfd3f2d61a288f238798cbd857c674e1d93cbfb754631687913aa",
+  "stats": {
+    "tested": 1267,
+    "agree": 1267,
+    "skip_body_or_raw_request": 1448,
+    "skip_unlogged_header": 67,
+    "skip_rule_not_applicable": 141,
+    "skip_excluded_operator": 40
+  },
+  "rules_tested": 123,
+  "disagreements": []
+}
