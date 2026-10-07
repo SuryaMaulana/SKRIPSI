@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 RAW := data/raw/srbh2020/data_capec_multilabel.csv
 
-.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot llm-single
+.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot llm-single agent-pilot agent
 
 help:
 	@echo "make setup     buat .venv (Python 3.11) dan pasang dependensi terkunci"
@@ -21,6 +21,8 @@ help:
 	@echo "make eval      D: Tabel 4.2/4.3, F1 per kelas, confusion matrix, IK 95% untuk semua results/*.jsonl"
 	@echo "make llm-single-pilot C: LLM tunggal pada 30 baris pilot (5 per kelas) -> results/pilot/"
 	@echo "make llm-single C: LLM tunggal pada 500 baris -> results/llm_single.jsonl (panggilan: results/llm_single_calls.jsonl)"
+	@echo "make agent-pilot E: deep agent pada 30 baris pilot yang sama dengan C -> results/pilot/"
+	@echo "make agent        E: deep agent pada 500 baris -> results/agent.jsonl (panggilan: results/agent_calls.jsonl)"
 
 setup:
 	@if command -v uv >/dev/null 2>&1; then \
@@ -72,7 +74,7 @@ regex-full:
 	$(PY) -m src.baselines.regex_baseline --config configs/regex_full.yaml
 
 eval:
-	$(PY) -m src.eval.evaluate --rules
+	$(PY) -m src.eval.evaluate --rules --out reports/evaluasi.md
 
 llm-single-pilot:
 	$(PY) -m src.eval.pilot
@@ -80,3 +82,9 @@ llm-single-pilot:
 
 llm-single:
 	$(PY) -m src.baselines.llm_single
+
+agent-pilot:
+	$(PY) -m src.agent.run --ids results/pilot/pilot_ids.json --out-dir results/pilot
+
+agent:
+	$(PY) -m src.agent.run

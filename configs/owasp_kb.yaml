@@ -1,0 +1,59 @@
+# Basis pengetahuan ringkas per kelas untuk alat lookup_owasp deep agent (keputusan penulis, 2026-10-07).
+# Ditulis dari Tabel 2.1 draf skripsi dan dokumen OWASP (OWASP Top 10 2025, OWASP Web Security Testing Guide v4.2),
+# ditambah rujukan CAPEC/CWE. Berkas statis: agen tidak mengakses internet saat runtime.
+# Bagian "ciri" disalin dari Tabel 2.1 (sel Command Injection dari teks final penulis); bagian lain ringkasan rujukan.
+
+SQLI:
+  nama: SQL Injection
+  definisi: Penyisipan sintaks SQL ke parameter untuk memanipulasi kueri basis data.
+  ciri: "' OR 1=1, UNION SELECT, SLEEP(, komentar -- / #, sering ter-URL-encode (%27, %20)"
+  rujukan: [OWASP Top 10 2025 A05 Injection, WSTG-INPV-05 Testing for SQL Injection, CAPEC-66, CWE-89]
+  catatan:
+    - Bentuk umum di log akses - tautologi (' OR '1'='1), UNION SELECT, kueri bertumpuk (;SELECT), fungsi waktu (SLEEP, BENCHMARK, WAITFOR DELAY, pg_sleep), fungsi galat (EXTRACTVALUE, UPDATEXML, CONCAT(0x...)), dan komentar (--, #, /**/).
+    - Payload bisa berada di parameter query, segmen path, atau header yang tercatat (User-Agent, Referer).
+
+XSS:
+  nama: Cross-Site Scripting
+  definisi: Penyisipan skrip sisi klien agar dieksekusi di peramban korban.
+  ciri: "<script>, onerror=, javascript:, varian ter-encode (%3Cscript%3E), dapat muncul di referer"
+  rujukan: [OWASP Top 10 2025 A05 Injection, WSTG-INPV-01 Testing for Reflected Cross Site Scripting, CAPEC-63, CWE-79]
+  catatan:
+    - Bentuk umum - tag <script>, atribut event (onerror=, onload=, onmouseover=), skema javascript:, tag <img>/<svg>/<iframe>, dan fungsi alert(, prompt(, confirm(.
+    - Sering ter-encode berlapis (%253C) atau sebagai entity HTML (&lt;, &#60;).
+
+PATH_TRAVERSAL:
+  nama: Path Traversal / File Inclusion
+  definisi: Akses berkas di luar web root atau penyertaan berkas lokal/jarak jauh.
+  ciri: "../, ..%2f, /etc/passwd, win.ini, URL eksternal ber-skema (http://...) di segmen path atau parameter (RFI)"
+  rujukan: [OWASP Top 10 2025 A01 Broken Access Control, WSTG-ATHZ-01 Testing Directory Traversal File Include, CAPEC-126, CAPEC-193, CWE-22, CWE-98]
+  catatan:
+    - Urutan traversal bisa ter-encode (%2e%2e%2f, ..%5c, %252e%252e) atau berulang.
+    - Berkas sasaran umum - /etc/passwd, /etc/shadow, /proc/self/environ, boot.ini, win.ini.
+    - Remote File Inclusion - URL ber-skema (http://, https://, ftp://) sebagai nilai parameter atau segmen path.
+
+CMD_INJECTION:
+  nama: Command Injection
+  definisi: Penyisipan perintah sistem operasi melalui parameter.
+  ciri: "Pemisah perintah diikuti perintah shell: ;id, |cat /etc/passwd, &&sleep 15, substitusi perintah dengan tanda backtick atau $(...), varian ter-encode (%7C, %26%26, %60), Shellshock () {, argumen PHP-CGI -d allow_url_include"
+  rujukan: [OWASP Top 10 2025 A05 Injection, WSTG-INPV-12 Testing for Command Injection, CAPEC-88, CWE-78]
+  catatan:
+    - Menurut ciri Tabel 2.1, pembedanya dari Path Traversal adalah pemisah atau operator shell (; | || & && ` $( ) yang diikuti perintah (id, cat, sleep, ping, wget, curl, uname).
+    - Injeksi argumen PHP-CGI (-d allow_url_include=1 -d auto_prepend_file=php://input) termasuk kelas ini.
+    - Shellshock - nilai header yang diawali () { :; };
+
+WEB_SCANNING:
+  nama: Web Scanning / Enumeration
+  definisi: Pemindaian otomatis untuk menemukan berkas, direktori, atau kemampuan server.
+  ciri: "user agent pemindai (Nmap, zgrab, sqlmap), metode non-standar (PROPFIND, MKCOL, TRACK), berkas cadangan/VCS (.bak, .swp, .git/), probe /.env, /wp-login.php, kode 404 beruntun"
+  rujukan: [WSTG-INFO-02 Fingerprint Web Server, WSTG-CONF-04 Review Old Backup and Unreferenced Files for Sensitive Information, WSTG-CONF-06 Test HTTP Methods, CAPEC-310]
+  catatan:
+    - Satu baris log cukup bila memuat ciri per baris - user agent pemindai, metode HTTP non-standar, atau permintaan berkas cadangan/VCS/konfigurasi tanpa urutan traversal.
+    - Bila baris yang sama memuat payload injeksi atau traversal, kelas serangan itu yang dipilih, bukan pemindaian (prioritas kelas §3.2 skripsi).
+
+NORMAL:
+  nama: Normal
+  definisi: Permintaan sah pengguna atau crawler mesin pencari.
+  ciri: "URI wajar, parameter alfanumerik, kode 200/301/304, user agent peramban atau bot terverifikasi"
+  rujukan: [OWASP WSTG 4.2 (pembanding - tidak memenuhi ciri kelas serangan mana pun)]
+  catatan:
+    - Pilih NORMAL bila tidak ada bukti literal untuk kelas serangan mana pun (aturan 4 Lampiran A).
