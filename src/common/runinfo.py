@@ -73,12 +73,13 @@ def ids_sha256(ids: list[str]) -> str:
     return hashlib.sha256("\n".join(ids).encode("utf-8")).hexdigest()
 
 
-RESUME_KEYS = ("input_file", "ids_file", "rows", "row_ids_sha256", "calls_file", "output_name")
+RESUME_KEYS = ("input_file", "ids_file", "rows", "row_ids_sha256", "calls_file", "output_name", "model", "generation",
+               "provider_routing")
 
 
 def check_resume(info: dict, current: dict) -> None:
-    """Run yang dilanjutkan wajib memakai masukan, daftar baris, log panggilan, dan nama keluaran yang sama dengan run
-    awalnya; bila tidak, hentikan sebelum ada panggilan API."""
+    """Run yang dilanjutkan wajib memakai masukan, daftar baris, log panggilan, nama keluaran, model, parameter generasi
+    (termasuk max_tokens), dan routing yang sama dengan run awalnya; bila tidak, hentikan sebelum ada panggilan API."""
     diff = {k: (info.get(k), current.get(k)) for k in RESUME_KEYS if info.get(k) != current.get(k)}
     if diff:
         detail = "; ".join(f"{k}: awal={a!r}, sekarang={b!r}" for k, (a, b) in diff.items())

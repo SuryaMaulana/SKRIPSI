@@ -353,7 +353,7 @@ def test_run_writes_incrementally_and_resumes_after_api_abort(tmp_path, monkeypa
     monkeypatch.setattr(ar, "method_rows", lambda path, split: (rows, ar.SAMPLE_PATH))
     monkeypatch.setattr(ar, "load_llm_config", lambda: {"model": "openai/gpt-4.1-nano"})
     monkeypatch.setattr(ar, "sha256_file", lambda path: "x")
-    monkeypatch.setattr(ar, "run_info", lambda method, model, **extra: {"run_id": "run-1", "git_dirty": False, **extra})
+    monkeypatch.setattr(ar, "run_info", lambda method, model, **extra: {"run_id": "run-1", "git_dirty": False, "model": model, **extra})
     calls = tmp_path / "calls.jsonl"
     with pytest.raises(ar.RunAborted):
         ar.run(out_dir=tmp_path, inputs_path=ar.SAMPLE_PATH, calls_path=calls, agent=FakeAgent(fail_on="srbh-1"))
@@ -543,7 +543,7 @@ def test_resume_with_different_rows_or_calls_is_refused_before_any_call(tmp_path
     monkeypatch.setattr(ar, "method_rows", lambda path, split: (current["rows"], ar.SAMPLE_PATH))
     monkeypatch.setattr(ar, "load_llm_config", lambda: {"model": "openai/gpt-4.1-nano"})
     monkeypatch.setattr(ar, "sha256_file", lambda path: "x")
-    monkeypatch.setattr(ar, "run_info", lambda method, model, **extra: {"run_id": "run-1", "git_dirty": False, **extra})
+    monkeypatch.setattr(ar, "run_info", lambda method, model, **extra: {"run_id": "run-1", "git_dirty": False, "model": model, **extra})
     calls = tmp_path / "calls.jsonl"
     with pytest.raises(ar.RunAborted):
         ar.run(out_dir=tmp_path, calls_path=calls, agent=FakeAgent(fail_on="srbh-1"))
@@ -628,3 +628,99 @@ def test_classifier_truncated_twice_records_a_parse_error_classification(ctx):
     node = g.build_classifier(GenericFakeChatModel(messages=iter([_cut(json.dumps(GOOD)), _cut("{")])))
     node.invoke({"messages": []})
     assert ctx.classifications[-1]["_parse_error"].startswith("TRUNCATED") and len(ctx.truncations) == 2
+
+
+def _openrouter_body(content="", tool_calls=None, finish="stop", completion_tokens=10, native=None):
+    message = {"role": "assistant", "content": content}
+    if tool_calls:
+        message["tool_calls"] = tool_calls
+    choice = {"index": 0, "message": message, "finish_reason": finish}
+    if native:
+        choice["native_finish_reason"] = native
+    return {"id": "gen", "object": "chat.completion", "created": 0, "model": "openai/gpt-4.1-nano", "provider": "OpenAI",
+            "choices": [choice], "usage": {"prompt_tokens": 100, "completion_tokens": completion_tokens,
+                                           "total_tokens": 100 + completion_tokens, "cost": 0.0001}}
+
+
+def _http_model(bodies, sent):
+    """OpenRouterChat sungguhan (jalur SDK openai lengkap) dengan transport HTTP tiruan, tanpa jaringan."""
+    queue = list(bodies)
+
+    def handler(request):
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json=queue.pop(0))
+
+    config = {"model": "openai/gpt-4.1-nano", "generation": {"temperature": 0, "seed": 42, "max_tokens": 4096},
+              "provider_routing": {"order": ["openai"], "allow_fallbacks": False, "require_parameters": True}}
+    base = g.make_model(config, "klasifikasi", "sk-test")
+    fields = base.model_dump(exclude={"client", "async_client", "root_client", "root_async_client", "http_client",
+                                      "http_async_client"})
+    return g.OpenRouterChat(**{**fields, "api_key": "sk-test", "http_client": httpx.Client(transport=httpx.MockTransport(handler))})
+
+
+def test_classifier_truncation_through_the_real_sdk_path_is_retried_then_parse_error(ctx):
+    """Review: response_format sebagai argumen membuat SDK melempar LengthFinishReasonError. Lewat extra_body tidak."""
+    sent = []
+    cut = '{"label": "SQLI", "confidence": 0.9, "evidence": ["' + " " * 50
+    model = _http_model([_openrouter_body(cut, finish="length", completion_tokens=4096, native="max_output_tokens"),
+                         _openrouter_body(cut, finish="length", completion_tokens=4096)], sent)
+    g.build_classifier(model).invoke({"messages": []})
+    assert ctx.classifications[-1]["_parse_error"].startswith("TRUNCATED")
+    assert [t["percobaan"] for t in ctx.truncations] == [1, 2] and len(sent) == 2
+    body = sent[0]
+    assert body["response_format"]["json_schema"]["strict"] is True and body["max_tokens"] == 4096
+    assert body["provider"]["order"] == ["openai"] and "max_completion_tokens" not in body
+
+
+def test_classifier_recovers_after_one_truncation_through_the_real_sdk_path(ctx):
+    sent = []
+    model = _http_model([_openrouter_body("{", finish="length", completion_tokens=4096),
+                         _openrouter_body(json.dumps(GOOD))], sent)
+    g.build_classifier(model).invoke({"messages": []})
+    assert ctx.classifications[-1] == GOOD and len(ctx.truncations) == 1
+
+
+def test_truncated_tool_call_reported_as_tool_calls_is_normalised_to_length():
+    """OpenRouter melaporkan pemanggilan alat yang terpotong sebagai finish_reason 'tool_calls' (pengamatan run E)."""
+    sent = []
+    garbage = [{"id": "c1", "type": "function", "function": {"name": "task", "arguments": '{"description": "' + " " * 80}}]
+    model = _http_model([_openrouter_body("", tool_calls=garbage, finish="tool_calls", completion_tokens=4096),
+                         _openrouter_body("ok", completion_tokens=12)], sent)
+    cut = model.invoke("x")
+    assert cut.response_metadata["finish_reason"] == "length" and cut.response_metadata["finish_reason_asli"] == "tool_calls"
+    normal = model.invoke("y")
+    assert normal.response_metadata["finish_reason"] == "stop" and "finish_reason_asli" not in normal.response_metadata
+
+
+def test_shared_truncation_rule():
+    from src.llm.openrouter import is_truncated
+
+    assert is_truncated("length", None, 10, 4096) and is_truncated("tool_calls", None, 4096, 4096)
+    assert is_truncated("tool_calls", "max_output_tokens", 100, 4096) and not is_truncated("stop", "stop", 4095, 4096)
+
+
+class _Raising(_RecordingModel):
+    """Model tiruan yang dapat melempar galat pada giliran tertentu."""
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        item = next(self.messages)
+        if isinstance(item, Exception):
+            raise item
+        from langchain_core.outputs import ChatResult
+
+        return ChatResult(generations=[ChatGeneration(message=item)])
+
+
+def test_truncation_retry_is_not_reset_by_a_service_error(ctx, monkeypatch):
+    """Review: TruncationGuard di luar ModelRetryMiddleware -> [terpotong, galat layanan, terpotong] = tepat 2 percobaan."""
+    def fake_model(config, subagent, key):
+        script = {"orkestrator": [_cut(), g.ServiceFailure("upstream"), _cut()], "parser": [], "analisis_payload": [],
+                  "klasifikasi": []}[subagent]
+        return _Raising(messages=iter(script), name_tag=subagent)
+
+    monkeypatch.setattr(g, "make_model", fake_model)
+    monkeypatch.setattr(g, "api_key", lambda: "sk-test")
+    agent = g.build_agent({"model": "openai/gpt-4.1-nano"})
+    with pytest.raises(g.TruncatedOutput):
+        agent.invoke({"messages": [HumanMessage(f"<log>{LOG}</log>")]}, {"recursion_limit": 40})
+    assert [t["percobaan"] for t in ctx.truncations] == [1, 2]

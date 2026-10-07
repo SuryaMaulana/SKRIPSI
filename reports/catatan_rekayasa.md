@@ -19,7 +19,9 @@ ini mendokumentasikan riwayat rekayasa agar setiap keputusan dapat ditelusuri. L
 | `agent-20261007T185745Z-3988205` | E v2 final, tanpa batas token | 30 val | validasi K4 | selesai | konfigurasi final menambah `max_tokens` |
 | `llm_single-20261007T201505Z-3988205` | C, tanpa batas token | 30 val | pembanding validasi | selesai | validasi |
 | `agent-20261007T201758Z-e0daa05` | E v2, tanpa batas token | 82 uji | E 500 pertama | dihentikan (keputusan penulis) | konfigurasi final menambah `max_tokens`; disimpan untuk analisis keluaran degeneratif (`results/archive/agent_uncapped_partial.jsonl`) |
-| `llm_single-20261007T214045Z-dc055cd` (3 run) | C final | ±15 uji tiap run | run resmi | dihentikan | ketiga run paralel mendapat run_id sama; run_id kini memuat nama run |
+| `llm_single-20261007T214045Z-dc055cd` (3 run) | C ber-batas | 30 / 30 / 27 uji (r1/r2/r3) | run resmi | dihentikan | ketiga run paralel mendapat run_id sama; run_id kini memuat nama run (koreksi: pesan commit 9890bd0 menyebut ±15 baris) |
+| `llm_single_r{1,2,3}-20261007T214206Z-9890bd0` | C ber-batas | 500 uji tiap run | run resmi | selesai, diganti | deteksi TRUNCATED diperluas (aturan bersama C/E: finish_reason length, alasan asli penyedia, atau token keluaran ≥ max_tokens); pada ketiga run ini aturan baru memberi hasil identik (4 panggilan TRUNCATED, semuanya finish_reason length), tetapi run diulang agar keenam run resmi berasal dari satu commit (`results/archive/c_9890bd0/`) |
+| `agent_r{1,2,3}-20261007T215441Z-bcb3445` | E ber-batas | 52 / 55 / 52 uji | run resmi | dihentikan | review: Klasifikasi memakai chat.completions.parse() yang melempar LengthFinishReasonError pada keluaran terpotong (run akan crash), dan pemanggilan alat orkestrator yang terpotong dilaporkan OpenRouter sebagai finish_reason tool_calls sehingga TRUNCATED tidak terdeteksi (6 kejadian di ±160 baris) (`results/archive/dihentikan_e_bcb3445/`) |
 
 ## 2. C 500 baris tanpa batas token (`llm_single-20261007T161203Z-6ce9f30`)
 

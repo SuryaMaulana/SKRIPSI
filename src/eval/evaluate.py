@@ -84,7 +84,8 @@ def load_truth(source: str = "sample") -> Truth:
 
 
 def is_prediction_file(path: Path) -> bool:
-    return path.suffix == ".jsonl" and not path.name.endswith("_calls.jsonl")
+    """Berkas prediksi selesai: bukan log panggilan (*_calls.jsonl) dan bukan run yang belum selesai (*.partial.jsonl)."""
+    return path.suffix == ".jsonl" and not path.name.endswith(("_calls.jsonl", ".partial.jsonl"))
 
 
 def load_method(path: Path) -> Method:

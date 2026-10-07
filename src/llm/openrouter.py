@@ -136,9 +136,23 @@ def summarize(call: dict, rates: dict[str, Decimal] | None = None) -> dict:
         "cost_usd": usage.get("cost"),
         "cost_usd_from_rates": from_rates,
         "finish_reason": choice.get("finish_reason"),
+        "native_finish_reason": choice.get("native_finish_reason"),  # alasan asli penyedia (OpenRouter)
         "content": (choice.get("message") or {}).get("content"),
         "refusal": (choice.get("message") or {}).get("refusal"),
         "error": body.get("error"),
         "choice_error": choice.get("error"),  # galat tingkat pilihan (OpenRouter), mis. galat hulu saat generasi
         "non_json_body": "raw_text" in body,
     }
+
+
+NATIVE_LENGTH_REASONS = ("length", "max_output_tokens", "max_tokens", "MAX_TOKENS")
+
+
+def is_truncated(finish_reason: str | None, native_finish_reason: str | None, completion_tokens: int | None,
+                 max_tokens: int | None) -> bool:
+    """Panggilan terpotong di batas max_tokens (TRUNCATED). OpenRouter melaporkan pemanggilan alat yang terpotong sebagai
+    finish_reason "tool_calls", jadi selain finish_reason "length" dipakai juga alasan asli penyedia dan jumlah token
+    keluaran >= max_tokens (aturan yang sama untuk C dan E)."""
+    if finish_reason == "length" or native_finish_reason in NATIVE_LENGTH_REASONS:
+        return True
+    return max_tokens is not None and (completion_tokens or 0) >= max_tokens

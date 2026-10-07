@@ -149,3 +149,12 @@ def test_evidence_literal_definition_and_table_4_5():
     e = ev.evidence_literal(method, truth)
     assert (e["rows"], e["rows_with_evidence"], e["items"], e["literal"], e["rows_all_literal"]) == (2, 1, 2, 1, 0)
     assert e["proportion"] == 0.5
+
+
+def test_partial_runs_are_not_prediction_files():
+    from pathlib import Path
+
+    from src.eval.evaluate import is_prediction_file
+
+    assert is_prediction_file(Path("agent_r1.jsonl"))
+    assert not is_prediction_file(Path("agent_r1.partial.jsonl")) and not is_prediction_file(Path("agent_r1_calls.jsonl"))

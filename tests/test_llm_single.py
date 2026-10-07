@@ -133,7 +133,7 @@ def test_run_writes_incrementally_and_resumes_after_abort(tmp_path, monkeypatch)
     monkeypatch.setattr(ls, "method_rows", lambda path, split: (rows, ls.SAMPLE_PATH))
     monkeypatch.setattr(ls, "load_llm_config", lambda: {**CONFIG, "model_version": "openai/gpt-4.1-nano-2025-04-14"})
     monkeypatch.setattr(ls, "sha256_file", lambda path: "x")
-    monkeypatch.setattr(ls, "run_info", lambda method, model, **extra: {"run_id": "run-1", "git_dirty": False, **extra})
+    monkeypatch.setattr(ls, "run_info", lambda method, model, **extra: {"run_id": "run-1", "git_dirty": False, "model": model, **extra})
     good = _response(json.dumps(GOOD))
     first = OpenRouterClient(SECRET, transport=httpx.MockTransport(
         lambda r, q=[good, _response(None, 402)]: q.pop(0)))

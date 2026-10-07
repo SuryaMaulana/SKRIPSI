@@ -166,6 +166,8 @@ class CallRecorder(BaseCallbackHandler):
             "prompt_tokens": usage.get("prompt_tokens"), "completion_tokens": usage.get("completion_tokens"),
             "cached_tokens": (usage.get("prompt_tokens_details") or {}).get("cached_tokens"),
             "cost_usd": usage.get("cost"), "latency_s": round(latency, 3), "finish_reason": meta.get("finish_reason"),
+            "finish_reason_asli": meta.get("finish_reason_asli", meta.get("finish_reason")),
+            "native_finish_reason": meta.get("native_finish_reason"),
             "status_panggilan": "TRUNCATED" if meta.get("finish_reason") == "length" else "ok",
             "served_model": output.get("model_name"), "upstream_provider": output.get("upstream_provider"),
             "system_fingerprint": output.get("system_fingerprint"), "parameter": params, "prompt": prompt,
@@ -343,7 +345,8 @@ def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: 
     if resume:
         check_resume(info, {"input_file": repo_path(inputs_path), "ids_file": repo_path(ids_path), "rows": len(rows),
                             "row_ids_sha256": ids_sha256([r["id"] for r in rows]), "calls_file": repo_path(calls_path),
-                            "output_name": name})
+                            "output_name": name, "model": config["model"], "generation": config.get("generation"),
+                            "provider_routing": config.get("provider_routing")})
     info_path.write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     agent = agent or build_agent(config)
     logger = CallLogger(calls_path)

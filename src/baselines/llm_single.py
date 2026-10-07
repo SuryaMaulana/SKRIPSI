@@ -34,7 +34,7 @@ import httpx
 from ..common.inputs import SAMPLE_PATH, method_rows
 from ..common.runinfo import check_resume, git_state, ids_sha256, repo_path, run_info, sha256_file
 from ..data.config import ROOT
-from ..llm.openrouter import OpenRouterClient, api_key, build_payload, load_llm_config, summarize
+from ..llm.openrouter import OpenRouterClient, api_key, build_payload, is_truncated, load_llm_config, summarize
 from .llm_prompt import CLASS_LABELS, OUTPUT_SCHEMA, SYSTEM_PROMPT, prompt_sha256, user_message
 
 RESULTS_DIR = ROOT / "results"
@@ -142,14 +142,17 @@ class Runner:
         for attempt in range(1, PARSE_ATTEMPTS + 1):
             call, summary = self._call(row["id"], attempt, payload)
             output, reason = parse_output(summary["content"])
-            if summary["finish_reason"] == "length":  # terpotong di batas max_tokens (keputusan penulis 2026-10-08)
+            cut = is_truncated(summary["finish_reason"], summary.get("native_finish_reason"), summary["completion_tokens"],
+                               payload.get("max_tokens"))
+            if cut:  # terpotong di batas max_tokens (keputusan penulis 2026-10-08)
                 truncated += 1
-                output, reason = None, f"TRUNCATED: finish_reason length (max_tokens {payload.get('max_tokens')})"
+                output, reason = None, (f"TRUNCATED: finish_reason {summary['finish_reason']}, "
+                                        f"{summary['completion_tokens']} token (max_tokens {payload.get('max_tokens')})")
             elif output is not None and summary["finish_reason"] not in (None, "stop"):
                 output, reason = None, f"finish_reason {summary['finish_reason']}"
             if summary["refusal"]:
                 output, reason = None, f"penolakan: {str(summary['refusal'])[:200]}"
-            outcome = "ok" if output else ("TRUNCATED" if summary["finish_reason"] == "length" else "parse_error")
+            outcome = "ok" if output else ("TRUNCATED" if cut else "parse_error")
             self._log(row["id"], attempt, payload, call, summary, outcome, reason)
             if output is not None:
                 return {"id": row["id"], **output, "status": "ok", "attempts": attempt, "truncated_calls": truncated,
@@ -220,7 +223,8 @@ def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: 
     if resume:
         check_resume(info, {"input_file": repo_path(inputs_path), "ids_file": repo_path(ids_path), "rows": len(rows),
                             "row_ids_sha256": ids_sha256([r["id"] for r in rows]), "calls_file": repo_path(calls_path),
-                            "output_name": name})
+                            "output_name": name, "model": config["model"], "generation": config.get("generation"),
+                            "provider_routing": config.get("provider_routing")})
     info_path.write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     finished = {p["id"] for p in done}
     with (client or OpenRouterClient(api_key())) as client, open(calls_path, "a", encoding="utf-8") as calls, \

@@ -62,7 +62,7 @@ def test_runs_with_different_configuration_are_refused():
 def test_group_files_finds_main_and_numbered_replications(tmp_path):
     (tmp_path / "rep").mkdir()
     for path in ("agent.jsonl", "rep/agent_r1.jsonl", "rep/agent_r2.jsonl", "rep/agent_r10.jsonl",
-                 "rep/agent_r1_calls.jsonl", "rep/llm_single_r1.jsonl"):
+                 "rep/agent_r1_calls.jsonl", "rep/llm_single_r1.jsonl", "rep/agent_r3.partial.jsonl"):
         (tmp_path / path).write_text(json.dumps({"id": "x", "label": "NORMAL"}) + "\n")
     files = rp.group_files("agent", tmp_path, tmp_path / "rep")
     assert [p.name for p in files] == ["agent_r1.jsonl", "agent_r2.jsonl", "agent_r10.jsonl"]  # run resmi saja
@@ -74,7 +74,8 @@ def test_degenerate_outputs_and_call_latency_are_reported_per_run(tmp_path, monk
     calls = tmp_path / "calls.jsonl"
     calls.write_text("".join(json.dumps(r) + "\n" for r in [
         {"run_id": "r1", "jenis": "llm", "latency_s": 1.0}, {"run_id": "r1", "jenis": "llm", "latency_s": 3.0},
-        {"run_id": "r1", "jenis": "alat", "latency_s": 0.1}, {"run_id": "lain", "jenis": "llm", "latency_s": 99.0}]))
+        {"run_id": "r1", "jenis": "alat", "latency_s": 0.1}, {"run_id": "lain", "jenis": "llm", "latency_s": 99.0},
+        *({"run_id": "r1", "outcome": "TRUNCATED"} for _ in range(3))]))
     method = _method(truth, {"SQLI-0"}, run={"run_id": "r1", "model": "m", "calls_file": str(calls)})
     for row in method.rows:
         row["truncated_calls"] = 0
@@ -86,3 +87,30 @@ def test_degenerate_outputs_and_call_latency_are_reported_per_run(tmp_path, monk
     assert metrics["degeneratif_terdampak_parse_error"] == 1 and metrics["degeneratif_terdampak_ok"] == 1
     text = rp.render({"llm_single": rp.aggregate([method], truth)})
     assert "Keluaran degeneratif" in text and "latensi per panggilan median" in text
+
+
+def test_incomplete_or_unfinished_groups_are_refused(tmp_path):
+    truth = _truth()
+    runs = [_method(truth, set()) for _ in range(3)]
+    for m in runs:
+        m.run["rows"] = len(truth.labels)
+    rp.check_complete("agent", runs, truth, tmp_path)
+    with pytest.raises(ValueError, match="2 run"):
+        rp.check_complete("agent", runs[:2], truth, tmp_path)
+    short = _method(truth, set())
+    short.run["rows"] = 10
+    with pytest.raises(ValueError, match="cakupan"):
+        rp.check_complete("agent", [*runs[:2], short], truth, tmp_path)
+    (tmp_path / "agent_r3.partial.jsonl").write_text("{}\n")
+    with pytest.raises(ValueError, match="belum selesai"):
+        rp.check_complete("agent", runs, truth, tmp_path)
+
+
+def test_degenerate_outcomes_include_verification_skipped():
+    truth = _truth()
+    method = _method(truth, set(), run={"run_id": "r", "model": "m"})
+    for row in method.rows:
+        row["truncated_calls"] = 0
+    method.rows[0].update(truncated_calls=2, status="verification_skipped")
+    out = rp.degenerate(method, truth)
+    assert out["terdampak_verification_skipped"] == 1 and out["baris_terdampak"] == 1

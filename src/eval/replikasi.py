@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import statistics
 import sys
 from pathlib import Path
@@ -45,15 +46,34 @@ from .evaluate import (
 
 REPLICATION_DIR = RESULTS_DIR  # run resmi: results/<nama>_r<n>.jsonl
 GROUPS = {"llm_single": "llm_single", "agent": "agent"}  # nama metode -> awalan berkas run
-CONFIG_KEYS = ("model", "model_version", "generation", "provider_routing", "prompt_sha256", "input_sha256")
+CONFIG_KEYS = ("model", "model_version", "generation", "provider_routing", "prompt_sha256", "input_sha256", "input_file",
+               "ids_file", "row_ids_sha256")
+EXPECTED_RUNS = 3  # keputusan penulis: total 3 run per metode
+STATUSES = ("ok", "verification_failed", "verification_skipped", "PARSE_ERROR")
 SINGLE_RUN = ("regex", "regex_full")
 
 
 def group_files(name: str, main_dir: Path = RESULTS_DIR, replication_dir: Path = REPLICATION_DIR,
                 include_main: bool = False) -> list[Path]:
     files = [main_dir / f"{name}.jsonl"] if include_main else []
-    files += sorted(replication_dir.glob(f"{name}_r*.jsonl"), key=lambda p: (len(p.name), p.name))
-    return [p for p in files if p.exists() and p.stat().st_size > 0 and not p.name.endswith("_calls.jsonl")]
+    official = re.compile(rf"{re.escape(name)}_r\d+\.jsonl")  # bukan *_calls.jsonl dan bukan *.partial.jsonl
+    files += sorted((p for p in replication_dir.glob(f"{name}_r*.jsonl") if official.fullmatch(p.name)),
+                    key=lambda p: (len(p.name), p.name))
+    return [p for p in files if p.exists() and p.stat().st_size > 0]
+
+
+def check_complete(name: str, methods: list[Method], truth, replication_dir: Path = REPLICATION_DIR,
+                   expected: int | None = EXPECTED_RUNS) -> None:
+    """Hentikan agregasi bila ada run yang belum selesai, jumlah run tidak sesuai, atau cakupan baris tidak penuh."""
+    unfinished = sorted(p.name for p in replication_dir.glob(f"{name}_r*.partial.jsonl"))
+    if unfinished:
+        raise ValueError(f"{name}: run belum selesai / dihentikan: {unfinished}")
+    if expected is not None and len(methods) != expected:
+        raise ValueError(f"{name}: {len(methods)} run, seharusnya {expected}")
+    for m in methods:
+        missing = set(truth.labels) - set(m.predictions)
+        if missing or m.run.get("rows") != len(truth.labels):
+            raise ValueError(f"{m.relpath}: cakupan tidak penuh ({len(m.predictions)}/{len(truth.labels)} baris)")
 
 
 def check_consistent(methods: list[Method]) -> dict:
@@ -91,15 +111,36 @@ def call_latencies(method: Method) -> list[float]:
     return out
 
 
+def truncated_in_log(method: Method) -> int | None:
+    """Jumlah panggilan TRUNCATED menurut log panggilan run (C: outcome; E: status_panggilan), untuk cek silang."""
+    calls_file = method.run.get("calls_file")
+    path = None if not calls_file else (Path(calls_file) if Path(calls_file).is_absolute() else ROOT / calls_file)
+    if path is None or not path.exists():
+        return None
+    count = 0
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            record = json.loads(line)
+            if record.get("run_id") == method.run.get("run_id") and "TRUNCATED" in (
+                    record.get("outcome"), record.get("status_panggilan")):
+                count += 1
+    return count
+
+
 def degenerate(method: Method, truth) -> dict:
-    """Keluaran degeneratif (TRUNCATED) dan outcome baris terdampak."""
+    """Keluaran degeneratif (TRUNCATED) dan outcome baris terdampak per status; kejadian dicek silang dengan log."""
     rows = [r for r in method.rows if r["id"] in truth.labels]
     hit = [r for r in rows if r.get("truncated_calls", 0) > 0]
-    return {"kejadian": sum(r.get("truncated_calls", 0) for r in rows), "baris_terdampak": len(hit),
-            "terdampak_ok": sum(r["status"] == "ok" for r in hit),
-            "terdampak_verification_failed": sum(r["status"] == "verification_failed" for r in hit),
-            "terdampak_parse_error": sum(r["status"] == "PARSE_ERROR" for r in hit),
-            "terdampak_label_benar": sum(r["label"] == truth.labels[r["id"]] for r in hit)}
+    out = {"kejadian": sum(r.get("truncated_calls", 0) for r in rows), "baris_terdampak": len(hit),
+           **{f"terdampak_{s.lower()}": sum(r["status"] == s for r in hit) for s in STATUSES},
+           "terdampak_label_benar": sum(r["label"] == truth.labels[r["id"]] for r in hit)}
+    unknown = len(hit) - sum(out[f"terdampak_{s.lower()}"] for s in STATUSES)
+    if unknown:
+        raise ValueError(f"{method.relpath}: {unknown} baris terdampak berstatus di luar {STATUSES}")
+    in_log = truncated_in_log(method)
+    if in_log is not None and in_log != out["kejadian"]:
+        raise ValueError(f"{method.relpath}: TRUNCATED di baris ({out['kejadian']}) != di log panggilan ({in_log})")
+    return out
 
 
 def run_metrics(method: Method, truth) -> dict:
@@ -243,10 +284,10 @@ def render(groups: dict[str, dict]) -> str:
     with_deg = [n for n in names if "degeneratif_kejadian" in groups[n]["metrics"]]
     if with_deg:
         out += ["", "Keluaran degeneratif — panggilan LLM terpotong di max_tokens (TRUNCATED), per run", ""]
-        keys = ("kejadian", "baris_terdampak", "terdampak_ok", "terdampak_verification_failed", "terdampak_parse_error",
-                "terdampak_label_benar")
+        keys = ("kejadian", "baris_terdampak", "terdampak_ok", "terdampak_verification_failed",
+                "terdampak_verification_skipped", "terdampak_parse_error", "terdampak_label_benar")
         out.append(_table(["metode", "kejadian", "baris terdampak", "outcome: ok", "outcome: verification_failed",
-                           "outcome: PARSE_ERROR", "label benar (baris terdampak)"],
+                           "outcome: verification_skipped", "outcome: PARSE_ERROR", "label benar (baris terdampak)"],
                           [[label[n], *(_cell(groups[n]["metrics"][f"degeneratif_{k}"], 1) for k in keys)]
                            for n in with_deg]))
     for n in names:
@@ -274,6 +315,8 @@ def render(groups: dict[str, dict]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Agregasi replikasi: rerata dan rentang min-maks per metrik")
     parser.add_argument("--replication-dir", type=Path, default=REPLICATION_DIR)
+    parser.add_argument("--preview", action="store_true",
+                        help="pratinjau: izinkan jumlah run selain 3 (laporan tetap ditandai pratinjau)")
     parser.add_argument("--out", type=Path, help="simpan Markdown + JSON ke path ini (.md)")
     args = parser.parse_args(argv)
     truth = load_truth("sample")
@@ -288,12 +331,13 @@ def main(argv: list[str] | None = None) -> int:
         if not files:
             continue
         methods = [load_method(p) for p in files]
+        check_complete(base, methods, truth, args.replication_dir, None if args.preview else EXPECTED_RUNS)
         configs[name] = check_consistent(methods)
         groups[name] = aggregate(methods, truth)
     info = run_info("replikasi", None, groups={n: [r["file"] for r in g["runs"]] for n, g in groups.items()},
                     configs=configs)
     text = (f"Agregasi replikasi {info['run_id']} (commit {str(info['git_commit'])[:7]}, dirty={info['git_dirty']})\n\n"
-            + render(groups))
+            + ("PRATINJAU — jumlah run belum lengkap; bukan laporan akhir.\n\n" if args.preview else "") + render(groups))
     print(text)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

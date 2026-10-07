@@ -22,9 +22,10 @@
   sub-agen parser/analisis_payload paling banyak SUBAGENT_MODEL_CALLS panggilan model. Seberapa sering batas ini tercapai
   dicatat per baris.
 - Batas token keluaran generation.max_tokens (configs/llm.yaml, 4.096) untuk semua panggilan LLM, sama dengan C (keputusan
-  penulis 2026-10-08: pengaman kegagalan). Panggilan yang terpotong (finish_reason=length) dicatat TRUNCATED dan diulang
-  sekali; bila terpotong lagi: pada Klasifikasi menjadi klasifikasi PARSE_ERROR (seperti C), pada orkestrator/parser/
-  analisis_payload baris dihentikan sebagai PARSE_ERROR (TruncatedOutput).
+  penulis 2026-10-08: pengaman kegagalan). Panggilan yang terpotong (openrouter.is_truncated: finish_reason length, alasan
+  asli penyedia, atau token keluaran >= max_tokens) dicatat TRUNCATED dan diulang sekali; bila terpotong lagi: pada
+  Klasifikasi menjadi klasifikasi PARSE_ERROR (seperti C); pada orkestrator/parser/analisis_payload baris dihentikan
+  (TruncatedOutput) dengan label klasifikasi valid terakhir bila ada, selain itu PARSE_ERROR.
 """
 
 from __future__ import annotations
@@ -53,7 +54,7 @@ from langchain_openai import ChatOpenAI
 
 from ..baselines.llm_single import SERVICE_RETRIES, parse_output, service_failure
 from ..llm.klasifikasi import OUTPUT_SCHEMA
-from ..llm.openrouter import BASE_URL, api_key, summarize
+from ..llm.openrouter import BASE_URL, api_key, is_truncated, summarize
 from . import context
 from .context import MAX_VERIFICATION_ROUNDS
 from .prompts import (
@@ -92,8 +93,10 @@ def is_service_error(exc: BaseException) -> bool:
 
 
 class OpenRouterChat(ChatOpenAI):
-    """ChatOpenAI yang memeriksa respons HTTP 200 dengan aturan kegagalan layanan LLM tunggal, dan menyimpan penyedia
-    hulu (field provider OpenRouter) di llm_output."""
+    """ChatOpenAI yang memeriksa respons HTTP 200 dengan aturan kegagalan layanan LLM tunggal, menyimpan penyedia hulu
+    (field provider OpenRouter) di llm_output, dan menormalkan panggilan yang terpotong di max_tokens menjadi
+    finish_reason "length" (nilai asli disimpan sebagai finish_reason_asli) agar TRUNCATED terdeteksi juga pada
+    pemanggilan alat, yang oleh OpenRouter dilaporkan sebagai "tool_calls"."""
 
     def _create_chat_result(self, response, generation_info=None):
         body = response if isinstance(response, dict) else response.model_dump()
@@ -106,6 +109,17 @@ class OpenRouterChat(ChatOpenAI):
             raise ServiceFailure(reason)
         result = super()._create_chat_result(response, generation_info)
         result.llm_output = {**(result.llm_output or {}), "upstream_provider": body.get("provider")}
+        choice = (body.get("choices") or [{}])[0] or {}
+        truncated = is_truncated(choice.get("finish_reason"), choice.get("native_finish_reason"),
+                                 (body.get("usage") or {}).get("completion_tokens"), (self.extra_body or {}).get("max_tokens"))
+        for generation in result.generations:
+            info = dict(generation.generation_info or {})
+            info["native_finish_reason"] = choice.get("native_finish_reason")
+            if truncated:
+                info["finish_reason_asli"] = info.get("finish_reason")
+                info["finish_reason"] = "length"
+            generation.generation_info = info
+            generation.message.response_metadata = {**(generation.message.response_metadata or {}), **info}
         return result
 
 
@@ -133,7 +147,9 @@ def _finish_reason(response) -> str | None:
 
 class TruncationGuard(AgentMiddleware):
     """Panggilan model yang terpotong di max_tokens dicatat TRUNCATED dan diulang sekali; bila terpotong lagi, baris
-    dihentikan (TruncatedOutput -> PARSE_ERROR). Dipasang paling dalam agar setiap percobaan adalah satu panggilan."""
+    dihentikan (TruncatedOutput): label klasifikasi valid terakhir tetap dipakai (status ok/verification_failed/
+    verification_skipped), tanpa klasifikasi valid -> PARSE_ERROR. Dipasang di LUAR ModelRetryMiddleware, jadi ulangan
+    kegagalan layanan terjadi di dalam setiap percobaan (seperti C) dan panggilan terpotong diulang tepat sekali."""
 
     def __init__(self, subagent: str):
         super().__init__()
@@ -191,22 +207,27 @@ def _register_profile() -> None:
     ))
 
 
+RESPONSE_FORMAT = {"type": "json_schema", "json_schema": {"name": "klasifikasi_log", "strict": True, "schema": OUTPUT_SCHEMA}}
+
+
 def build_classifier(model, sleep=time.sleep) -> RunnableLambda:
-    structured = model.bind(response_format={"type": "json_schema", "json_schema": {
-        "name": "klasifikasi_log", "strict": True, "schema": OUTPUT_SCHEMA}})
+    """response_format dikirim lewat extra_body (digabung dengan routing dan max_tokens model), bukan argumen
+    response_format: argumen itu membuat langchain-openai memakai chat.completions.parse(), yang melempar
+    LengthFinishReasonError pada keluaran terpotong sehingga TRUNCATED tidak dapat dicatat dan diulang (temuan review
+    2026-10-08). Badan permintaan tetap sama dengan C (response_format json_schema ketat)."""
+    structured = model.bind(extra_body={**(getattr(model, "extra_body", None) or {}), "response_format": RESPONSE_FORMAT})
 
     def run(state: dict, config: RunnableConfig) -> dict:
         ctx = context.current()
         messages = [SystemMessage(CLASSIFIER_PROMPT), HumanMessage(classifier_input(ctx))]
         output, reason = None, "tidak ada percobaan"
-        for _ in range(CLASSIFIER_ATTEMPTS):
+        for attempt in range(1, CLASSIFIER_ATTEMPTS + 1):
             reply = invoke_with_retries(structured, messages, as_subagent(config, "klasifikasi"), sleep)
             output, reason = parse_output(reply.content)
             finish = (reply.response_metadata or {}).get("finish_reason")
             if finish == "length":  # terpotong di max_tokens: TRUNCATED, diulang sekali seperti C
                 with ctx.lock:
-                    ctx.truncations.append({"subagen": "klasifikasi", "percobaan": len(ctx.truncations) + 1,
-                                            "putaran": ctx.verification_round})
+                    ctx.truncations.append({"subagen": "klasifikasi", "percobaan": attempt, "putaran": ctx.verification_round})
                 output, reason = None, "TRUNCATED: finish_reason length"
             elif output is not None and finish not in (None, "stop"):
                 output, reason = None, f"finish_reason {finish}"
@@ -390,12 +411,12 @@ def build_agent(config: dict):
     subagents = [
         {"name": "parser", "description": "Menguraikan baris log menjadi kolom dan menandai kolom yang rusak.",
          "system_prompt": PARSER_PROMPT, "tools": PARSER_TOOLS, "model": make_model(config, "parser", key),
-         "middleware": [retry_middleware(), limit_middleware(), TruncationGuard("parser")]},
+         "middleware": [TruncationGuard("parser"), retry_middleware(), limit_middleware()]},
         {"name": "analisis_payload",
          "description": "Mendekode payload dan mencari indikator serangan atau pemindaian pada path, query, user "
                         "agent, dan referer dengan pencocok pola CRS, indikator pemindai, dan basis pengetahuan OWASP.",
          "system_prompt": PAYLOAD_PROMPT, "tools": PAYLOAD_TOOLS, "model": make_model(config, "analisis_payload", key),
-         "middleware": [retry_middleware(), limit_middleware(), TruncationGuard("analisis_payload")]},
+         "middleware": [TruncationGuard("analisis_payload"), retry_middleware(), limit_middleware()]},
         {"name": "klasifikasi", "description": "Menetapkan satu dari enam kelas berdasarkan bukti yang dikumpulkan alat; "
                                                "keluaran JSON {label, confidence, evidence, explanation}.",
          "runnable": build_classifier(make_model(config, "klasifikasi", key))},
@@ -405,6 +426,6 @@ def build_agent(config: dict):
     ]
     return create_deep_agent(
         model=make_model(config, "orkestrator", key), tools=[], system_prompt=ORCHESTRATOR_PROMPT, subagents=subagents,
-        middleware=[TodoListMiddleware(), VerificationRoundGuard(), ProcedureGuard(), retry_middleware(),
-                    TruncationGuard("orkestrator")], name="orkestrator",
+        middleware=[TodoListMiddleware(), VerificationRoundGuard(), ProcedureGuard(), TruncationGuard("orkestrator"),
+                    retry_middleware()], name="orkestrator",
     )
