@@ -7,6 +7,8 @@ results/pilot/ bukan berkas prediksi utama. Aturan penilaian:
 - Biner: serangan = kelas selain NORMAL. FPR = FP / (FP + TN) pada baris NORMAL.
 - Macro-P/R/F1 dirata-rata atas 6 kelas (zero_division = 0).
 - Berkas yang barisnya ber-field post_hoc=true ditandai "(post hoc)" di semua tabel.
+- Tabel 4.5 evidence literal (metode yang mengeluarkan `evidence`): proporsi item evidence yang ada secara harfiah di
+  raw_log_masked mentah atau hasil decode (definisi di src/common/evidence.py, sama dengan alat Verifikasi deep agent).
 - IK 95% Macro-F1: bootstrap klaster 1.000 kali (random_state=42) yang meresampel template_key (kunci templat payload,
   laporan data §6), bukan baris. Templat diresampel di dalam tiap kelas sebenarnya (strata = kelas), karena sampel uji
   dibangun dengan kuota per kelas (keputusan asisten); interval = persentil 2,5 dan 97,5.
@@ -24,6 +26,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ..common.evidence import evidence_exists
 from ..common.runinfo import run_info
 from ..data.config import CLASSES, RANDOM_STATE, ROOT
 from ..common.inputs import SAMPLE_PATH, split_path
@@ -40,6 +43,7 @@ class Truth:
     labels: dict[str, str]
     template_keys: dict[str, str | None]
     source: str
+    logs: dict[str, str] = field(default_factory=dict)  # raw_log_masked per id (untuk evidence literal)
 
 
 @dataclass
@@ -65,16 +69,18 @@ class Method:
 def load_truth(source: str = "sample") -> Truth:
     """Label sebenarnya: "sample" = test_sample_500.jsonl (dengan template_key); nama split = srbh_<split>.parquet."""
     if source == "sample":
-        labels, keys = {}, {}
+        labels, keys, logs = {}, {}, {}
         with open(SAMPLE_PATH, encoding="utf-8") as f:
             for line in f:
                 record = json.loads(line)
                 labels[record["id"]] = record["label"]
                 keys[record["id"]] = record["template_key"]
-        return Truth(labels, keys, str(SAMPLE_PATH.relative_to(ROOT)))
-    frame = pd.read_parquet(split_path(source), columns=["id", "label"])
+                logs[record["id"]] = record["raw_log_masked"]
+        return Truth(labels, keys, str(SAMPLE_PATH.relative_to(ROOT)), logs)
+    frame = pd.read_parquet(split_path(source), columns=["id", "label", "raw_log_masked"])
     labels = dict(zip(frame["id"], frame["label"]))
-    return Truth(labels, dict.fromkeys(labels), str(split_path(source).relative_to(ROOT)))
+    return Truth(labels, dict.fromkeys(labels), str(split_path(source).relative_to(ROOT)),
+                 dict(zip(frame["id"], frame["raw_log_masked"])))
 
 
 def is_prediction_file(path: Path) -> bool:
@@ -191,11 +197,30 @@ def evaluate(method: Method, truth: Truth, ci: bool = True) -> dict:
     ids = [i for i in truth.labels if i in method.predictions]  # urutan sumber kebenaran
     t, p = _indices([truth.labels[i] for i in ids], [method.predictions[i] for i in ids])
     result = {"method": method.display, "coverage": f"{len(ids)}/{len(truth.labels)}", "binary": binary(t, p),
-              "multiclass": multiclass(t, p)}
+              "multiclass": multiclass(t, p), "evidence_literal": evidence_literal(method, truth) if truth.logs else None}
     if ci and all(truth.template_keys[i] is not None for i in ids):
         clusters = [f"{truth.labels[i]}|{truth.template_keys[i]}" for i in ids]
         result["macro_f1_ci95"] = bootstrap_macro_f1(t, p, clusters)
     return result
+
+
+def evidence_literal(method: Method, truth: Truth) -> dict | None:
+    """Tabel 4.5: hanya baris yang punya field `evidence` (keluaran LLM); None untuk metode tanpa evidence."""
+    rows = [r for r in method.rows if "evidence" in r and r["id"] in truth.labels]
+    if not rows:
+        return None
+    items = literal = rows_with = rows_all = 0
+    for row in rows:
+        evidence = [e for e in row.get("evidence") or [] if isinstance(e, str)]
+        if not evidence:
+            continue
+        flags = [evidence_exists(e, truth.logs[row["id"]]) for e in evidence]
+        rows_with += 1
+        items += len(flags)
+        literal += sum(flags)
+        rows_all += all(flags)
+    return {"rows": len(rows), "rows_with_evidence": rows_with, "items": items, "literal": literal,
+            "proportion": literal / items if items else None, "rows_all_literal": rows_all}
 
 
 # --------------------------------------------------------------------------------------------------- analisis aturan
@@ -250,6 +275,15 @@ def render(results: list[dict], methods: list[Method], truth: Truth) -> str:
     out += ["", "F1 per kelas", ""]
     out.append(_table(["metode", *CLASSES], [[r["method"], *(_f(r["multiclass"]["per_class"][c]["f1"]) for c in CLASSES)]
                                              for r in results]))
+    with_evidence = [r for r in results if r.get("evidence_literal")]
+    if with_evidence:
+        out += ["", "Tabel 4.5 — evidence literal (item evidence yang ada harfiah di raw_log_masked mentah/hasil decode)", ""]
+        out.append(_table(["metode", "baris", "baris ber-evidence", "item", "item literal", "proporsi literal",
+                           "baris semua literal"],
+                          [[r["method"], str(e["rows"]), str(e["rows_with_evidence"]), str(e["items"]), str(e["literal"]),
+                            "—" if e["proportion"] is None else _f(e["proportion"]), str(e["rows_all_literal"])]
+                           for r in with_evidence for e in [r["evidence_literal"]]]))
+        out.append("Metode tanpa field evidence (mis. regex) tidak dimasukkan.")
     for r in results:
         cm = r["multiclass"]["confusion"]
         extra = r["multiclass"]["invalid_predictions"] > 0

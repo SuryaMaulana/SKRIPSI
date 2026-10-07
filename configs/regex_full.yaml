@@ -28,6 +28,7 @@ class_map:                               # kategori -> kelas
 
 rule_class_map:                          # aturan tunggal dari kategori yang selain itu diabaikan
   "920440": WEB_SCANNING                 # restricted file extension (keputusan penulis)
+  "920500": WEB_SCANNING                 # backup/working file; ditambahkan SETELAH run uji (lihat adjustments)
 
 ignored_categories:                      # tidak punya padanan kelas: aturannya tidak dievaluasi (dicatat di run)
   "901": inisialisasi (bukan aturan deteksi)
@@ -69,3 +70,12 @@ adjustments:                             # hasil pengujian di srbh_val (bukan di
       diemulasi. Diperbaiki di commit dd93c9b; ini perbaikan emulasi, bukan perubahan pemetaan, dan diverifikasi
       1267/1267 uji regresi resmi CRS untuk semua aturan regex_full. Pembanding utama tidak berubah (985/985, hasil
       identik).
+  - date: "2026-10-07"
+    kind: penyesuaian SETELAH run uji (keputusan penulis)
+    change: "920500 -> WEB_SCANNING (rule_class_map)"
+    evidence: >-
+      Ditemukan reviewer setelah run uji regex_full-20261007T153015Z-675337d: di srbh_val, CRS 920500 (PL1, "Attempt
+      to access a backup or working file", pola \.[^.~]+~(?:/.*|)$ pada REQUEST_FILENAME) cocok pada 36 dari 38 baris
+      WEB_SCANNING yang masih lolos dan tidak cocok pada kelas lain. Alasan taksonominya sama dengan 920440: berkas
+      cadangan/VCS tanpa traversal termasuk WEB_SCANNING (aturan T3 di configs/label_mapping.yaml).
+    impact_on_test: "920500 tidak pernah cocok di test_sample_500 (0 baris); prediksi results/regex_full.jsonl tidak berubah"

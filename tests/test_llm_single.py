@@ -149,7 +149,10 @@ def test_run_writes_incrementally_and_resumes_after_abort(tmp_path, monkeypatch)
     assert not (tmp_path / "llm_single.partial.jsonl").exists() and SECRET not in calls.read_text()
 
 
-@pytest.mark.xfail(strict=True, reason="sel ciri Command Injection di Tabel 2.1 draf terpotong (';id, `'); menunggu teks final penulis")
-def test_table_2_1_traits_are_complete():
+def test_table_2_1_traits_are_complete_and_shared_with_the_agent():
+    from src.llm import klasifikasi
+    assert TABLE_2_1 is klasifikasi.TABLE_2_1
     for label, _, _, traits in TABLE_2_1:
-        assert traits.count("`") % 2 == 0 and not traits.rstrip().endswith((",", "`")), label
+        assert not traits.rstrip().endswith((",", "`")), label
+    assert "argumen PHP-CGI -d allow_url_include" in dict((r[0], r[3]) for r in TABLE_2_1)["CMD_INJECTION"]
+    assert "6. Tulis explanation dalam bahasa Indonesia." in SYSTEM_PROMPT

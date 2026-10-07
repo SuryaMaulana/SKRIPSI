@@ -134,3 +134,18 @@ def test_default_files_skip_calls_pilot_and_tuning_and_render_format(tmp_path, m
     truth = ev.Truth({"a": "SQLI"}, {"a": "k"}, "uji")
     text = ev.render([ev.evaluate(ev.Method("m", tmp_path / "regex.jsonl", {"a": "PARSE_ERROR"}, True), truth)], [], truth)
     assert "| m (post hoc) | 1/1 | 0,000 |" in text and "tidak valid" in text and "| SQLI | 0 | 0 | 0 | 0 | 0 | 0 | 1 |" in text
+
+
+def test_evidence_literal_definition_and_table_4_5():
+    from src.common.evidence import evidence_exists
+    log = '1.2.3.4 - - [x] "GET /?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E&a=x+y&b=%2527 HTTP/1.1" 200 1 "-" "UA"'
+    assert evidence_exists("%3Cscript%3E", log) and evidence_exists("<script>alert(1)</script>", log)
+    assert evidence_exists(" a=x y ", log) and evidence_exists("b='", log)  # '+' -> spasi; dua lapis %2527 -> '
+    assert not evidence_exists("<SCRIPT>", log) and not evidence_exists("'<script>'", log) and not evidence_exists("", log)
+    rows = [{"id": "a", "label": "XSS", "evidence": ["<script>alert(1)</script>", "kalimat deskriptif"]},
+            {"id": "b", "label": "NORMAL", "evidence": []}, {"id": "c", "label": "PARSE_ERROR"}]
+    method = ev.Method("llm", None, {r["id"]: r["label"] for r in rows}, False, rows=rows)
+    truth = ev.Truth({"a": "XSS", "b": "NORMAL", "c": "SQLI"}, {}, "uji", {"a": log, "b": log, "c": log})
+    e = ev.evidence_literal(method, truth)
+    assert (e["rows"], e["rows_with_evidence"], e["items"], e["literal"], e["rows_all_literal"]) == (2, 1, 2, 1, 0)
+    assert e["proportion"] == 0.5
