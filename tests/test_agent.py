@@ -563,3 +563,26 @@ def test_resume_with_different_rows_or_calls_is_refused_before_any_call(tmp_path
     assert Counting.n == 0
     ar.run(out_dir=tmp_path, calls_path=calls, resume=True, agent=Counting())
     assert Counting.n == 2
+
+
+def test_classifier_input_marks_tools_that_never_ran(ctx):
+    """Review v2: alat yang tidak dijalankan tidak boleh tampak sebagai 'dijalankan, hasil kosong'."""
+    from src.agent.prompts import NOT_RUN
+
+    text = classifier_input(ctx)
+    for tag in ("parsed", "decoded", "pattern_hits", "scanner_indicators"):
+        assert f"<{tag}>{NOT_RUN}</{tag}>" in text
+    ctx.pattern_hits, ctx.scanner_indicators = [], {"ua_pemindai": []}
+    text = classifier_input(ctx)
+    assert "<pattern_hits>[]</pattern_hits>" in text and NOT_RUN not in text.split("<pattern_hits>")[1]
+
+
+def test_klasifikasi_batched_with_evidence_subagents_waits_for_the_next_message(ctx, monkeypatch):
+    scripts = {"orkestrator": [_batch("analisis_payload", "klasifikasi"), _task("klasifikasi", 2), _task("verifikasi", 3),
+                               AIMessage("selesai")],
+               "parser": [], "analisis_payload": [AIMessage("selesai analisis")],
+               "klasifikasi": [AIMessage(json.dumps(GOOD))]}
+    agent = _graph_with_scripts(monkeypatch, scripts)
+    agent.invoke({"messages": [HumanMessage(f"<log>{LOG}</log>")]}, {"recursion_limit": 40})
+    assert [b["alasan"] for b in ctx.guard_blocks] == [g.AFTER_EVIDENCE_MESSAGE]
+    assert len(ctx.classifications) == 1 and ctx.verdicts[-1]["lolos"]

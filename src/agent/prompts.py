@@ -77,15 +77,23 @@ assert SINGLE_LLM_PROMPT.count(SCHEMA_SECTION) == 1
 CLASSIFIER_PROMPT = SINGLE_LLM_PROMPT.replace(SCHEMA_SECTION, MASUKAN_SECTION + "\n\n" + SCHEMA_SECTION)
 
 
+NOT_RUN = "(alat tidak dijalankan)"  # pembeda "alat tidak dijalankan" dari "alat dijalankan, hasil kosong"
+
+
 def _section(tag: str, value) -> str:
+    if value is None:
+        return f"<{tag}>{NOT_RUN}</{tag}>"
     return f"<{tag}>{json.dumps(value, ensure_ascii=False)}</{tag}>"
 
 
 def classifier_input(ctx: RowContext) -> str:
-    """Bagian MASUKAN Lampiran A, dirakit dari keluaran alat yang tercatat di konteks (bukan dari teks orkestrator)."""
-    parts = [f"<log>{ctx.raw_log_masked}</log>", _section("parsed", ctx.parsed or {}),
-             _section("decoded", ctx.decoded + ctx.html_decoded), _section("pattern_hits", ctx.pattern_hits or []),
-             _section("scanner_indicators", ctx.scanner_indicators or {})]
+    """Bagian MASUKAN Lampiran A, dirakit dari keluaran alat yang tercatat di konteks (bukan dari teks orkestrator).
+    Alat yang belum pernah dijalankan untuk baris ini ditulis NOT_RUN, bukan hasil kosong, agar Klasifikasi tidak menerima
+    informasi palsu ("pola tidak cocok") ketika orkestrator melewati sub-agen (perbaikan review v2, 2026-10-08)."""
+    decoded = ctx.decoded + ctx.html_decoded  # setiap pemanggilan alat dekode menambah satu entri
+    parts = [f"<log>{ctx.raw_log_masked}</log>", _section("parsed", ctx.parsed),
+             _section("decoded", decoded or None), _section("pattern_hits", ctx.pattern_hits),
+             _section("scanner_indicators", ctx.scanner_indicators)]
     rejected = [v for v in ctx.verdicts if not v["lolos"]]
     if rejected:
         parts.append(_section("umpan_balik_verifikasi", rejected[-1]["alasan"]))

@@ -212,28 +212,42 @@ def build_verifier() -> RunnableLambda:
 
 
 SEQUENTIAL_SUBAGENTS = ("klasifikasi", "verifikasi")
+EVIDENCE_SUBAGENTS = ("parser", "analisis_payload")
 BATCH_MESSAGE = ("Panggil klasifikasi dan verifikasi satu per satu, tidak dalam satu pesan; hanya pemanggilan pertama di "
                  "pesan itu yang dijalankan.")
+AFTER_EVIDENCE_MESSAGE = ("Panggil klasifikasi dalam pesan terpisah setelah parser dan analisis_payload di pesan ini selesai, "
+                          "agar Klasifikasi menerima keluaran alatnya.")
 
 
-def _batch_position(state, call_id: str) -> int:
-    """Urutan pemanggilan klasifikasi/verifikasi ini di antara pemanggilan sejenis pada pesan AI yang sama (0 = pertama)."""
+def _batch(state, call_id: str) -> list[dict]:
+    """Pemanggilan task pada pesan AI yang memuat pemanggilan `call_id` (urutan daftar)."""
     messages = (state or {}).get("messages", []) if isinstance(state, dict) else getattr(state, "messages", [])
     for message in reversed(messages or []):
         calls = getattr(message, "tool_calls", None) or []
         if any(c.get("id") == call_id for c in calls):
-            ordered = [c["id"] for c in calls if c.get("name") == "task"
-                       and (c.get("args") or {}).get("subagent_type") in SEQUENTIAL_SUBAGENTS]
-            return ordered.index(call_id) if call_id in ordered else 0
-    return 0
+            return [c for c in calls if c.get("name") == "task"]
+    return []
+
+
+def _batch_position(state, call_id: str) -> int:
+    """Urutan pemanggilan klasifikasi/verifikasi ini di antara pemanggilan sejenis pada pesan AI yang sama (0 = pertama)."""
+    ordered = [c["id"] for c in _batch(state, call_id)
+               if (c.get("args") or {}).get("subagent_type") in SEQUENTIAL_SUBAGENTS]
+    return ordered.index(call_id) if call_id in ordered else 0
+
+
+def _with_evidence_subagents(state, call_id: str) -> bool:
+    """Apakah pesan yang sama juga memanggil parser/analisis_payload (yang akan berjalan paralel)."""
+    return any((c.get("args") or {}).get("subagent_type") in EVIDENCE_SUBAGENTS for c in _batch(state, call_id))
 
 
 class VerificationRoundGuard(AgentMiddleware):
     """Menahan pemanggilan sub-agen yang melanggar batas putaran (keputusan penulis: maksimum 2 putaran).
 
     Pemanggilan klasifikasi/verifikasi dijalankan berurutan: bila satu pesan orkestrator memuat lebih dari satu, hanya yang
-    pertama (urutan daftar) dijalankan; sisanya ditahan. Pemeriksaan dan eksekusinya dikunci per baris agar putusan guard
-    tidak bergantung pada urutan thread (alat paralel)."""
+    pertama (urutan daftar) dijalankan; sisanya ditahan. Klasifikasi yang dipanggil dalam pesan yang sama dengan parser atau
+    analisis_payload ditahan sampai pesan berikutnya (masukannya tidak bergantung pada urutan thread). Pemeriksaan dan
+    eksekusinya dikunci per baris agar putusan guard tidak bergantung pada urutan thread (alat paralel)."""
 
     def wrap_tool_call(self, request, handler):
         call = request.tool_call
@@ -246,6 +260,8 @@ class VerificationRoundGuard(AgentMiddleware):
         ctx = context.current()
         if _batch_position(request.state, call["id"]) > 0:
             return self._block_or_run(request, handler, BATCH_MESSAGE, args)
+        if target == "klasifikasi" and _with_evidence_subagents(request.state, call["id"]):
+            return self._block_or_run(request, handler, AFTER_EVIDENCE_MESSAGE, args)
         with ctx.procedure_lock:
             return self._block_or_run(request, handler, self.blocked(args), args)
 
