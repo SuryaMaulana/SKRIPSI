@@ -76,3 +76,12 @@ def test_val_selection_does_not_overwrite_the_test_pilot_ids():
 
     assert pilot.default_out(None) == pilot.PILOT_PATH
     assert pilot.default_out("val").parts[-2:] == ("validasi", "val_ids.json")
+
+
+def test_parallel_runs_started_in_the_same_second_get_distinct_run_ids(monkeypatch):
+    from src.common import runinfo
+
+    monkeypatch.setattr(runinfo, "git_state", lambda: {"git_commit": "abcdef0123", "git_branch": "b", "git_dirty": False})
+    ids = {runinfo.run_info("llm_single", "m", run_name=f"llm_single_r{r}")["run_id"].split("-")[0] for r in (1, 2, 3)}
+    assert ids == {"llm_single_r1", "llm_single_r2", "llm_single_r3"}
+    assert runinfo.run_info("evaluate", None)["run_id"].startswith("evaluate-")

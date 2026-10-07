@@ -321,7 +321,8 @@ def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: 
         if partial.exists():
             raise FileExistsError(f"{partial} sudah ada: jalankan ulang perintah yang sama dengan --resume")
         info = run_info(
-            "agent", config["model"], model_version=config.get("model_version"), generation=config.get("generation"),
+            "agent", config["model"], run_name=name, model_version=config.get("model_version"),
+            generation=config.get("generation"),
             provider_routing=config.get("provider_routing"),
             pricing_usd_per_1m_tokens=config.get("pricing_usd_per_1m_tokens"), prompt_sha256=prompt_hashes,
             prompts=prompts,

@@ -45,12 +45,13 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def run_info(method: str, model: str | None, **extra) -> dict:
-    """Catatan run: run_id, tanggal UTC, commit/cabang/dirty, nama model, versi Python, ditambah `extra`."""
+def run_info(method: str, model: str | None, run_name: str | None = None, **extra) -> dict:
+    """Catatan run: run_id, tanggal UTC, commit/cabang/dirty, nama model, versi Python, ditambah `extra`. run_name (mis.
+    llm_single_r2) menggantikan nama metode di run_id agar run paralel yang mulai pada detik yang sama tetap unik."""
     now = datetime.now(timezone.utc)
     git = git_state()
     return {
-        "run_id": f"{method}-{now:%Y%m%dT%H%M%SZ}-{(git['git_commit'] or 'nogit')[:7]}",
+        "run_id": f"{run_name or method}-{now:%Y%m%dT%H%M%SZ}-{(git['git_commit'] or 'nogit')[:7]}",
         "method": method,
         "date_utc": now.isoformat(timespec="seconds"),
         **git,
