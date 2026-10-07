@@ -1,0 +1,445 @@
+{
+ "run": {
+  "run_id": "evaluate-20261007T164624Z-2efbd87",
+  "method": "evaluate",
+  "date_utc": "2026-10-07T16:46:24+00:00",
+  "git_commit": "2efbd87fcadf8acb6e7d8dc7b867a7c5371efcdf",
+  "git_branch": "tahap-sistem",
+  "git_dirty": false,
+  "model": null,
+  "python": "3.11.13",
+  "truth": "data/processed/test_sample_500.jsonl",
+  "skipped": [],
+  "inputs": {
+   "results/llm_single.jsonl": {
+    "run_id": "llm_single-20261007T161203Z-6ce9f30",
+    "git_commit": "6ce9f303c019b67d55cd5a6eaa67cc770322f96c",
+    "git_dirty": false,
+    "model": "openai/gpt-4.1-nano",
+    "model_version": "openai/gpt-4.1-nano-2025-04-14"
+   },
+   "results/regex.jsonl": {
+    "run_id": "regex-20261007T150817Z-497dc3d",
+    "git_commit": "497dc3d5c80b44da1b8c232644ebc769dcfb23be",
+    "git_dirty": false,
+    "model": null,
+    "model_version": null
+   },
+   "results/regex_full.jsonl": {
+    "run_id": "regex_full-20261007T161037Z-d7fd371",
+    "git_commit": "d7fd37166f0e70c5b2223bffee28321b995c0a5d",
+    "git_dirty": false,
+    "model": null,
+    "model_version": null
+   }
+  }
+ },
+ "results": [
+  {
+   "method": "llm_single",
+   "coverage": "500/500",
+   "binary": {
+    "tp": 368,
+    "fp": 3,
+    "fn": 44,
+    "tn": 85,
+    "accuracy": 0.906,
+    "precision": 0.9919137466307277,
+    "recall": 0.8932038834951457,
+    "f1": 0.9399744572158366,
+    "fpr": 0.03409090909090909
+   },
+   "multiclass": {
+    "n": 500,
+    "accuracy": 0.83,
+    "macro_precision": 0.8578371963460699,
+    "macro_recall": 0.8407601293837249,
+    "macro_f1": 0.8289390331416647,
+    "classes_in_macro": [
+     "SQLI",
+     "XSS",
+     "PATH_TRAVERSAL",
+     "CMD_INJECTION",
+     "WEB_SCANNING",
+     "NORMAL"
+    ],
+    "per_class": {
+     "SQLI": {
+      "precision": 0.9456521739130435,
+      "recall": 0.9775280898876404,
+      "f1": 0.9613259668508287,
+      "support": 89.0
+     },
+     "XSS": {
+      "precision": 0.9032258064516129,
+      "recall": 1.0,
+      "f1": 0.9491525423728813,
+      "support": 56.0
+     },
+     "PATH_TRAVERSAL": {
+      "precision": 0.7830188679245284,
+      "recall": 0.9325842696629213,
+      "f1": 0.8512820512820514,
+      "support": 89.0
+     },
+     "CMD_INJECTION": {
+      "precision": 1.0,
+      "recall": 0.7191011235955056,
+      "f1": 0.8366013071895425,
+      "support": 89.0
+     },
+     "WEB_SCANNING": {
+      "precision": 0.851063829787234,
+      "recall": 0.449438202247191,
+      "f1": 0.588235294117647,
+      "support": 89.0
+     },
+     "NORMAL": {
+      "precision": 0.6640625,
+      "recall": 0.9659090909090909,
+      "f1": 0.7870370370370371,
+      "support": 88.0
+     }
+    },
+    "confusion": [
+     [
+      87,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0
+     ],
+     [
+      0,
+      56,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      83,
+      0,
+      2,
+      4,
+      0
+     ],
+     [
+      5,
+      1,
+      13,
+      64,
+      5,
+      1,
+      0
+     ],
+     [
+      0,
+      1,
+      10,
+      0,
+      40,
+      37,
+      1
+     ],
+     [
+      0,
+      3,
+      0,
+      0,
+      0,
+      85,
+      0
+     ]
+    ],
+    "invalid_predictions": 1
+   },
+   "evidence_literal": {
+    "rows": 499,
+    "rows_with_evidence": 499,
+    "items": 785,
+    "literal": 588,
+    "proportion": 0.7490445859872611,
+    "rows_all_literal": 336
+   },
+   "macro_f1_ci95": {
+    "low": 0.7511095271228412,
+    "high": 0.8776241847788073,
+    "mean": 0.8192085231792327,
+    "n_bootstrap": 1000,
+    "clusters": 237
+   }
+  },
+  {
+   "method": "regex",
+   "coverage": "500/500",
+   "binary": {
+    "tp": 264,
+    "fp": 0,
+    "fn": 148,
+    "tn": 88,
+    "accuracy": 0.704,
+    "precision": 1.0,
+    "recall": 0.6407766990291263,
+    "f1": 0.7810650887573964,
+    "fpr": 0.0
+   },
+   "multiclass": {
+    "n": 500,
+    "accuracy": 0.698,
+    "macro_precision": 0.8890699695784442,
+    "macro_recall": 0.7172284644194757,
+    "macro_f1": 0.7168701801933989,
+    "classes_in_macro": [
+     "SQLI",
+     "XSS",
+     "PATH_TRAVERSAL",
+     "CMD_INJECTION",
+     "WEB_SCANNING",
+     "NORMAL"
+    ],
+    "per_class": {
+     "SQLI": {
+      "precision": 1.0,
+      "recall": 0.2247191011235955,
+      "f1": 0.36697247706422015,
+      "support": 89.0
+     },
+     "XSS": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 56.0
+     },
+     "PATH_TRAVERSAL": {
+      "precision": 1.0,
+      "recall": 0.8089887640449438,
+      "f1": 0.8944099378881988,
+      "support": 89.0
+     },
+     "CMD_INJECTION": {
+      "precision": 0.9615384615384616,
+      "recall": 0.8426966292134831,
+      "f1": 0.8982035928143712,
+      "support": 89.0
+     },
+     "WEB_SCANNING": {
+      "precision": 1.0,
+      "recall": 0.42696629213483145,
+      "f1": 0.5984251968503937,
+      "support": 89.0
+     },
+     "NORMAL": {
+      "precision": 0.3728813559322034,
+      "recall": 1.0,
+      "f1": 0.54320987654321,
+      "support": 88.0
+     }
+    },
+    "confusion": [
+     [
+      20,
+      0,
+      0,
+      2,
+      0,
+      67,
+      0
+     ],
+     [
+      0,
+      56,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      72,
+      1,
+      0,
+      16,
+      0
+     ],
+     [
+      0,
+      0,
+      0,
+      75,
+      0,
+      14,
+      0
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      38,
+      51,
+      0
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      0,
+      88,
+      0
+     ]
+    ],
+    "invalid_predictions": 0
+   },
+   "evidence_literal": null,
+   "macro_f1_ci95": {
+    "low": 0.6224029215800236,
+    "high": 0.7792694772750653,
+    "mean": 0.708628878535812,
+    "n_bootstrap": 1000,
+    "clusters": 237
+   }
+  },
+  {
+   "method": "regex_full (post hoc)",
+   "coverage": "500/500",
+   "binary": {
+    "tp": 330,
+    "fp": 0,
+    "fn": 82,
+    "tn": 88,
+    "accuracy": 0.836,
+    "precision": 1.0,
+    "recall": 0.8009708737864077,
+    "f1": 0.8894878706199462,
+    "fpr": 0.0
+   },
+   "multiclass": {
+    "n": 500,
+    "accuracy": 0.828,
+    "macro_precision": 0.9123212086767074,
+    "macro_recall": 0.8389513108614232,
+    "macro_f1": 0.8202319632956581,
+    "classes_in_macro": [
+     "SQLI",
+     "XSS",
+     "PATH_TRAVERSAL",
+     "CMD_INJECTION",
+     "WEB_SCANNING",
+     "NORMAL"
+    ],
+    "per_class": {
+     "SQLI": {
+      "precision": 1.0,
+      "recall": 0.2247191011235955,
+      "f1": 0.36697247706422015,
+      "support": 89.0
+     },
+     "XSS": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 56.0
+     },
+     "PATH_TRAVERSAL": {
+      "precision": 1.0,
+      "recall": 0.8089887640449438,
+      "f1": 0.8944099378881988,
+      "support": 89.0
+     },
+     "CMD_INJECTION": {
+      "precision": 0.967391304347826,
+      "recall": 1.0,
+      "f1": 0.9834254143646408,
+      "support": 89.0
+     },
+     "WEB_SCANNING": {
+      "precision": 0.9888888888888889,
+      "recall": 1.0,
+      "f1": 0.9944134078212291,
+      "support": 89.0
+     },
+     "NORMAL": {
+      "precision": 0.5176470588235295,
+      "recall": 1.0,
+      "f1": 0.682170542635659,
+      "support": 88.0
+     }
+    },
+    "confusion": [
+     [
+      20,
+      0,
+      0,
+      2,
+      0,
+      67,
+      0
+     ],
+     [
+      0,
+      56,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      72,
+      1,
+      1,
+      15,
+      0
+     ],
+     [
+      0,
+      0,
+      0,
+      89,
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      89,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      0,
+      88,
+      0
+     ]
+    ],
+    "invalid_predictions": 0
+   },
+   "evidence_literal": null,
+   "macro_f1_ci95": {
+    "low": 0.751974328219282,
+    "high": 0.859377291410102,
+    "mean": 0.814071708669869,
+    "n_bootstrap": 1000,
+    "clusters": 237
+   }
+  }
+ ]
+}
