@@ -45,3 +45,12 @@ def test_thesis_draft_changes_do_not_mark_runs_dirty(monkeypatch):
     status = ' D "Draft Skripsi (1).docx"\n?? "Draft Skripsi (2).docx"\n M results/regex.jsonl'
     monkeypatch.setattr(runinfo, "_git", lambda *a: status if a[0] == "status" else "abc")
     assert runinfo.git_state()["git_dirty"] is False
+
+
+def test_method_rows_switches_between_the_test_sample_and_a_split(monkeypatch):
+    from src.common import inputs
+
+    monkeypatch.setattr(inputs, "load_inputs", lambda path: ["sampel", path])
+    monkeypatch.setattr(inputs, "load_split_inputs", lambda split: ["split", split])
+    assert inputs.method_rows() == (["sampel", inputs.SAMPLE_PATH], inputs.SAMPLE_PATH)
+    assert inputs.method_rows(split="val") == (["split", "val"], inputs.split_path("val"))

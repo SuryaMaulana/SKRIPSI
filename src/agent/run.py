@@ -37,7 +37,7 @@ from langchain_core.messages import HumanMessage, ToolMessage
 from langgraph.errors import GraphRecursionError
 
 from ..baselines.llm_single import RunAborted, totals
-from ..common.inputs import SAMPLE_PATH, load_inputs
+from ..common.inputs import SAMPLE_PATH, method_rows
 from ..common.runinfo import git_state, run_info, sha256_file
 from ..data.config import ROOT
 from ..llm.klasifikasi import sha256
@@ -46,6 +46,7 @@ from . import context
 from .context import MAX_VERIFICATION_ROUNDS, CallLogger, RowContext
 from .graph import (
     CLASSIFIER_ATTEMPTS,
+    EXCLUDED_TOOLS,
     LIMIT_MARKER,
     MAX_CLASSIFICATIONS,
     MAX_REMINDERS,
@@ -55,13 +56,14 @@ from .graph import (
     ServiceFailure,
     build_agent,
 )
-from .prompts import CLASSIFIER_PROMPT, ORCHESTRATOR_PROMPT, PARSER_PROMPT, PAYLOAD_PROMPT, VERIFIER_PROMPT
+from .prompts import CLASSIFIER_PROMPT, ORCHESTRATOR_PROMPT, PARSER_PROMPT, PAYLOAD_PROMPT
 
 RESULTS_DIR = ROOT / "results"
 CALLS_PATH = RESULTS_DIR / "agent_calls.jsonl"
 KB_PATH = ROOT / "configs" / "owasp_kb.yaml"
 TEXT_LIMIT = 4000  # potongan masukan/keluaran alat yang disimpan di log panggilan
 STATUSES = ("ok", "verification_failed", "verification_skipped", "PARSE_ERROR")
+SUBAGENTS = ("parser", "analisis_payload", "klasifikasi", "verifikasi")
 _KEYLIKE = re.compile(r"sk-[A-Za-z0-9_\-]{6,}")
 
 
@@ -113,6 +115,7 @@ class CallRecorder(BaseCallbackHandler):
         self._llm: dict = {}
         self._tool: dict = {}
         self._seen: set[str] = set()
+        self.sent: dict[str, dict] = {}  # sha256 -> {"jenis", "isi"}: prompt sistem/definisi alat yang benar-benar terkirim
         self._lock = threading.Lock()
 
     def _once(self, kind: str, value) -> str:
@@ -122,6 +125,7 @@ class CallRecorder(BaseCallbackHandler):
         with self._lock:
             new = digest not in self._seen
             self._seen.add(digest)
+            self.sent.setdefault(digest, {"jenis": kind, "isi": value})
         if new:
             self.logger.write({"run_id": context.current().run_id, "jenis": kind, "sha256": digest, "isi": value})
         return digest
@@ -206,14 +210,15 @@ def assemble(ctx: RowContext, run_id: str, wall_s: float, final_message: str | N
     valid = [k for k, c in enumerate(ctx.classifications, 1) if "_parse_error" not in c]
     verification = {"putaran": ctx.verification_round, "penolakan": ctx.rejections(), "verification_failed": False,
                     "verification_skipped": False,
-                    "batas_panggilan_verifikator": sum(bool(v.get("batas_panggilan_tercapai")) for v in ctx.verdicts),
-                    "putusan": [{k: v.get(k) for k in ("putaran", "klasifikasi_ke", "lolos", "lolos_menurut_llm", "skema_valid",
-                                                       "evidence_hilang", "alasan")} for v in ctx.verdicts]}
+                    "putusan": [{k: v.get(k) for k in ("putaran", "klasifikasi_ke", "lolos", "skema_valid", "evidence_hilang",
+                                                       "alasan")} for v in ctx.verdicts]}
+    delegated = {name: f"task:{name}" in ctx.tool_names for name in SUBAGENTS}
     base = {"id": ctx.row_id, "run_id": run_id, "prompt_tokens": ctx.prompt_tokens,
             "completion_tokens": ctx.completion_tokens, "cost_usd": ctx.cost_usd, "latency_s": wall_s,
             "llm_latency_s": ctx.llm_latency_s, "llm_calls": ctx.llm_calls, "tool_calls": ctx.tool_calls,
             "klasifikasi_dipanggil": len(ctx.classifications),
             "riwayat_label": [c.get("label", "PARSE_ERROR") for c in ctx.classifications], "verifikasi": verification,
+            "delegasi": {**delegated, "keempat_subagen": all(delegated.values())},
             "alat_dipanggil": dict(Counter(ctx.tool_names)),
             "ditahan_guard": ctx.guard_blocks, "pengingat_prosedur": ctx.reminders, "batas_panggilan_subagen": limit_hits,
             "attempts": ctx.attempt}
@@ -266,25 +271,28 @@ def summarize_rows(done: list[dict]) -> dict:
             "rows_with_rejection": sum(p["verifikasi"]["penolakan"] > 0 for p in done),
             "guard_blocks": sum(len(p["ditahan_guard"]) for p in done),
             "procedure_reminders": sum(len(p["pengingat_prosedur"]) for p in done),
-            "subagent_limit_hits": sum(p["batas_panggilan_subagen"] + p["verifikasi"]["batas_panggilan_verifikator"]
-                                       for p in done),
+            "subagent_limit_hits": sum(p["batas_panggilan_subagen"] for p in done),
+            "delegated_all_four": sum(p["delegasi"]["keempat_subagen"] for p in done),
             "recursion_limit_rows": sum("batas rekursi" in (p.get("detail") or "") for p in done),
             "llm_calls_mean": sum(p["llm_calls"] for p in done) / n,
             "tool_calls_mean": sum(p["tool_calls"] for p in done) / n}
 
 
 def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: Path = SAMPLE_PATH,
-        resume: bool = False, calls_path: Path = CALLS_PATH, agent=None) -> dict:
+        resume: bool = False, calls_path: Path = CALLS_PATH, agent=None, split: str | None = None,
+        name: str = "agent") -> dict:
+    """split: baris srbh_<split>.parquet (mis. val) sebagai pengganti test_sample_500; name: nama berkas keluaran
+    (mis. agent_r1 untuk replikasi)."""
     disable_remote_tracing()
     config = load_llm_config()
-    rows = load_inputs(inputs_path)
+    rows, inputs_path = method_rows(inputs_path, split)
     if ids_path is not None:
         by_id = {r["id"]: r for r in rows}
         rows = [by_id[i] for i in json.loads(ids_path.read_text(encoding="utf-8"))["ids"]]
     out_dir.mkdir(parents=True, exist_ok=True)
-    partial, info_path = out_dir / "agent.partial.jsonl", out_dir / "agent.partial.run.json"
+    partial, info_path = out_dir / f"{name}.partial.jsonl", out_dir / f"{name}.partial.run.json"
     prompts = {"orkestrator": ORCHESTRATOR_PROMPT, "parser": PARSER_PROMPT, "analisis_payload": PAYLOAD_PROMPT,
-               "klasifikasi": CLASSIFIER_PROMPT, "verifikasi": VERIFIER_PROMPT}
+               "klasifikasi": CLASSIFIER_PROMPT}
     prompt_hashes = {k: sha256(v) for k, v in prompts.items()}
     done: list[dict] = []
     if resume:
@@ -306,12 +314,14 @@ def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: 
                     "max_classifications": MAX_CLASSIFICATIONS, "orchestrator_recursion_limit": RECURSION_LIMIT,
                     "subagent_model_calls": SUBAGENT_MODEL_CALLS, "procedure_reminders": MAX_REMINDERS,
                     "request_timeout_s": REQUEST_TIMEOUT_S},
+            excluded_tools=sorted(EXCLUDED_TOOLS), verifier="deterministik tanpa LLM (schema_check + evidence_exists)",
             pattern_match="mesin emulasi CRS 4.30.0 yang sama dengan regex_full (configs/regex_full.yaml), tanpa "
                           "pemetaan kelas",
             knowledge_base=str(KB_PATH.relative_to(ROOT)), knowledge_base_sha256=sha256_file(KB_PATH),
             remote_tracing="dimatikan (LangSmith); catatan hanya lokal",
             input_file=str(inputs_path.relative_to(ROOT)), input_sha256=sha256_file(inputs_path),
-            ids_file=str(ids_path.relative_to(ROOT)) if ids_path else None, rows=len(rows))
+            ids_file=str(ids_path.relative_to(ROOT)) if ids_path else None, rows=len(rows), output_name=name,
+            calls_file=str(calls_path.relative_to(ROOT)) if calls_path.is_relative_to(ROOT) else str(calls_path))
     if info["prompt_sha256"] != prompt_hashes:
         raise RuntimeError("prompt berubah sejak run ini dimulai; mulai run baru")
     info_path.write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -336,8 +346,9 @@ def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: 
     order = {r["id"]: k for k, r in enumerate(rows)}
     done.sort(key=lambda p: order[p["id"]])
     info["totals"] = summarize_rows(done)
-    (out_dir / "agent.jsonl").write_text("".join(json.dumps(p, ensure_ascii=True) + "\n" for p in done), encoding="utf-8")
-    (out_dir / "agent.run.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    info.setdefault("prompt_terkirim", {}).update(recorder.sent)  # prompt sistem + definisi alat yang benar-benar dikirim
+    (out_dir / f"{name}.jsonl").write_text("".join(json.dumps(p, ensure_ascii=True) + "\n" for p in done), encoding="utf-8")
+    (out_dir / f"{name}.run.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     partial.unlink()
     info_path.unlink()
     return info
@@ -347,10 +358,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Deep agent (langkah E)")
     parser.add_argument("--ids", type=Path, help="berkas JSON {'ids': [...]} (mis. results/pilot/pilot_ids.json)")
     parser.add_argument("--out-dir", type=Path, default=RESULTS_DIR)
-    parser.add_argument("--resume", action="store_true", help="lanjutkan run yang terhenti (agent.partial.jsonl)")
+    parser.add_argument("--resume", action="store_true", help="lanjutkan run yang terhenti (<name>.partial.jsonl)")
+    parser.add_argument("--split", help="baris srbh_<split>.parquet (mis. val) sebagai pengganti test_sample_500")
+    parser.add_argument("--name", default="agent", help="nama berkas keluaran (mis. agent_r1)")
+    parser.add_argument("--calls", type=Path, default=CALLS_PATH, help="log panggilan (bawaan results/agent_calls.jsonl)")
     args = parser.parse_args(argv)
     try:
-        info = run(args.ids.resolve() if args.ids else None, args.out_dir.resolve(), resume=args.resume)
+        info = run(args.ids.resolve() if args.ids else None, args.out_dir.resolve(), resume=args.resume,
+                   calls_path=args.calls.resolve(), split=args.split, name=args.name)
     except RunAborted as exc:
         print(f"[agent] DIHENTIKAN: {exc}", file=sys.stderr)
         return 2

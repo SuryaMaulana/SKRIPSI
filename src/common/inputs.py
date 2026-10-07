@@ -41,3 +41,10 @@ def load_split_inputs(split: str) -> list[dict]:
     dikonversi seperti saat sampel ditulis). Dipakai untuk menyesuaikan pemetaan pada split val, bukan pada data uji."""
     frame = pd.read_parquet(split_path(split), columns=list(METHOD_COLUMNS))
     return [{c: _json_value(v) for c, v in record.items()} for record in frame.to_dict("records")]
+
+
+def method_rows(inputs_path: Path = SAMPLE_PATH, split: str | None = None) -> tuple[list[dict], Path]:
+    """Baris masukan metode dan berkas sumbernya: test_sample_500.jsonl (bawaan) atau srbh_<split>.parquet."""
+    if split is not None:
+        return load_split_inputs(split), split_path(split)
+    return load_inputs(inputs_path), inputs_path

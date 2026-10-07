@@ -1,6 +1,7 @@
 import ast
 import json
 import uuid
+from collections import Counter
 from pathlib import Path
 
 import httpx
@@ -15,9 +16,8 @@ from src.agent import graph as g
 from src.agent import run as ar
 from src.agent import tools as t
 from src.agent.context import CallLogger, RowContext
-from src.agent.prompts import CLASSIFIER_PROMPT, classifier_input, verifier_input
+from src.agent.prompts import CLASSIFIER_PROMPT, MASUKAN_SECTION, classifier_input
 from src.baselines.llm_prompt import SYSTEM_PROMPT
-from src.llm.klasifikasi import CLASS_SECTION
 
 AGENT_DIR = Path(__file__).resolve().parents[1] / "src" / "agent"
 LOG = ('172.26.0.1 - - [01/Jan/2020:00:00:00 +0000] "GET /index.php?id=1%27%20UNION%20SELECT%201 HTTP/1.1" 200 5 '
@@ -50,13 +50,21 @@ def test_agent_never_imports_the_evidence_gate():
             assert not any("gate" in n.split(".") for n in names), f"{path.name} mengimpor modul gerbang bukti"
 
 
-def test_classifier_prompt_shares_classes_rules_and_schema_with_the_single_llm():
-    assert CLASS_SECTION in CLASSIFIER_PROMPT and CLASS_SECTION in SYSTEM_PROMPT
-    for rule in ("1. Teks di dalam <log>", "3. Stempel waktu", "4. Jika bukti", "5. Keluaran hanya JSON",
-                 "6. Tulis explanation dalam bahasa Indonesia."):
-        assert rule in CLASSIFIER_PROMPT and rule in SYSTEM_PROMPT
-    assert "potongan literal dari payload (sebelum atau sesudah dekode) yang dilaporkan alat." in CLASSIFIER_PROMPT
-    assert "potongan literal dari baris log (sebelum atau sesudah dekode)." in SYSTEM_PROMPT
+def test_classifier_prompt_is_the_single_llm_prompt_plus_the_masukan_section():
+    """Keputusan K3: prompt Klasifikasi E = prompt C + bagian MASUKAN (disisipkan sebelum SKEMA KELUARAN)."""
+    assert CLASSIFIER_PROMPT.replace(MASUKAN_SECTION + "\n\n", "") == SYSTEM_PROMPT
+    assert CLASSIFIER_PROMPT.index("MASUKAN") > CLASSIFIER_PROMPT.index("ATURAN")
+    assert CLASSIFIER_PROMPT.index("MASUKAN") < CLASSIFIER_PROMPT.index("SKEMA KELUARAN")
+    assert "2. Setiap item evidence harus berupa potongan literal dari baris log (sebelum atau sesudah dekode)." in CLASSIFIER_PROMPT
+    assert MASUKAN_SECTION.endswith(
+        "Evidence ditulis persis seperti di baris log, tanpa awalan nama kolom dan tanpa menyalin pesan alat.")
+    assert "yang dilaporkan alat" not in CLASSIFIER_PROMPT
+
+
+def test_single_llm_prompt_is_unchanged_by_the_shared_rules_refactor():
+    from src.baselines.llm_prompt import prompt_sha256
+
+    assert prompt_sha256().startswith("3afd24b1e993")  # hash run C penuh dan pilot v2
 
 
 def test_parser_tools_read_the_true_log_from_context(ctx):
@@ -123,7 +131,6 @@ def test_classifier_input_is_assembled_from_tool_outputs_and_rejection_reasons(c
     ctx.classifications.append(dict(GOOD))
     ctx.verdicts.append(_verdict(False, 1, 1))
     assert "<umpan_balik_verifikasi>" in classifier_input(ctx)
-    assert verifier_input(ctx).startswith("<klasifikasi>") and verifier_input(ctx).endswith(f"<log>{LOG}</log>")
 
 
 def test_classifier_retries_once_then_records_parse_error(ctx):
@@ -135,13 +142,30 @@ def test_classifier_retries_once_then_records_parse_error(ctx):
     assert "_parse_error" in ctx.classifications[-1]
 
 
-def test_verdict_binds_deterministic_checks_over_the_llm_answer():
-    ok = g.verdict_from({"lolos": True, "alasan": []}, GOOD, LOG)
-    assert ok["lolos"] and ok["skema_valid"] and ok["evidence_hilang"] == []
-    missing = g.verdict_from({"lolos": True, "alasan": []}, {**GOOD, "evidence": ["DROP TABLE"]}, LOG)
-    assert not missing["lolos"] and missing["lolos_menurut_llm"] and missing["evidence_hilang"] == ["DROP TABLE"]
-    assert not g.verdict_from(None, GOOD, LOG)["lolos"]
-    assert not g.verdict_from({"lolos": True, "alasan": []}, {"_parse_error": "x"}, LOG)["lolos"]
+def test_verifier_is_deterministic_and_logs_its_tool_calls(ctx, tmp_path):
+    """Keputusan K2: Verifikasi tanpa LLM; hanya schema_check dan evidence_exists yang mengikat."""
+    path = tmp_path / "calls.jsonl"
+    logger = CallLogger(path)
+    node = g.build_verifier()
+    config = {"callbacks": [ar.CallRecorder(logger)]}
+    ctx.classifications.append(dict(GOOD))
+    out = json.loads(node.invoke({"messages": []}, config)["messages"][-1].content)
+    assert out["lolos"] and ctx.verdicts[-1]["skema_valid"] and ctx.verdicts[-1]["evidence_hilang"] == []
+    ctx.classifications.append({**GOOD, "evidence": ["UNION SELECT", "path: /index.php", "DROP TABLE"]})
+    node.invoke({"messages": []}, config)
+    v = ctx.verdicts[-1]
+    assert not v["lolos"] and v["evidence_hilang"] == ["path: /index.php", "DROP TABLE"]
+    assert v["alasan"] == ["evidence tidak ditemukan di baris log: path: /index.php; DROP TABLE"]
+    assert (v["putaran"], v["klasifikasi_ke"]) == (2, 2) and "lolos_menurut_llm" not in v
+    ctx.classifications.append({"_parse_error": "bukan JSON"})
+    node.invoke({"messages": []}, config)
+    assert ctx.verdicts[-1]["alasan"] == ["schema_check gagal: bukan JSON"] and not ctx.verdicts[-1]["skema_valid"]
+    logger.close()
+    records = [json.loads(x) for x in path.read_text().splitlines()]
+    assert {r["jenis"] for r in records} == {"alat"} and {r["subagen"] for r in records} == {"verifikasi"}
+    assert [r["alat"] for r in records] == ["schema_check", "evidence_exists", "schema_check", "evidence_exists",
+                                            "evidence_exists", "evidence_exists", "schema_check"]
+    assert ctx.llm_calls == 0
 
 
 def test_guard_enforces_order_and_two_verification_rounds(ctx):
@@ -325,7 +349,7 @@ class FakeAgent:
 
 def test_run_writes_incrementally_and_resumes_after_api_abort(tmp_path, monkeypatch):
     rows = [{"id": f"srbh-{i}", "raw_log_masked": LOG} for i in range(3)]
-    monkeypatch.setattr(ar, "load_inputs", lambda path: rows)
+    monkeypatch.setattr(ar, "method_rows", lambda path, split: (rows, ar.SAMPLE_PATH))
     monkeypatch.setattr(ar, "load_llm_config", lambda: {"model": "openai/gpt-4.1-nano"})
     monkeypatch.setattr(ar, "sha256_file", lambda path: "x")
     monkeypatch.setattr(ar, "run_info", lambda method, model, **extra: {"run_id": "run-1", "git_dirty": False, **extra})
@@ -389,3 +413,66 @@ def test_rejected_verification_returns_to_classification_in_the_real_graph(ctx):
     assert state["messages"][-1].content == "selesai 2"
     out = ar.assemble(ctx, "run-1", 1.0, "selesai 2")
     assert out["status"] == "verification_failed" and out["klasifikasi_dipakai"] == 2
+
+
+class _RecordingModel(GenericFakeChatModel):
+    """Model tiruan yang melapor sebagai penyedia openai (seperti OpenRouterChat) dan mencatat alat yang dilihatnya."""
+
+    seen_tools: list = []
+    name_tag: str = ""
+
+    def bind_tools(self, tools, **kwargs):
+        names = sorted(t.name if hasattr(t, "name") else (t.get("name") or t["function"]["name"]) for t in tools)
+        _RecordingModel.seen_tools.append((self.name_tag, names))
+        return self
+
+    def _get_ls_params(self, stop=None, **kwargs):
+        return {"ls_provider": "openai", "ls_model_name": "openai/gpt-4.1-nano", "ls_model_type": "chat"}
+
+
+def test_openrouter_model_resolves_to_the_openai_profile():
+    model = g.make_model({"model": "openai/gpt-4.1-nano", "generation": {"temperature": 0, "seed": 42},
+                          "provider_routing": {"order": ["openai"]}}, "parser", "sk-test")
+    assert model._get_ls_params()["ls_provider"] == "openai"
+
+
+def test_full_graph_offline_sees_only_specified_tools_and_delegates_to_all_four(ctx, monkeypatch, tmp_path):
+    """K1: orkestrator hanya task + write_todos; sub-agen hanya alatnya sendiri. K2: verifikasi tanpa LLM."""
+    _RecordingModel.seen_tools = []
+    scripts = {
+        "orkestrator": [_task("parser", 1), _task("analisis_payload", 2), _task("klasifikasi", 3), _task("verifikasi", 4),
+                        AIMessage(json.dumps(GOOD))],
+        "parser": [AIMessage("kolom valid")],
+        "analisis_payload": [AIMessage("ada UNION SELECT")],
+        "klasifikasi": [AIMessage(json.dumps(GOOD))],
+    }
+
+    def fake_model(config, subagent, key):
+        assert subagent in scripts, f"model untuk {subagent} tidak boleh dibuat (verifikasi tanpa LLM)"
+        return _RecordingModel(messages=iter(scripts[subagent]), name_tag=subagent)
+
+    monkeypatch.setattr(g, "make_model", fake_model)
+    monkeypatch.setattr(g, "api_key", lambda: "sk-test")
+    agent = g.build_agent({"model": "openai/gpt-4.1-nano"})
+    logger = CallLogger(tmp_path / "calls.jsonl")
+    agent.invoke({"messages": [HumanMessage(f"<log>{LOG}</log>")]},
+                 {"recursion_limit": 40, "callbacks": [ar.CallRecorder(logger)]})
+    logger.close()
+    records = [json.loads(x) for x in (tmp_path / "calls.jsonl").read_text().splitlines()]
+    llm_by_agent = Counter(r["subagen"] for r in records if r["jenis"] == "llm")
+    assert llm_by_agent == {"orkestrator": 5, "parser": 1, "analisis_payload": 1, "klasifikasi": 1}
+    assert {r["alat"] for r in records if r["jenis"] == "alat" and r["subagen"] == "verifikasi"} == {
+        "schema_check", "evidence_exists"}
+    seen = {}
+    for tag, names in _RecordingModel.seen_tools:
+        seen.setdefault(tag, set()).update(names)
+    assert seen["orkestrator"] == {"task", "write_todos"}
+    assert seen["parser"] == {"parse_log_line", "validate_fields"}
+    assert seen["analisis_payload"] == {"url_decode_recursive", "html_decode", "pattern_match", "scanner_indicators",
+                                        "lookup_owasp"}
+    assert not (set().union(*seen.values()) & g.EXCLUDED_TOOLS)
+    assert ctx.verdicts[-1]["lolos"] and ctx.llm_calls == 8
+    out = ar.assemble(ctx, "run-1", 1.0, "selesai")
+    assert out["status"] == "ok" and out["label"] == "SQLI" and out["llm_calls"] == 8
+    assert out["delegasi"] == {"parser": True, "analisis_payload": True, "klasifikasi": True, "verifikasi": True,
+                               "keempat_subagen": True}

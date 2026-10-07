@@ -129,7 +129,7 @@ def test_persistent_service_failure_aborts_after_backoff():
 
 def test_run_writes_incrementally_and_resumes_after_abort(tmp_path, monkeypatch):
     rows = [{**ROW, "id": f"srbh-{k}"} for k in range(3)]
-    monkeypatch.setattr(ls, "load_inputs", lambda path: rows)
+    monkeypatch.setattr(ls, "method_rows", lambda path, split: (rows, ls.SAMPLE_PATH))
     monkeypatch.setattr(ls, "load_llm_config", lambda: {**CONFIG, "model_version": "openai/gpt-4.1-nano-2025-04-14"})
     monkeypatch.setattr(ls, "sha256_file", lambda path: "x")
     monkeypatch.setattr(ls, "run_info", lambda method, model, **extra: {"run_id": "run-1", "git_dirty": False, **extra})

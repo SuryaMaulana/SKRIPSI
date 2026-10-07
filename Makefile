@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 RAW := data/raw/srbh2020/data_capec_multilabel.csv
 
-.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot llm-single agent-pilot agent
+.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot llm-single agent-pilot agent-val agent
 
 help:
 	@echo "make setup     buat .venv (Python 3.11) dan pasang dependensi terkunci"
@@ -22,6 +22,7 @@ help:
 	@echo "make llm-single-pilot C: LLM tunggal pada 30 baris pilot (5 per kelas) -> results/pilot/"
 	@echo "make llm-single C: LLM tunggal pada 500 baris -> results/llm_single.jsonl (panggilan: results/llm_single_calls.jsonl)"
 	@echo "make agent-pilot E: deep agent pada 30 baris pilot yang sama dengan C -> results/pilot/"
+	@echo "make agent-val    E: validasi deep agent v2 + LLM tunggal pada 30 baris srbh_val -> results/validasi/"
 	@echo "make agent        E: deep agent pada 500 baris -> results/agent.jsonl (panggilan: results/agent_calls.jsonl)"
 
 setup:
@@ -85,6 +86,14 @@ llm-single:
 
 agent-pilot:
 	$(PY) -m src.agent.run --ids results/pilot/pilot_ids.json --out-dir results/pilot
+
+agent-val:
+	$(PY) -m src.eval.pilot --split val --out results/validasi/val_ids.json
+	$(PY) -m src.agent.run --split val --ids results/validasi/val_ids.json --out-dir results/validasi
+	$(PY) -m src.baselines.llm_single --split val --ids results/validasi/val_ids.json --out-dir results/validasi
+	$(PY) -m src.eval.pilot_compare --truth val --ids results/validasi/val_ids.json --agent results/validasi/agent.jsonl \
+		--single results/validasi/llm_single.jsonl --single-pilot '' \
+		--title "Validasi deep agent v2 vs LLM tunggal (srbh_val)" --out reports/validasi_agent_val.md
 
 agent:
 	$(PY) -m src.agent.run

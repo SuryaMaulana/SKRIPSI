@@ -6,7 +6,15 @@ agent; satu-satunya perbedaan kedua metode adalah arsitektur.
 
 from __future__ import annotations
 
-from ..llm.klasifikasi import CLASS_LABELS, CLASS_SECTION, OUTPUT_SCHEMA, SCHEMA_SECTION, TABLE_2_1, rules, sha256
+from ..llm.klasifikasi import (
+    CLASS_LABELS,
+    CLASS_SECTION,
+    OUTPUT_SCHEMA,
+    RULES_SECTION,
+    SCHEMA_SECTION,
+    TABLE_2_1,
+    sha256,
+)
 
 __all__ = ["CLASS_LABELS", "OUTPUT_SCHEMA", "SYSTEM_PROMPT", "TABLE_2_1", "prompt_sha256", "user_message"]
 
@@ -17,7 +25,7 @@ SYSTEM_PROMPT = "\n".join([
     "",
     CLASS_SECTION,
     "",
-    rules("baris log"),
+    RULES_SECTION,
     "",
     SCHEMA_SECTION,
 ])

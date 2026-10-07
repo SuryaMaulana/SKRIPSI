@@ -31,7 +31,7 @@ from pathlib import Path
 
 import httpx
 
-from ..common.inputs import SAMPLE_PATH, load_inputs
+from ..common.inputs import SAMPLE_PATH, method_rows
 from ..common.runinfo import git_state, run_info, sha256_file
 from ..data.config import ROOT
 from ..llm.openrouter import OpenRouterClient, api_key, build_payload, load_llm_config, summarize
@@ -174,17 +174,19 @@ def totals(predictions: list[dict]) -> dict:
 
 
 def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: Path = SAMPLE_PATH,
-        resume: bool = False, client: OpenRouterClient | None = None, calls_path: Path = CALLS_PATH) -> dict:
-    """Jalankan (atau lanjutkan) satu run. Prediksi ditulis bertahap ke llm_single.partial.jsonl; baru setelah semua
-    baris selesai berkas itu menjadi llm_single.jsonl beserta llm_single.run.json."""
+        resume: bool = False, client: OpenRouterClient | None = None, calls_path: Path = CALLS_PATH,
+        split: str | None = None, name: str = "llm_single") -> dict:
+    """Jalankan (atau lanjutkan) satu run. Prediksi ditulis bertahap ke <name>.partial.jsonl; baru setelah semua baris
+    selesai berkas itu menjadi <name>.jsonl beserta <name>.run.json. split: baris srbh_<split>.parquet (mis. val) sebagai
+    pengganti test_sample_500; name: nama berkas keluaran (mis. llm_single_r1 untuk replikasi)."""
     config = load_llm_config()
-    rows = load_inputs(inputs_path)
+    rows, inputs_path = method_rows(inputs_path, split)
     if ids_path is not None:
         wanted = json.loads(ids_path.read_text(encoding="utf-8"))["ids"]
         by_id = {r["id"]: r for r in rows}
         rows = [by_id[i] for i in wanted]
     out_dir.mkdir(parents=True, exist_ok=True)
-    partial, info_path = out_dir / "llm_single.partial.jsonl", out_dir / "llm_single.partial.run.json"
+    partial, info_path = out_dir / f"{name}.partial.jsonl", out_dir / f"{name}.partial.run.json"
     done: list[dict] = []
     if resume:
         if not partial.exists():
@@ -202,7 +204,8 @@ def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: 
             pricing_usd_per_1m_tokens=config.get("pricing_usd_per_1m_tokens"),
             prompt_sha256=prompt_sha256(), system_prompt=SYSTEM_PROMPT, output_schema=OUTPUT_SCHEMA,
             input_file=str(inputs_path.relative_to(ROOT)), input_sha256=sha256_file(inputs_path),
-            ids_file=str(ids_path.relative_to(ROOT)) if ids_path else None, rows=len(rows),
+            ids_file=str(ids_path.relative_to(ROOT)) if ids_path else None, rows=len(rows), output_name=name,
+            calls_file=str(calls_path.relative_to(ROOT)) if calls_path.is_relative_to(ROOT) else str(calls_path),
         )
     if info["prompt_sha256"] != prompt_sha256():
         raise RuntimeError("prompt berubah sejak run ini dimulai; mulai run baru")
@@ -222,9 +225,9 @@ def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: 
     order = {r["id"]: k for k, r in enumerate(rows)}
     done.sort(key=lambda p: order[p["id"]])
     info["totals"] = totals(done)
-    (out_dir / "llm_single.jsonl").write_text("".join(json.dumps(p, ensure_ascii=True) + "\n" for p in done),
-                                              encoding="utf-8")
-    (out_dir / "llm_single.run.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out_dir / f"{name}.jsonl").write_text("".join(json.dumps(p, ensure_ascii=True) + "\n" for p in done),
+                                           encoding="utf-8")
+    (out_dir / f"{name}.run.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     partial.unlink()
     info_path.unlink()
     return info
@@ -234,10 +237,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="LLM tunggal zero-shot")
     parser.add_argument("--ids", type=Path, help="berkas JSON {'ids': [...]} (mis. results/pilot/pilot_ids.json)")
     parser.add_argument("--out-dir", type=Path, default=RESULTS_DIR)
-    parser.add_argument("--resume", action="store_true", help="lanjutkan run yang terhenti (llm_single.partial.jsonl)")
+    parser.add_argument("--resume", action="store_true", help="lanjutkan run yang terhenti (<name>.partial.jsonl)")
+    parser.add_argument("--split", help="baris srbh_<split>.parquet (mis. val) sebagai pengganti test_sample_500")
+    parser.add_argument("--name", default="llm_single", help="nama berkas keluaran (mis. llm_single_r1)")
+    parser.add_argument("--calls", type=Path, default=CALLS_PATH, help="log panggilan (bawaan results/llm_single_calls.jsonl)")
     args = parser.parse_args(argv)
     try:
-        info = run(args.ids.resolve() if args.ids else None, args.out_dir.resolve(), resume=args.resume)
+        info = run(args.ids.resolve() if args.ids else None, args.out_dir.resolve(), resume=args.resume,
+                   calls_path=args.calls.resolve(), split=args.split, name=args.name)
     except RunAborted as exc:
         print(f"[llm_single] DIHENTIKAN: {exc}", file=sys.stderr)
         return 2

@@ -18,6 +18,7 @@ make regex-full     # B: regex_full sekali pada test_sample_500 -> results/regex
 make llm-single-pilot # C: LLM tunggal pada 30 baris pilot (5 per kelas) -> results/pilot/
 make llm-single       # C: LLM tunggal pada 500 baris -> results/llm_single.jsonl (+ llm_single_calls.jsonl)
 make agent-pilot      # E: deep agent pada 30 baris pilot yang sama -> results/pilot/agent.jsonl
+make agent-val        # E: validasi deep agent v2 (K1-K3) + LLM tunggal pada 30 baris srbh_val -> results/validasi/
 make agent            # E: deep agent pada 500 baris -> results/agent.jsonl (+ agent_calls.jsonl)
 make eval             # D: Tabel 4.2-4.5, F1 per kelas, confusion matrix, CI bootstrap -> reports/evaluasi.md/.json
 ```
@@ -78,8 +79,11 @@ src/baselines/               pembanding: crs (pemuat aturan CRS), modsec (emulas
                              bas_seyyar, regex_baseline, crs_regression (verifikasi terhadap uji resmi CRS)
                              llm_prompt + llm_single (LLM tunggal zero-shot, langkah C)
 src/agent/                   deep agent (langkah E): graph (orkestrator deepagents + 4 sub-agen), tools,
-                             prompts, context, run; tidak mengimpor src/data/gate/
-src/eval/                    evaluate (Tabel 4.2-4.5, bootstrap klaster), pilot (pemilihan 30 baris)
+                             prompts, context, run; tidak mengimpor src/data/gate/. Sejak keputusan K1-K3
+                             (2026-10-08): orkestrator hanya task + write_todos (alat berkas deepagents dan execute
+                             dimatikan), Verifikasi deterministik tanpa LLM, prompt Klasifikasi = prompt C + MASUKAN
+src/eval/                    evaluate (Tabel 4.2-4.5, bootstrap klaster), pilot (pemilihan 30 baris),
+                             pilot_compare (perbandingan per baris E vs C)
 scripts/check_openrouter.py  langkah A
 scripts/make_modsec_golden.py vektor emas port ModSecurity dari harness C (tests/fixtures/modsec_v2915_golden.json)
 data/external/crs/           arsip OWASP CRS terpatok (diunduh otomatis, diverifikasi SHA-256)

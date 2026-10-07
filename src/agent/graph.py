@@ -6,19 +6,21 @@
 - Kegagalan layanan diperlakukan sama dengan LLM tunggal: HTTP 408/429/5xx, galat jaringan/timeout, dan respons HTTP 200
   yang sebenarnya galat (galat penyedia, galat generasi, konten kosong tanpa panggilan alat) diulang 6 kali dengan jeda
   2, 4, ..., 64 detik; bila menetap, atau HTTP 4xx lain, run dihentikan dan dilanjutkan dengan --resume.
-- Orkestrator: write_todos (TodoListMiddleware), task (memanggil sub-agen), alat berkas virtual deepagents sebagai
-  memori kerja; alat execute dan sub-agen general-purpose bawaan dimatikan lewat HarnessProfile.
+- Orkestrator hanya memegang write_todos (TodoListMiddleware) dan task (memanggil sub-agen). Alat berkas virtual deepagents
+  (ls, read_file, write_file, edit_file, delete, glob, grep), execute, dan sub-agen general-purpose dimatikan lewat
+  HarnessProfile untuk orkestrator dan sub-agen (keputusan penulis K1 setelah pilot v1, 2026-10-08).
 - parser dan analisis_payload: sub-agen deklaratif deepagents dengan alat deterministik (tools.py).
 - klasifikasi: sub-agen terkompilasi tanpa alat. Masukannya bagian MASUKAN Lampiran A yang dirakit dari keluaran alat;
   keluarannya JSON skema ketat yang sama dengan LLM tunggal. Gagal parse -> diulang sekali -> PARSE_ERROR.
-- verifikasi: agen dengan alat evidence_exists dan schema_check yang menjawab {lolos, alasan}. Hasil alat mengikat:
-  bila skema gagal atau ada evidence yang tidak ditemukan, putusan menjadi tolak walaupun LLM menjawab lolos.
+- verifikasi: node deterministik TANPA panggilan LLM (keputusan penulis K2): menjalankan schema_check dan evidence_exists
+  (tercatat sebagai pemanggilan alat sub-agen verifikasi); lolos hanya bila skema valid dan semua evidence ditemukan.
 - VerificationRoundGuard menegakkan paling banyak MAX_VERIFICATION_ROUNDS putaran klasifikasi -> verifikasi.
 - ProcedureGuard menegakkan aturan "jika verifikasi gagal kembali ke Klasifikasi" (keputusan penulis): bila orkestrator
   hendak berhenti padahal belum ada klasifikasi, klasifikasi terakhir belum diverifikasi, atau verifikasi menolak dan
   putaran belum habis, orkestrator diberi pengingat dan kembali ke model. Pemanggilan sub-agen tetap keputusan orkestrator.
 - Pengaman putaran tak berujung (bukan pertimbangan biaya): orkestrator RECURSION_LIMIT langkah graf, tiap pemanggilan
-  sub-agen ber-LLM paling banyak SUBAGENT_MODEL_CALLS panggilan model. Seberapa sering batas ini tercapai dicatat per baris.
+  sub-agen parser/analisis_payload paling banyak SUBAGENT_MODEL_CALLS panggilan model. Seberapa sering batas ini tercapai
+  dicatat per baris.
 """
 
 from __future__ import annotations
@@ -34,7 +36,6 @@ from deepagents import (
     create_deep_agent,
     register_harness_profile,
 )
-from langchain.agents import create_agent
 from langchain.agents.middleware import (
     AgentMiddleware,
     ModelCallLimitMiddleware,
@@ -42,14 +43,11 @@ from langchain.agents.middleware import (
     TodoListMiddleware,
     hook_config,
 )
-from langchain.agents.structured_output import ToolStrategy
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig, RunnableLambda
 from langchain_openai import ChatOpenAI
-from pydantic import BaseModel, Field
 
 from ..baselines.llm_single import SERVICE_RETRIES, parse_output, service_failure
-from ..common.evidence import evidence_exists
 from ..llm.klasifikasi import OUTPUT_SCHEMA
 from ..llm.openrouter import BASE_URL, api_key, summarize
 from . import context
@@ -59,18 +57,18 @@ from .prompts import (
     ORCHESTRATOR_PROMPT,
     PARSER_PROMPT,
     PAYLOAD_PROMPT,
-    VERIFIER_PROMPT,
     classifier_input,
-    verifier_input,
 )
-from .tools import PARSER_TOOLS, PAYLOAD_TOOLS, VERIFIER_TOOLS
+from .tools import PARSER_TOOLS, PAYLOAD_TOOLS, evidence_exists, schema_check
 
 CLASSIFIER_ATTEMPTS = 2  # sama dengan LLM tunggal: satu percobaan + satu ulangan bila gagal parse
 MAX_CLASSIFICATIONS = 4  # pengaman putaran tak berujung di luar batas verifikasi
 RECURSION_LIMIT = 80  # langkah graf orkestrator per baris
-SUBAGENT_MODEL_CALLS = 15  # panggilan model per pemanggilan sub-agen parser/analisis_payload/verifikasi
+SUBAGENT_MODEL_CALLS = 15  # panggilan model per pemanggilan sub-agen parser/analisis_payload
 LIMIT_MARKER = "Model call limits exceeded"  # awal pesan ModelCallLimitMiddleware saat batas tercapai
 REQUEST_TIMEOUT_S = 120.0  # sama dengan klien LLM tunggal (src/llm/openrouter.py)
+FILESYSTEM_TOOLS = frozenset({"ls", "read_file", "write_file", "edit_file", "delete", "glob", "grep"})  # bawaan deepagents
+EXCLUDED_TOOLS = FILESYSTEM_TOOLS | {"execute"}  # keputusan penulis K1
 MAX_REMINDERS = 4  # pengingat prosedur per baris (cukup untuk: klasifikasi, verifikasi, klasifikasi ulang, verifikasi ulang)
 
 
@@ -144,7 +142,7 @@ def invoke_with_retries(model, messages, config, sleep=time.sleep):
 
 def _register_profile() -> None:
     register_harness_profile("openai", HarnessProfile(
-        excluded_tools=frozenset({"execute"}),
+        excluded_tools=EXCLUDED_TOOLS,
         general_purpose_subagent=GeneralPurposeSubagentProfile(enabled=False),
     ))
 
@@ -176,41 +174,31 @@ def build_classifier(model, sleep=time.sleep) -> RunnableLambda:
     return RunnableLambda(run, name="klasifikasi")
 
 
-class Verdict(BaseModel):
-    """Putusan sub-agen Verifikasi."""
-
-    lolos: bool = Field(description="true bila keluaran klasifikasi lolos verifikasi")
-    alasan: list[str] = Field(description="alasan singkat, terutama bila ditolak")
-
-
-def verdict_from(llm: dict | None, latest: dict | None, raw_log_masked: str) -> dict:
-    """Putusan akhir: jawaban LLM verifikator digabung dengan pemeriksaan deterministik yang mengikat."""
-    llm = llm or {"lolos": False, "alasan": ["verifikator tidak memberi putusan"]}
-    reasons = list(llm["alasan"])
-    schema_ok = latest is not None and "_parse_error" not in latest and parse_output(json.dumps(latest))[0] is not None
-    missing = [e for e in (latest["evidence"] if schema_ok else []) if not evidence_exists(e, raw_log_masked)]
-    if not schema_ok:
-        reasons.append("schema_check gagal")
+def deterministic_verdict(schema: dict, missing: list[str]) -> dict:
+    """Putusan Verifikasi dari hasil schema_check dan evidence_exists saja (K2)."""
+    reasons = []
+    if not schema["valid"]:
+        reasons.append(f"schema_check gagal: {schema.get('alasan')}")
     if missing:
         reasons.append("evidence tidak ditemukan di baris log: " + "; ".join(e[:120] for e in missing))
-    return {"lolos": bool(llm["lolos"]) and schema_ok and not missing, "alasan": reasons,
-            "lolos_menurut_llm": bool(llm["lolos"]), "skema_valid": schema_ok, "evidence_hilang": missing}
+    return {"lolos": bool(schema["valid"]) and not missing, "alasan": reasons, "skema_valid": bool(schema["valid"]),
+            "evidence_hilang": missing}
 
 
-def build_verifier(model) -> RunnableLambda:
-    inner = create_agent(model, tools=VERIFIER_TOOLS, system_prompt=VERIFIER_PROMPT,
-                         response_format=ToolStrategy(Verdict), name="verifikasi",
-                         middleware=[retry_middleware(), limit_middleware()])
+def build_verifier() -> RunnableLambda:
+    """Sub-agen Verifikasi deterministik (tanpa LLM): schema_check atas klasifikasi terakhir, lalu evidence_exists untuk
+    setiap item evidence. Alat dipanggil sebagai alat LangChain agar tercatat di agent_calls.jsonl atas nama verifikasi."""
 
     def run(state: dict, config: RunnableConfig) -> dict:
         ctx = context.current()
-        result = inner.invoke({"messages": [HumanMessage(verifier_input(ctx))]}, as_subagent(config, "verifikasi"))
-        llm = result.get("structured_response")
-        verdict = verdict_from(llm.model_dump() if isinstance(llm, BaseModel) else None, ctx.latest_classification(),
-                               ctx.raw_log_masked)
-        verdict["batas_panggilan_tercapai"] = any(
-            isinstance(m, AIMessage) and isinstance(m.content, str) and m.content.startswith(LIMIT_MARKER)
-            for m in result.get("messages") or [])
+        cfg = as_subagent(config, "verifikasi")
+        schema = json.loads(schema_check.invoke({}, cfg))
+        missing = []
+        if schema["valid"]:
+            for item in ctx.latest_classification()["evidence"]:
+                if not json.loads(evidence_exists.invoke({"item": item}, cfg))["ada"]:
+                    missing.append(item)
+        verdict = deterministic_verdict(schema, missing)
         with ctx.lock:
             verdict["putaran"] = len(ctx.verdicts) + 1
             verdict["klasifikasi_ke"] = len(ctx.classifications)
@@ -314,7 +302,7 @@ def build_agent(config: dict):
          "runnable": build_classifier(make_model(config, "klasifikasi", key))},
         {"name": "verifikasi", "description": "Memeriksa skema keluaran klasifikasi terakhir dan keberadaan literal setiap "
                                               "evidence di baris log; menjawab lolos atau tolak beserta alasan.",
-         "runnable": build_verifier(make_model(config, "verifikasi", key))},
+         "runnable": build_verifier()},
     ]
     return create_deep_agent(
         model=make_model(config, "orkestrator", key), tools=[], system_prompt=ORCHESTRATOR_PROMPT, subagents=subagents,

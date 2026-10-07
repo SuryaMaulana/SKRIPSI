@@ -46,11 +46,12 @@ def test_compare_reports_rows_rejections_and_label_history(tmp_path, monkeypatch
          "respons": {"content": "bukan json"}},
     ])
     assert pc.classification_history(calls, "agent-1") == {"a": ["SQLI", "XSS"]}
-    text = pc.compare(tmp_path / "ids.json", agent_dir / "agent.jsonl", tmp_path / "llm_single.jsonl",
-                      agent_dir / "llm_single.jsonl", calls)
+    text = pc.compare(tmp_path / "ids.json", agent_dir / "agent.jsonl",
+                      [("C (500 penuh)", tmp_path / "llm_single.jsonl"), ("C pilot", agent_dir / "llm_single.jsonl")], calls)
     assert "| 1 | `a` | XSS | SQLI ✗ | XSS ✓ | ok | 2 | 1 |" in text
     assert "| benar (dari 2) | 1 | 1 | 2 |" in text
-    assert "E benar di baris yang C salah: 1 (`a`)" in text
+    assert "E benar di baris yang C (500 penuh) salah: 1 (`a`)" in text
+    assert "mendelegasikan ke keempat sub-agen: 0/2 baris" in text
     assert "riwayat label klasifikasi: SQLI -> XSS" in text
     assert "label berubah setelah penolakan: 1 baris" in text
     assert "penilaian LLM verifikator: 1" in text
@@ -70,3 +71,21 @@ def test_rejection_without_a_verifier_verdict_is_its_own_category():
     no_verdict = {"lolos": False, "lolos_menurut_llm": False,
                   "alasan": ["verifikator tidak memberi putusan", "evidence tidak ditemukan di baris log: x"]}
     assert pc._rejection_kind(no_verdict) == "verifikator tanpa putusan + evidence/skema"
+
+
+def test_deterministic_verifier_rejections_are_categorised_without_llm():
+    verdict = {"lolos": False, "skema_valid": True, "evidence_hilang": ["x"],
+               "alasan": ["evidence tidak ditemukan di baris log: x"], "putaran": 1, "klasifikasi_ke": 1}
+    assert pc._rejection_kind(verdict) == "evidence/skema (deterministik)"
+    schema = {"lolos": False, "skema_valid": False, "evidence_hilang": [], "alasan": ["schema_check gagal: bukan JSON"]}
+    assert pc._rejection_kind(schema) == "evidence/skema (deterministik)"
+
+
+def test_truth_can_come_from_a_split(tmp_path, monkeypatch):
+    import pandas as pd
+
+    path = tmp_path / "srbh_val.parquet"
+    pd.DataFrame([{"id": "v1", "label": "XSS", "raw_log_masked": LOG, "template_key": "t"},
+                  {"id": "v2", "label": "NORMAL", "raw_log_masked": LOG, "template_key": "u"}]).to_parquet(path)
+    monkeypatch.setattr(pc, "split_path", lambda split: path)
+    assert pc.load_truth("val", ["v2"]) == {"v2": {"id": "v2", "label": "NORMAL", "raw_log_masked": LOG}}
