@@ -1045,8 +1045,9 @@ def resolve_targets(link: Link, coll: dict, state: _State) -> list[tuple[str, st
     return chosen
 
 
-def _expand(text: str, coll: dict, state: _State) -> str | None:
-    """Makro %{TX.n} / %{MATCHED_VAR} / %{REQUEST_HEADERS.x}; None bila nilainya tidak tersedia di log."""
+def _expand(text: str, coll: dict, state: _State) -> str:
+    """Makro %{TX.x} / %{MATCHED_VAR} / %{REQUEST_HEADERS.x}. Seperti expand_macros() (re_actions.c), makro yang tidak
+    terselesaikan diganti string kosong; aturan yang makronya merujuk header tak tercatat sudah disaring is_applicable."""
     def repl(m: re.Match) -> str:
         name = m.group(1)
         upper = name.upper()
@@ -1059,13 +1060,8 @@ def _expand(text: str, coll: dict, state: _State) -> str | None:
             value = next((v for k, v in coll.get("REQUEST_HEADERS", []) if k.lower() == key), None)
         else:
             value = None
-        if value is None:
-            raise KeyError(name)
-        return value
-    try:
-        return re.sub(r"%\{([^}]+)\}", repl, text)
-    except KeyError:
-        return None
+        return "" if value is None else value
+    return re.sub(r"%\{([^}]+)\}", repl, text)
 
 
 class Evaluator:
@@ -1080,16 +1076,20 @@ class Evaluator:
     _CACHE_CHARS = 20_000_000  # batas total karakter di cache transformasi (memori), bukan jumlah entri
 
     def __init__(self, phrase_files: dict[str, list[str]], removals: list[TargetRemoval] | None = None,
-                 unicode_map: list[int] | None = None):
+                 unicode_map: list[int] | None = None, tx_defaults: dict[str, str] | None = None):
         self.phrases = dict(phrase_files)
         self.removals = list(removals or [])
         self.unicode_map = unicode_map
+        self.tx_defaults = dict(tx_defaults or {})  # koleksi TX awal: nilai kebijakan bawaan CRS (crs.tx_defaults)
         self._acmp: dict[tuple[str, str], Acmp] = {}
         self._steps: dict[tuple[str, tuple[str, ...]], list[tuple[str, bool]]] = {}
         self._cached_chars = 0
 
     def active_removals(self, coll: dict) -> list[TargetRemoval]:
-        return [r for r in self.removals if self._link(r.link, _phase(coll, r.phase), _State())]
+        return [r for r in self.removals if self._link(r.link, _phase(coll, r.phase), self._state())]
+
+    def _state(self) -> _State:
+        return _State(tx=dict(self.tx_defaults))
 
     def _matcher(self, op: str, arg: str) -> Acmp:
         key = (op, arg)
@@ -1138,8 +1138,6 @@ class Evaluator:
             phrase = self._matcher(op, arg).find(value)
             return phrase is not None, phrase or "", None if phrase is None else [phrase]
         expanded = _expand(arg, coll, state)
-        if expanded is None:
-            return False, "", None
         if op == "contains":
             return expanded in value, expanded, None
         if op == "beginsWith":
@@ -1177,7 +1175,7 @@ class Evaluator:
     def evaluate(self, rule: Rule, coll: dict, removals: list[TargetRemoval] | None = None) -> Match | None:
         """Match pertama dari link pertama bila seluruh rantai cocok, selain itu None. `coll` = hasil collections()."""
         coll = _phase(coll, rule.phase)
-        state = _State()
+        state = self._state()
         first: list[Match] = []
         drop = {(r.target.collection, r.target.selector) for r in removals or []
                 if (r.by == "tag" and r.selector in rule.tags) or (r.by == "id" and r.selector == str(rule.id))}

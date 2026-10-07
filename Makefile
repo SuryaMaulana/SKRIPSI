@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 RAW := data/raw/srbh2020/data_capec_multilabel.csv
 
-.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check
+.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval
 
 help:
 	@echo "make setup     buat .venv (Python 3.11) dan pasang dependensi terkunci"
@@ -16,6 +16,9 @@ help:
 	@echo "make regex     langkah B: pembanding regex (CRS + Baş Seyyar dkk.) pada test_sample_500 -> results/regex.jsonl"
 	@echo "make verify-crs cocokkan emulasi CRS dengan uji regresi resmi CRS -> results/crs_regression.json"
 	@echo "make golden-check bangun harness C ModSecurity 2.9.15 (butuh cc) dan audit tests/fixtures/modsec_v2915_golden.json"
+	@echo "make regex-full-val varian regex_full pada srbh_val + evaluasi (penyesuaian pemetaan)"
+	@echo "make regex-full varian regex_full pada test_sample_500 -> results/regex_full.jsonl (post_hoc)"
+	@echo "make eval      D: Tabel 4.2/4.3, F1 per kelas, confusion matrix, IK 95% untuk semua results/*.jsonl"
 
 setup:
 	@if command -v uv >/dev/null 2>&1; then \
@@ -58,3 +61,13 @@ golden-check:
 	cc -O2 -w -I $$tmp/apr_stub -o $$tmp/tfns_map $$tmp/main_map.c && \
 	cc -O2 -w -I $$tmp/apr_stub -o $$tmp/pm $$tmp/pm_main.c $$tmp/acmp.c && \
 	$(PY) scripts/make_modsec_golden.py --check $$tmp; status=$$?; rm -rf $$tmp; exit $$status
+
+regex-full-val:
+	$(PY) -m src.baselines.regex_baseline --config configs/regex_full.yaml --split val
+	$(PY) -m src.eval.evaluate results/tuning/regex_full_val.jsonl --truth val --rules
+
+regex-full:
+	$(PY) -m src.baselines.regex_baseline --config configs/regex_full.yaml
+
+eval:
+	$(PY) -m src.eval.evaluate --rules

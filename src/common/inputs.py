@@ -9,8 +9,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
+
 from ..data.config import PROCESSED_DIR
-from ..data.sample import EVAL_COLUMNS, INPUT_COLUMNS
+from ..data.sample import EVAL_COLUMNS, INPUT_COLUMNS, _json_value
 
 SAMPLE_PATH = PROCESSED_DIR / "test_sample_500.jsonl"
 METHOD_COLUMNS = ("id", *INPUT_COLUMNS)
@@ -28,3 +30,14 @@ def load_inputs(path: Path = SAMPLE_PATH) -> list[dict]:
                 raise KeyError(f"{path.name} baris {n}: kolom masukan tidak ada: {missing}")
             rows.append({c: record[c] for c in METHOD_COLUMNS})
     return rows
+
+
+def split_path(split: str) -> Path:
+    return PROCESSED_DIR / f"srbh_{split}.parquet"
+
+
+def load_split_inputs(split: str) -> list[dict]:
+    """Baris srbh_<split>.parquet dalam bentuk yang sama dengan test_sample_500.jsonl (hanya METHOD_COLUMNS, nilai
+    dikonversi seperti saat sampel ditulis). Dipakai untuk menyesuaikan pemetaan pada split val, bukan pada data uji."""
+    frame = pd.read_parquet(split_path(split), columns=list(METHOD_COLUMNS))
+    return [{c: _json_value(v) for c, v in record.items()} for record in frame.to_dict("records")]

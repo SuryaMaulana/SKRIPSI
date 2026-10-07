@@ -39,3 +39,9 @@ def test_run_info_records_date_commit_and_model(monkeypatch):
 def test_git_dirty_when_code_changes(monkeypatch):
     monkeypatch.setattr(runinfo, "_git", lambda *a: " M src/baselines/regex_baseline.py" if a[0] == "status" else "abc")
     assert runinfo.git_state()["git_dirty"] is True
+
+
+def test_thesis_draft_changes_do_not_mark_runs_dirty(monkeypatch):
+    status = ' D "Draft Skripsi (1).docx"\n?? "Draft Skripsi (2).docx"\n M results/regex.jsonl'
+    monkeypatch.setattr(runinfo, "_git", lambda *a: status if a[0] == "status" else "abc")
+    assert runinfo.git_state()["git_dirty"] is False

@@ -18,7 +18,7 @@ import yaml
 
 from ..common.runinfo import run_info
 from ..data.config import ROOT
-from .crs import ensure_crs, load_data_file, load_rules, tree_digest
+from .crs import ensure_crs, load_data_file, load_rules, tree_digest, tx_defaults
 from .modsec import Evaluator, Request, collections, compile_pcre, is_applicable, to_bytes_str
 from .regex_baseline import CONFIG_PATH, engine_unicode_map, load_config
 
@@ -42,7 +42,8 @@ def verify(root: Path, categories: list[str], excluded_operators: set[str], max_
     rules, report = load_rules(root / "rules", categories)
     by_id = {r.id: r for r in rules}
     files = {f for r in rules for link in r.links if link.operator in ("pmFromFile", "pmf") for f in link.argument.split()}
-    evaluator = Evaluator({f: load_data_file(root / "rules", f) for f in sorted(files)}, report.removals, unicode_map)
+    evaluator = Evaluator({f: load_data_file(root / "rules", f) for f in sorted(files)}, report.removals, unicode_map,
+                          tx_defaults(root / "rules"))
     stats: Counter = Counter()
     per_rule: dict[int, list[int]] = {}
     disagreements = []

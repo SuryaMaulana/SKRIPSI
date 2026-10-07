@@ -51,9 +51,24 @@ def test_request_from_row_keeps_raw_target_and_logged_headers():
 
 
 def test_restricted_file_without_traversal_maps_to_web_scanning():
-    assert rb.rule_class(930130, "930", {930130}, CONFIG) == "WEB_SCANNING"
-    assert rb.rule_class(930130, "930", {930130, 930110}, CONFIG) == "PATH_TRAVERSAL"
-    assert rb.rule_class(930120, "930", {930120}, CONFIG) == "PATH_TRAVERSAL"
+    restricted, os_file = _rule(930130, "rx", "x"), _rule(930120, "rx", "x")
+    assert rb.rule_class(restricted, {930130}, CONFIG) == "WEB_SCANNING"
+    assert rb.rule_class(restricted, {930130, 930110}, CONFIG) == "PATH_TRAVERSAL"
+    assert rb.rule_class(os_file, {930120}, CONFIG) == "PATH_TRAVERSAL"
+
+
+def test_rule_class_map_overrides_category_and_unmapped_rules_are_ignored():
+    config = {**CONFIG, "rule_class_map": {"920440": "WEB_SCANNING"}}
+    assert rb.mapped_class(_rule(920440, "rx", "x"), config) == "WEB_SCANNING"
+    assert rb.mapped_class(_rule(920270, "rx", "x"), config) is None  # kategori 920 lain: tanpa padanan kelas
+    assert rb.mapped_class(_rule(942100, "rx", "x"), config) == "SQLI"
+
+
+def test_child_config_inherits_and_overrides(tmp_path, monkeypatch):
+    (tmp_path / "parent.yaml").write_text("a: {x: 1, y: 2}\nb: [1]\nname: p\n", encoding="utf-8")
+    (tmp_path / "child.yaml").write_text("inherits: parent.yaml\na: {y: 3}\nname: c\n", encoding="utf-8")
+    monkeypatch.setattr(rb, "ROOT", tmp_path)
+    assert rb.load_config(tmp_path / "child.yaml") == {"a": {"x": 1, "y": 3}, "b": [1], "name": "c"}
 
 
 def test_classify_sums_points_per_class_and_breaks_ties_by_priority():

@@ -286,12 +286,42 @@ class LoadReport:
     removals: list[TargetRemoval] | None = None
 
 
+def available_categories(rules_dir: Path) -> list[str]:
+    """Kategori tiga digit dari semua berkas REQUEST-9xx-*.conf dan RESPONSE-9xx-*.conf."""
+    found = {m.group(1) for p in rules_dir.glob("*.conf") if (m := re.match(r"(?:REQUEST|RESPONSE)-(\d{3})-", p.name))}
+    return sorted(found)
+
+
+def tx_defaults(rules_dir: Path) -> dict[str, str]:
+    """Nilai kebijakan bawaan CRS dari REQUEST-901: aturan `&TX:nama "@eq 0"` dengan setvar:'tx.nama=nilai'.
+
+    Inilah nilai yang berlaku bila crs-setup.conf tidak mengubahnya (mis. tx.allowed_methods, tx.restricted_extensions).
+    """
+    (conf,) = sorted(rules_dir.glob("REQUEST-901-*.conf"))
+    values: dict[str, str] = {}
+    for line in logical_lines(conf.read_text(encoding="utf-8")):
+        words = split_words(line)
+        if len(words) < 4 or words[0] != "SecRule":
+            continue
+        var = re.fullmatch(r"&TX:(\w+)", words[1], re.IGNORECASE)
+        if not var or not re.fullmatch(r"@eq\s+0", words[2]):
+            continue
+        for name, value in parse_actions(words[3]):
+            key, _, val = (value or "").partition("=")
+            if name == "setvar" and key.lower() == f"tx.{var.group(1).lower()}":
+                values[var.group(1).lower()] = val
+    for _ in range(3):  # makro antar-nilai bawaan, mis. detection_paranoia_level=%{TX.blocking_paranoia_level}
+        values = {k: re.sub(r"%\{tx\.(\w+)\}", lambda m: values.get(m.group(1).lower(), ""), v, flags=re.IGNORECASE)
+                  for k, v in values.items()}
+    return values
+
+
 def load_rules(rules_dir: Path, categories: list[str]) -> tuple[list[Rule], LoadReport]:
-    """Semua aturan deteksi (ber-tag paranoia-level) dari berkas REQUEST-<kategori>-*.conf."""
+    """Semua aturan deteksi (ber-tag paranoia-level) dari berkas REQUEST-/RESPONSE-<kategori>-*.conf."""
     rules: list[Rule] = []
     report = LoadReport(pl_tag_mismatch=[], removals=[])
     for category in categories:
-        (conf,) = sorted(rules_dir.glob(f"REQUEST-{category}-*.conf"))
+        (conf,) = sorted(rules_dir.glob(f"*-{category}-*.conf"))
         floor = 1  # PL dari penanda "TX:DETECTION_PARANOIA_LEVEL @lt N ... skipAfter"
         pending: list[tuple[list, list[tuple[str, str | None]]]] = []
         for line in logical_lines(conf.read_text(encoding="utf-8")):

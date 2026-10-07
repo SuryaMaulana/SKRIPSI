@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_PREFIXES = ("results/",)  # berkas keluaran run tidak membuat pohon kerja dianggap berubah
+DOCUMENT_SUFFIXES = (".docx",)  # draf skripsi penulis: bukan kode/konfigurasi yang memengaruhi hasil
 
 
 def _git(*args: str) -> str | None:
@@ -23,8 +24,10 @@ def _git(*args: str) -> str | None:
 def git_state() -> dict:
     """Commit dan cabang aktif, serta apakah ada perubahan belum di-commit di luar results/."""
     status = _git("status", "--porcelain", "--untracked-files=all")
-    changed = None if status is None else [
-        line[3:] for line in status.splitlines() if line and not line[3:].strip('"').startswith(OUTPUT_PREFIXES)
+    paths = None if status is None else [line[3:].strip('"') for line in status.splitlines() if line]
+    changed = None if paths is None else [
+        path for path in paths
+        if not path.startswith(OUTPUT_PREFIXES) and not path.lower().endswith(DOCUMENT_SUFFIXES)
     ]
     return {
         "git_commit": _git("rev-parse", "HEAD"),
