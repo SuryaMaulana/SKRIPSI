@@ -95,6 +95,10 @@ def _message(m) -> dict:
     out = {"role": m.type, "content": m.content}
     if getattr(m, "tool_calls", None):
         out["tool_calls"] = m.tool_calls
+    if getattr(m, "invalid_tool_calls", None):  # mis. argumen alat degeneratif sampai batas token (JSON tidak valid)
+        out["invalid_tool_calls"] = [{"name": t.get("name"), "id": t.get("id"), "error": t.get("error"),
+                                      "args_len": len(t.get("args") or ""), "args_prefix": (t.get("args") or "")[:2000]}
+                                     for t in m.invalid_tool_calls]
     if getattr(m, "tool_call_id", None):
         out["tool_call_id"] = m.tool_call_id
     return out

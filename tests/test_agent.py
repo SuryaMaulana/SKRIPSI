@@ -586,3 +586,11 @@ def test_klasifikasi_batched_with_evidence_subagents_waits_for_the_next_message(
     agent.invoke({"messages": [HumanMessage(f"<log>{LOG}</log>")]}, {"recursion_limit": 40})
     assert [b["alasan"] for b in ctx.guard_blocks] == [g.AFTER_EVIDENCE_MESSAGE]
     assert len(ctx.classifications) == 1 and ctx.verdicts[-1]["lolos"]
+
+
+def test_invalid_tool_calls_are_logged_with_a_bounded_prefix():
+    from langchain_core.messages import AIMessage as Msg
+
+    m = Msg("", invalid_tool_calls=[{"name": "task", "args": "{" + " " * 5000, "id": "x", "error": "JSON", "type": "invalid_tool_call"}])
+    logged = ar._message(m)["invalid_tool_calls"][0]
+    assert logged["args_len"] == 5001 and len(logged["args_prefix"]) == 2000 and logged["error"] == "JSON"
