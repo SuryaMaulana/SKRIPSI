@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 RAW := data/raw/srbh2020/data_capec_multilabel.csv
 
-.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval
+.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot llm-single
 
 help:
 	@echo "make setup     buat .venv (Python 3.11) dan pasang dependensi terkunci"
@@ -19,6 +19,8 @@ help:
 	@echo "make regex-full-val varian regex_full pada srbh_val + evaluasi (penyesuaian pemetaan)"
 	@echo "make regex-full varian regex_full pada test_sample_500 -> results/regex_full.jsonl (post_hoc)"
 	@echo "make eval      D: Tabel 4.2/4.3, F1 per kelas, confusion matrix, IK 95% untuk semua results/*.jsonl"
+	@echo "make llm-single-pilot C: LLM tunggal pada 30 baris pilot (5 per kelas) -> results/pilot/"
+	@echo "make llm-single C: LLM tunggal pada 500 baris -> results/llm_single.jsonl (panggilan: results/llm_single_calls.jsonl)"
 
 setup:
 	@if command -v uv >/dev/null 2>&1; then \
@@ -71,3 +73,10 @@ regex-full:
 
 eval:
 	$(PY) -m src.eval.evaluate --rules
+
+llm-single-pilot:
+	$(PY) -m src.eval.pilot
+	$(PY) -m src.baselines.llm_single --ids results/pilot/pilot_ids.json --out-dir results/pilot
+
+llm-single:
+	$(PY) -m src.baselines.llm_single
