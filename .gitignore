@@ -1,0 +1,19 @@
+# Data (mentah dan hasil olahan) tidak di-commit; dapat dibangun ulang dengan `make data`
+/data/
+
+# Rahasia
+.env
+.env.*
+
+# Lingkungan Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Sistem / editor
+.DS_Store
+.idea/
+.vscode/
+~$*.docx

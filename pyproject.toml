@@ -1,0 +1,21 @@
+[project]
+name = "skripsi-weblog-attack"
+version = "0.1.0"
+description = "Persiapan dataset deteksi dan klasifikasi serangan aplikasi web pada log akses web server (SR-BH 2020)."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pandas>=2.2,<3",
+    "pyarrow>=16",
+    "scikit-learn>=1.5",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q -m 'not slow'"
+markers = ["slow: uji lambat yang memakai data penuh (make test-slow)"]

@@ -1,0 +1,225 @@
+# =====================================================================================================
+# Pemetaan label SR-BH 2020 -> 6 kelas penelitian (gerbang bukti CLF)
+#
+# Usulan dan buktinya: reports/label_mapping_proposal.md. Disetujui penulis 2026-10-07 (blok `approved`).
+# Aturan diimplementasikan di src/data/gate/ (satu modul per kelompok label). ID aturan di sini wajib sama dengan
+# RULES di modulnya (diperiksa otomatis). `rows_expected` = jumlah baris berlabel itu yang jatuh ke aturan tersebut
+# menurut analisis bukti; pipeline membandingkannya dengan hasil aktual di reports/data_report.md (uji paritas).
+# Aturan bertanda "netral" tidak menyumbang kelas maupun alasan; kelas baris ditentukan label lain.
+# =====================================================================================================
+schema_version: 1
+status: disetujui
+dataset: "SR-BH 2020 — Harvard Dataverse doi:10.7910/DVN/OGOIXX (v1.2, CC0 1.0), 907.815 baris"
+classes: [SQLI, XSS, PATH_TRAVERSAL, CMD_INJECTION, WEB_SCANNING, NORMAL]
+normal_label: "000 - Normal"
+
+approved:
+  date: 2026-10-07
+  decisions:
+    K1: >
+      Gerbang bukti dua kunci dipakai, dengan syarat pola gerbang tidak sama dengan himpunan regex pembanding di §3.5;
+      jumlah baris yang dikeluarkan dilaporkan per label.
+    K2: "a — 118.793 baris NORMAL bermasalah dikeluarkan dengan kode alasan dan dilaporkan terpisah."
+    K3: "b — XSS hanya dari label (tanpa override); kuota XSS di sampel uji ±57; aturan split sama untuk semua kelas."
+    D4-D9: "Default usulan disetujui."
+    D6_cap: "Baris PATH_TRAVERSAL dari label 194: setelah dedup, maksimal 200 baris per templat payload; angkanya dilaporkan."
+    sebelum_split: >
+      Offset zona waktu di raw_log menjadi +0000 untuk semua baris (stempel waktu asli di kolom terpisah yang tidak
+      dipakai metode); fitur sesi dari jendela 60 detik tanpa IP; split stratified biasa tanpa grup per IP.
+
+# Prinsip: kelas akhir sebuah baris harus (1) berasal dari salah satu label SR-BH miliknya sendiri dan (2) buktinya
+# terlihat di field Combined Log Format (method, URI, User-Agent, Referer). Bila tidak -> EXCLUDED dengan kode alasan;
+# baris itu disimpan di data/processed/srbh_excluded.parquet, tidak dibuang.
+evidence_gate: true
+
+# Urutan prioritas penulis. Di bawah gerbang bukti hanya 962 baris yang memiliki >1 kandidat kelas
+# (935 CMD vs PT, 23 PT vs WS, 2 SQLI vs WS, 2 XSS vs WS); tidak ada baris dengan kandidat XSS dan SQLI sekaligus.
+priority: [CMD_INJECTION, SQLI, XSS, PATH_TRAVERSAL, WEB_SCANNING]
+priority_reason: >
+  Payload eksploit spesifik mengalahkan sinyal pemindaian (payload yang dikirim pemindai tetap diklasifikasikan menurut
+  payload-nya); perintah shell yang membaca berkas ('; cat /etc/passwd') adalah CMD_INJECTION karena berkasnya hanya argumen.
+
+exclusion_reasons:  # urutan = prioritas bila satu baris punya beberapa alasan
+  EMPTY_ROW: "Semua field kosong."
+  LABELER_BLIND: >
+    Baris berlabel NORMAL yang path mentahnya (sebelum '?') mengandung %2F, atau bermetode TRACE. Fakta teramati: Apache
+    menjawab 404 untuk semua 125.868 permintaan ber-%2F dan 405 untuk semua 2.340 TRACE; 56.729 permintaan ber-%2F dan 48
+    TRACE justru berlabel serangan, sedangkan keluarga payload yang sama dilabeli tidak konsisten (mis. <script> di path:
+    2.335 dari 2.385 baris ber-%2F berlabel NORMAL, 0 dari 124 baris tanpa %2F). Label NORMAL pada kelompok ini karena
+    itu tidak andal. Aturan ini tidak melihat isi payload. (Revisi 2026-10-07: penjelasan awal "Apache menolak sebelum
+    WAF memeriksa" dicabut karena dibantah data.)
+  INSPECTED_VISIBLE_PAYLOAD: "Baris berlabel NORMAL dengan payload serangan eksplisit yang terlihat di baris log."
+  SCANNER_PROBE: "Baris berlabel NORMAL yang jelas buatan pemindai tanpa payload eksploit."
+  LABEL_MISMATCH: "Payload yang terlihat adalah kelas lain yang labelnya tidak dimiliki baris itu."
+  OUT_OF_SCOPE: "Payload di luar taksonomi 6 kelas (injeksi kode PHP/EL, CRLF, open redirect, XPath, dll.)."
+  RFI_SCHEMELESS: "Templat RFI tanpa skema http(s)://; nama host polos tidak bisa dibaca sebagai inklusi berkas."
+  HIDDEN_EVIDENCE: "Bukti hanya ada di body POST, cookie, atau header yang tidak tercatat di log akses."
+  NO_EVIDENCE: "Tidak ada bukti untuk label tersebut di field mana pun."
+
+labels:
+  "000 - Normal":
+    capec: "000"
+    target: NORMAL
+    reason: >
+      Label normal SR-BH dipakai apa adanya, kecuali baris yang labelnya terbukti tidak informatif atau jelas bukan
+      lalu lintas sah (keputusan K2a).
+    rules:
+      - {id: N0, when: "semua field kosong", then: EXCLUDED, reason_code: EMPTY_ROW, rows_expected: 2}
+      - {id: N1, when: "path mentah sebelum '?' mengandung %2F, atau metode TRACE", then: EXCLUDED, reason_code: LABELER_BLIND, rows_expected: 71431}
+      - {id: N2, when: "payload serangan eksplisit terlihat di URI/UA/Referer", then: EXCLUDED, reason_code: INSPECTED_VISIBLE_PAYLOAD, rows_expected: 17378}
+      - {id: N3, when: "sidik jari pemindai tanpa payload", then: EXCLUDED, reason_code: SCANNER_PROBE, rows_expected: 29984}
+      - {id: N4, when: "selain di atas", then: NORMAL, rows_expected: 406400}
+
+  "66 - SQL Injection":
+    capec: 66
+    target: SQLI
+    reason: >
+      Isi label sesuai CAPEC-66: payload sqlmap (~39%) dan OWASP ZAP (~46%), terutama di segmen path. Sekitar 9% baris
+      berisi probe perintah OS ZAP tanpa sintaks SQL; baris itu dikeluarkan, tidak dipindah kelas (D4).
+    rules:
+      - {id: S1, when: "sintaks SQL terlihat di URI/UA/Referer", then: SQLI, rows_expected: 187338}
+      - {id: S2, when: "hanya probe metakarakter 1-2 karakter tanpa sintaks SQL: salah satu dari ', \", (, ), ;, %, |, NULL, atau pasangan kutip '\" / \"'", then: SQLI, flag: weak_evidence, rows_expected: 28625}
+      - {id: S3, when: "payload CMD/XSS/PT terlihat tanpa sintaks SQL", then: EXCLUDED, reason_code: LABEL_MISMATCH, rows_expected: 22847}
+      - {id: S4, when: "probe XPath/XML, open redirect, PHP, CRLF, SSI, EL", then: EXCLUDED, reason_code: OUT_OF_SCOPE, rows_expected: 5529}
+      - {id: S5, when: "bukti hanya di body/header", then: EXCLUDED, reason_code: HIDDEN_EVIDENCE, rows_expected: 5340}
+      - {id: S6, when: "tidak ada bukti", then: EXCLUDED, reason_code: NO_EVIDENCE, rows_expected: 629}
+      - {id: S7, when: "enumerasi path Nmap (berlabel 310 juga): netral", then: netral, rows_expected: 3}
+
+  "242 - Code Injection":
+    capec: 242
+    target: XSS
+    reason: >
+      CAPEC-63 (XSS) adalah anak CAPEC-242, tetapi isi label 242 hanya 3,2% XSS; mayoritasnya probe injeksi kode PHP
+      print(chr(..)) bertanda 'zap_token' dan ekspresi ${a+b}. Hanya XSS yang terlihat di baris log menjadi XSS (K3b).
+    rules:
+      - {id: K1, when: "tag <script>, atribut event handler, atau javascript: terlihat di URI/UA/Referer", then: XSS, rows_expected: 378}
+      - {id: K2, when: "SSI exec terlihat (selalu berlabel 88): netral, kelas dari 88", then: netral, rows_expected: 170}
+      - {id: K3, when: "PHP print(chr()), EL ${..}, '<!--' polos, xmlrpc multicall, ThinkPHP, PHPUnit terlihat", then: EXCLUDED, reason_code: OUT_OF_SCOPE, rows_expected: 13717}
+      - {id: K4, when: "PHP-CGI CVE-2012-1823 (kandidat CMD datang dari label 88 bila ada)", then: EXCLUDED, reason_code: OUT_OF_SCOPE, rows_expected: 539}
+      - {id: K5, when: "bukti hanya di body (termasuk XSS di body)", then: EXCLUDED, reason_code: HIDDEN_EVIDENCE, rows_expected: 1023}
+
+  "88 - OS Command Injection":
+    capec: 88
+    target: CMD_INJECTION
+    reason: >
+      Sesuai CAPEC-88 (99,5% dari satu active scan ZAP), tetapi 50,7% baris membawa payload hanya di body/header.
+      PHP-CGI CVE-2012-1823 (513 baris) ikut CMD karena berlabel 88 (D5).
+    rules:
+      - {id: C1, when: "perintah shell terlihat: pemisah + cat/sleep, Shellshock, SSI exec, dropper IoT, argumen PHP-CGI", then: CMD_INJECTION, rows_expected: 3089}
+      - {id: C2, when: "hanya /etc/passwd atau ../ tanpa perintah (selalu berlabel 126): netral", then: netral, rows_expected: 344}
+      - {id: C3, when: "probe eval PHP / EL / ThinkPHP", then: EXCLUDED, reason_code: OUT_OF_SCOPE, rows_expected: 254}
+      - {id: C4, when: "bukti hanya di body/header", then: EXCLUDED, reason_code: HIDDEN_EVIDENCE, rows_expected: 3792}
+      - {id: C5, when: "tidak ada payload", then: EXCLUDED, reason_code: NO_EVIDENCE, rows_expected: 3}
+
+  "248 - Command Injection":
+    capec: 248
+    target: UNMAPPED
+    reason: >
+      Hanya 1 baris; CAPEC-248 adalah kategori induk dan payload OGNL-nya di header Content-Type. Baris log hanya
+      menampakkan UA Nmap, sehingga baris ini WEB_SCANNING lewat label 310.
+    rules:
+      - {id: C0, when: "kategori induk: netral", then: netral, rows_expected: 1}
+
+  "126 - Path Traversal":
+    capec: 126
+    target: PATH_TRAVERSAL
+    reason: >
+      81% baris berisi urutan traversal nyata. Probe berkas VCS/backup tanpa traversal adalah penemuan berkas di dalam
+      web root sehingga WEB_SCANNING (D7). Tidak ada konten file inclusion di label ini.
+    rules:
+      - {id: T1, when: "urutan traversal di request line/UA, atau nilai parameter berupa path OS absolut", then: PATH_TRAVERSAL, rows_expected: 16430}
+      - {id: T2, when: "'<pemisah>cat /etc/passwd' (selalu berlabel 88, CMD menang lewat prioritas)", then: PATH_TRAVERSAL, rows_expected: 935}
+      - {id: T3, when: "berkas VCS/backup/terlarang tanpa traversal", then: WEB_SCANNING, rows_expected: 1356}
+      - {id: T4, when: "bukti hanya di body/header, atau tidak ada", then: EXCLUDED, reason_code: HIDDEN_EVIDENCE, rows_expected: 2271}
+
+  "310 - Scanning for Vulnerable Software":
+    capec: 310
+    target: WEB_SCANNING
+    reason: >
+      Semua baris memuat UA pemindai yang terlihat di log (Nmap NSE 2.714, zgrab 4), 99,85% dari satu sesi Nmap 30 menit.
+      Payload lain yang terlihat menang lewat prioritas.
+    rules:
+      - {id: W1, when: "UA pemindai terlihat", then: WEB_SCANNING, rows_expected: 2718}
+      - {id: W2, when: "UA pemindai tidak terlihat", then: EXCLUDED, reason_code: NO_EVIDENCE, rows_expected: 0}
+
+  "194 - Fake the Source of Data":
+    capec: 194
+    target: PATH_TRAVERSAL
+    reason: >
+      98% baris adalah probe Remote File Inclusion ZAP (http://www.google.com/ di segmen path/parameter), sesuai bagian
+      "File Inclusion" kelas PATH_TRAVERSAL (D6; Tabel 2.1 perlu tanda "URL eksternal di segmen path/parameter").
+      Setelah dedup dibatasi maksimal 200 baris per templat payload (options.rfi_template_cap).
+    rules:
+      - {id: F1, when: "templat RFI dengan skema http(s):// eksplisit di path/query ter-decode", then: PATH_TRAVERSAL, rows_expected: 37830}
+      - {id: F2, when: "templat yang sama tanpa skema", then: EXCLUDED, reason_code: RFI_SCHEMELESS, rows_expected: 12263}
+      - {id: F3, when: "payload di UA/Referer, atau UA Googlebot", then: EXCLUDED, reason_code: OUT_OF_SCOPE, rows_expected: 3236}
+      - {id: F4, when: "bukti hanya di body/header", then: EXCLUDED, reason_code: HIDDEN_EVIDENCE, rows_expected: 2280}
+      - {id: F5, when: "tidak ada bukti", then: EXCLUDED, reason_code: NO_EVIDENCE, rows_expected: 536}
+
+  "34 - HTTP Response Splitting":
+    capec: 34
+    target: UNMAPPED
+    reason: >
+      Tidak ada kelas CRLF di Tabel 2.1. Isinya probe ZAP 'Set-cookie: Tamper' (76,6%) dan probe perintah OS yang dipisah
+      newline di path (23,4%); probe perintah ini tidak dipindah ke CMD_INJECTION (D4).
+    rules:
+      - {id: R1, when: "probe CRLF terlihat", then: EXCLUDED, reason_code: OUT_OF_SCOPE, rows_expected: 14448}
+      - {id: R2, when: "probe perintah OS dipisah newline di path", then: EXCLUDED, reason_code: LABEL_MISMATCH, rows_expected: 4624}
+      - {id: R3, when: "bukti hanya di body", then: EXCLUDED, reason_code: HIDDEN_EVIDENCE, rows_expected: 666}
+
+  "33 - HTTP Request Smuggling":
+    capec: 33
+    target: UNMAPPED
+    reason: >
+      Tidak ada request smuggling di data; label ini efek samping aturan CRS-921 dan tidak pernah muncul sendirian.
+    rules:
+      - {id: R0, when: "probe PHP-CGI (berlabel 242+88): netral, kelas dari 88", then: netral, rows_expected: 513}
+      - {id: R1, when: "probe CRLF terlihat", then: EXCLUDED, reason_code: OUT_OF_SCOPE, rows_expected: 510}
+      - {id: R3, when: "bukti hanya di body", then: EXCLUDED, reason_code: HIDDEN_EVIDENCE, rows_expected: 36}
+
+  "272 - Protocol Manipulation":
+    capec: 272
+    target: WEB_SCANNING
+    reason: >
+      Label ini menandai aturan CRS-920 yang menyala, bukan satu jenis serangan. Hanya probe penemuan yang terlihat di
+      baris log yang menjadi WEB_SCANNING (D7).
+    rules:
+      - {id: P1, when: "metode non-standar, ekstensi backup/terlarang (kecuali .com), akhiran '~', atau target tanpa '/' di depan", then: WEB_SCANNING, rows_expected: 3931}
+      - {id: P2, when: "tidak ada pemicu di field mana pun", then: EXCLUDED, reason_code: NO_EVIDENCE, rows_expected: 3632}
+      - {id: P3, when: "anomali hanya di header Host/body", then: EXCLUDED, reason_code: HIDDEN_EVIDENCE, rows_expected: 994}
+      - {id: P4, when: "path '.com' tanpa skema, byte NUL", then: EXCLUDED, reason_code: OUT_OF_SCOPE, rows_expected: 596}
+
+  "274 - HTTP Verb Tampering":
+    capec: 274
+    target: WEB_SCANNING
+    reason: >
+      Identik dengan "metode bukan GET/POST/HEAD/OPTIONS/TRACE" (5.437/5.437): satu sapuan metode otomatis per halaman.
+      Metode terlihat di baris log; enumerasi kemampuan server sehingga WEB_SCANNING (D7).
+    rules:
+      - {id: V1, when: "seluruh label", then: WEB_SCANNING, rows_expected: 5437}
+
+  "16 - Dictionary-based Password Attack":
+    capec: 16
+    target: UNMAPPED
+    reason: >
+      Label ini menandai pengiriman formulir login wp-login.php, bukan perilaku brute force; kredensial hanya di body
+      dan tidak ada kelas brute force di Tabel 2.1. Label pendamping menentukan kelas bila payload-nya terlihat.
+    rules:
+      - {id: B1, when: "payload probe hanya di body/header", then: EXCLUDED, reason_code: HIDDEN_EVIDENCE, rows_expected: 1039}
+      - {id: B2, when: "lainnya (probe terlihat, login otomatis tanpa payload, bot, login sah)", then: EXCLUDED, reason_code: OUT_OF_SCOPE, rows_expected: 808}
+
+  "153 - Input Data Manipulation":
+    capec: 153
+    target: UNMAPPED
+    reason: >
+      Label ini menandai header Content-Type tak valid; payload-nya ada di header itu, yang tidak tercatat di log akses.
+    rules:
+      - {id: I1, when: "seluruh label", then: EXCLUDED, reason_code: HIDDEN_EVIDENCE, rows_expected: 2272}
+
+options:
+  rfi_template_cap: 200  # D6: maksimal baris per templat payload untuk PATH_TRAVERSAL dari label 194, setelah dedup
+  xss_template_override: false  # K3: tidak dipakai (penulis memilih K3b)
+  label_mismatch_relabel: false  # D4: payload yang bertentangan dengan label dikeluarkan, tidak dipindah kelas
+  # D9: porsi SQLI berbukti lemah (S2) di test_sample_500 — diputuskan penulis 2026-10-07: exclude.
+  # exclude = pool SQLI sampel hanya baris berbukti kuat; include = ikut diambil acak sesuai porsinya.
+  sample_weak_sqli: exclude
