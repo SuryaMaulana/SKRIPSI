@@ -168,7 +168,7 @@ def compare(ids_path: Path, agent_path: Path, singles: list[tuple[str, Path]], c
               row("latensi p95 (s)", lambda r: _num(_pct([r[i]["latency_s"] for i in ids], 0.95))),
               row("biaya total ($)", lambda r: f"{sum(r[i]['cost_usd'] for i in ids):.5f}"),
               row("panggilan LLM per baris (rerata)",
-                  lambda r: _num(statistics.mean(r[i].get("llm_calls", 1) for i in ids), 1)),
+                  lambda r: _num(statistics.mean(r[i].get("llm_calls", r[i].get("attempts", 1)) for i in ids), 1)),
               row("pemanggilan alat per baris (rerata)",
                   lambda r: _num(statistics.mean(r[i]["tool_calls"] for i in ids), 1) if "tool_calls" in r[ids[0]] else "—")]
     statuses = Counter(agent[i]["status"] for i in ids)

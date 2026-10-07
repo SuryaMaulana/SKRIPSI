@@ -25,9 +25,10 @@ make eval             # D: Tabel 4.2-4.5 per run (reports/evaluasi.md) + rerata 
                       #    run berkonfigurasi sama (reports/evaluasi_replikasi.md; tabel utama = rerata)
 ```
 
-Run LLM (C dan E) yang terhenti karena galat API dilanjutkan dengan `--resume`
-(`python -m src.baselines.llm_single --resume`, `python -m src.agent.run --resume`); baris yang terkena galat API tidak
-dinilai salah. Kunci `OPENROUTER_API_KEY` hanya dibaca dari `.env` di dalam kode dan tidak pernah dicatat; tracing
+Run LLM (C dan E) yang terhenti karena galat API dilanjutkan dengan menjalankan ulang perintah yang sama persis ditambah
+`--resume` (mis. `python -m src.agent.run --split val --ids results/validasi/val_ids.json --out-dir results/validasi
+--resume`); runner menolak bila masukan, daftar baris, log panggilan, atau nama keluaran berbeda dari run awal. Baris yang
+terkena galat API tidak dinilai salah. Kunci `OPENROUTER_API_KEY` hanya dibaca dari `.env` di dalam kode dan tidak pernah dicatat; tracing
 LangSmith dimatikan, semua catatan panggilan tetap lokal.
 
 Aturan umum tahap sistem: semua metode membaca kolom masukan yang sama dari `test_sample_500.jsonl` lewat

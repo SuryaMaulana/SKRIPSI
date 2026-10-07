@@ -476,3 +476,90 @@ def test_full_graph_offline_sees_only_specified_tools_and_delegates_to_all_four(
     assert out["status"] == "ok" and out["label"] == "SQLI" and out["llm_calls"] == 8
     assert out["delegasi"] == {"parser": True, "analisis_payload": True, "klasifikasi": True, "verifikasi": True,
                                "keempat_subagen": True}
+
+
+def _graph_with_scripts(monkeypatch, scripts):
+    def fake_model(config, subagent, key):
+        return _RecordingModel(messages=iter(scripts[subagent]), name_tag=subagent)
+
+    monkeypatch.setattr(g, "make_model", fake_model)
+    monkeypatch.setattr(g, "api_key", lambda: "sk-test")
+    return g.build_agent({"model": "openai/gpt-4.1-nano"})
+
+
+def _batch(*calls):
+    return AIMessage("", tool_calls=[{"name": "task", "args": {"description": "x", "subagent_type": s}, "id": f"b{k}-{s}"}
+                                     for k, s in enumerate(calls)])
+
+
+@pytest.mark.parametrize("attempt", range(5))
+def test_klasifikasi_and_verifikasi_in_one_message_run_one_at_a_time(ctx, monkeypatch, attempt):
+    """Review v2: pemanggilan paralel tidak boleh melompati aturan putaran. Hanya pemanggilan pertama di pesan yang jalan."""
+    bad = {**GOOD, "label": "CMD_INJECTION", "evidence": ["DROP TABLE"]}
+    scripts = {"orkestrator": [_task("klasifikasi", 1), _batch("klasifikasi", "verifikasi"), _task("verifikasi", 3),
+                               AIMessage("selesai"), _task("klasifikasi", 4), _task("verifikasi", 5), AIMessage("selesai")],
+               "parser": [], "analisis_payload": [],
+               "klasifikasi": [AIMessage(json.dumps(GOOD)), AIMessage(json.dumps(bad)), AIMessage(json.dumps(GOOD))]}
+    agent = _graph_with_scripts(monkeypatch, scripts)
+    agent.invoke({"messages": [HumanMessage(f"<log>{LOG}</log>")]}, {"recursion_limit": 60})
+    assert [b["alasan"] for b in ctx.guard_blocks] == [g.BATCH_MESSAGE]  # verifikasi di batch ditahan
+    assert len(ctx.classifications) == 3 and [v["klasifikasi_ke"] for v in ctx.verdicts] == [2, 3]
+    assert [v["lolos"] for v in ctx.verdicts] == [False, True] and len(ctx.reminders) == 1
+    out = ar.assemble(ctx, "run-1", 1.0, "selesai")
+    assert out["status"] == "ok" and out["klasifikasi_dipakai"] == 3 and out["label"] == "SQLI"
+
+
+def test_two_verifikasi_calls_in_one_message_use_a_single_round(ctx, monkeypatch):
+    scripts = {"orkestrator": [_task("klasifikasi", 1), _batch("verifikasi", "verifikasi"), AIMessage("selesai")],
+               "parser": [], "analisis_payload": [], "klasifikasi": [AIMessage(json.dumps(GOOD))]}
+    agent = _graph_with_scripts(monkeypatch, scripts)
+    agent.invoke({"messages": [HumanMessage(f"<log>{LOG}</log>")]}, {"recursion_limit": 40})
+    assert len(ctx.verdicts) == 1 and ctx.verdicts[0]["lolos"] and len(ctx.guard_blocks) == 1
+
+
+def test_delegation_counts_only_task_calls_that_ran(ctx, monkeypatch, tmp_path):
+    """Review v2: task dengan argumen tidak valid (sub-agen tidak jalan) tidak dihitung sebagai delegasi."""
+    invalid = AIMessage("", tool_calls=[{"name": "task", "args": {"subagent_type": "parser", "prompt": "x"}, "id": "i1"}])
+    scripts = {"orkestrator": [invalid, _task("analisis_payload", 2), _task("klasifikasi", 3), _task("verifikasi", 4),
+                               AIMessage("selesai")],
+               "parser": [AIMessage("tidak boleh terpakai")], "analisis_payload": [AIMessage("ok")],
+               "klasifikasi": [AIMessage(json.dumps(GOOD))]}
+    agent = _graph_with_scripts(monkeypatch, scripts)
+    logger = CallLogger(tmp_path / "calls.jsonl")
+    agent.invoke({"messages": [HumanMessage(f"<log>{LOG}</log>")]},
+                 {"recursion_limit": 40, "callbacks": [ar.CallRecorder(logger)]})
+    logger.close()
+    out = ar.assemble(ctx, "run-1", 1.0, "selesai")
+    assert out["delegasi"]["parser"] is False and out["delegasi"]["keempat_subagen"] is False
+    assert out["delegasi"]["analisis_payload"] and out["delegasi"]["klasifikasi"] and out["delegasi"]["verifikasi"]
+    assert out["alat_dipanggil"].get("task:parser") == 1  # percobaan tetap dihitung sebagai pemanggilan alat
+
+
+def test_resume_with_different_rows_or_calls_is_refused_before_any_call(tmp_path, monkeypatch):
+    rows = [{"id": f"srbh-{i}", "raw_log_masked": LOG} for i in range(3)]
+    other = [{"id": f"val-{i}", "raw_log_masked": LOG} for i in range(3)]
+    current = {"rows": rows}
+    monkeypatch.setattr(ar, "method_rows", lambda path, split: (current["rows"], ar.SAMPLE_PATH))
+    monkeypatch.setattr(ar, "load_llm_config", lambda: {"model": "openai/gpt-4.1-nano"})
+    monkeypatch.setattr(ar, "sha256_file", lambda path: "x")
+    monkeypatch.setattr(ar, "run_info", lambda method, model, **extra: {"run_id": "run-1", "git_dirty": False, **extra})
+    calls = tmp_path / "calls.jsonl"
+    with pytest.raises(ar.RunAborted):
+        ar.run(out_dir=tmp_path, calls_path=calls, agent=FakeAgent(fail_on="srbh-1"))
+
+    class Counting(FakeAgent):
+        n = 0
+
+        def invoke(self, state, config):
+            Counting.n += 1
+            return super().invoke(state, config)
+
+    current["rows"] = other
+    with pytest.raises(RuntimeError, match="row_ids_sha256"):
+        ar.run(out_dir=tmp_path, calls_path=calls, resume=True, agent=Counting())
+    current["rows"] = rows
+    with pytest.raises(RuntimeError, match="calls_file"):
+        ar.run(out_dir=tmp_path, calls_path=tmp_path / "lain.jsonl", resume=True, agent=Counting())
+    assert Counting.n == 0
+    ar.run(out_dir=tmp_path, calls_path=calls, resume=True, agent=Counting())
+    assert Counting.n == 2

@@ -32,7 +32,7 @@ def test_compare_reports_rows_rejections_and_label_history(tmp_path, monkeypatch
     (agent_dir / "agent.run.json").write_text(json.dumps({"run_id": "agent-1", "git_commit": "abcdef0", "git_dirty": False,
                                                           "model": "m"}))
     single = [{"id": i, "label": label, "evidence": ["<script>"], "prompt_tokens": 940, "completion_tokens": 90,
-               "cost_usd": 0.0001, "latency_s": 1.5} for i, label in (("a", "SQLI"), ("b", "NORMAL"))]
+               "cost_usd": 0.0001, "latency_s": 1.5, "attempts": n} for i, label, n in (("a", "SQLI", 1), ("b", "NORMAL", 2))]
     _write(tmp_path / "llm_single.jsonl", single)
     (tmp_path / "llm_single.run.json").write_text(json.dumps({"run_id": "llm_single-1"}))
     _write(agent_dir / "llm_single.jsonl", single)
@@ -53,6 +53,7 @@ def test_compare_reports_rows_rejections_and_label_history(tmp_path, monkeypatch
     assert "E benar di baris yang C (500 penuh) salah: 1 (`a`)" in text
     assert "mendelegasikan ke keempat sub-agen: 0/2 baris" in text
     assert "riwayat label klasifikasi: SQLI -> XSS" in text
+    assert "| panggilan LLM per baris (rerata) | 1,5 | 1,5 | 12,0 |" in text  # ulangan parse C ikut dihitung
     assert "label berubah setelah penolakan: 1 baris" in text
     assert "penilaian LLM verifikator: 1" in text
 

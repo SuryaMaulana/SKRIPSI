@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-OUTPUT_PREFIXES = ("results/",)  # berkas keluaran run tidak membuat pohon kerja dianggap berubah
+OUTPUT_PREFIXES = ("results/", "reports/")  # keluaran run/evaluasi tidak membuat pohon kerja dianggap berubah
 DOCUMENT_SUFFIXES = (".docx",)  # draf skripsi penulis: bukan kode/konfigurasi yang memengaruhi hasil
 
 
@@ -33,6 +33,7 @@ def git_state() -> dict:
         "git_commit": _git("rev-parse", "HEAD"),
         "git_branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
         "git_dirty": None if changed is None else bool(changed),
+        "git_dirty_paths": None if changed is None else changed[:20],
     }
 
 
@@ -57,3 +58,28 @@ def run_info(method: str, model: str | None, **extra) -> dict:
         "python": platform.python_version(),
         **extra,
     }
+
+
+def repo_path(path: Path | None) -> str | None:
+    """Path relatif terhadap akar repositori bila di dalamnya, selain itu path absolut (tidak pernah melempar galat)."""
+    if path is None:
+        return None
+    path = Path(path).resolve()
+    return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+
+
+def ids_sha256(ids: list[str]) -> str:
+    return hashlib.sha256("\n".join(ids).encode("utf-8")).hexdigest()
+
+
+RESUME_KEYS = ("input_file", "ids_file", "rows", "row_ids_sha256", "calls_file", "output_name")
+
+
+def check_resume(info: dict, current: dict) -> None:
+    """Run yang dilanjutkan wajib memakai masukan, daftar baris, log panggilan, dan nama keluaran yang sama dengan run
+    awalnya; bila tidak, hentikan sebelum ada panggilan API."""
+    diff = {k: (info.get(k), current.get(k)) for k in RESUME_KEYS if info.get(k) != current.get(k)}
+    if diff:
+        detail = "; ".join(f"{k}: awal={a!r}, sekarang={b!r}" for k, (a, b) in diff.items())
+        raise RuntimeError(f"--resume dengan konfigurasi berbeda dari run awal ({detail}). Jalankan ulang perintah yang "
+                           f"sama persis dengan --resume.")

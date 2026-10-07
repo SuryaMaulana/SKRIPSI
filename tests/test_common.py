@@ -54,3 +54,25 @@ def test_method_rows_switches_between_the_test_sample_and_a_split(monkeypatch):
     monkeypatch.setattr(inputs, "load_split_inputs", lambda split: ["split", split])
     assert inputs.method_rows() == (["sampel", inputs.SAMPLE_PATH], inputs.SAMPLE_PATH)
     assert inputs.method_rows(split="val") == (["split", "val"], inputs.split_path("val"))
+
+
+def test_repo_path_never_raises_for_paths_outside_the_repository(tmp_path):
+    from src.common import runinfo
+
+    assert runinfo.repo_path(runinfo.ROOT / "results" / "x.json") == "results/x.json"
+    assert runinfo.repo_path(tmp_path / "ids.json") == str((tmp_path / "ids.json").resolve())
+    assert runinfo.repo_path(None) is None
+
+
+def test_reports_are_outputs_for_the_dirty_check(monkeypatch):
+    from src.common import runinfo
+
+    monkeypatch.setattr(runinfo, "_git", lambda *a: "?? reports/validasi_agent_val.md" if a[0] == "status" else "abc")
+    assert runinfo.git_state()["git_dirty"] is False
+
+
+def test_val_selection_does_not_overwrite_the_test_pilot_ids():
+    from src.eval import pilot
+
+    assert pilot.default_out(None) == pilot.PILOT_PATH
+    assert pilot.default_out("val").parts[-2:] == ("validasi", "val_ids.json")

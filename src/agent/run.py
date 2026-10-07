@@ -38,7 +38,7 @@ from langgraph.errors import GraphRecursionError
 
 from ..baselines.llm_single import RunAborted, totals
 from ..common.inputs import SAMPLE_PATH, method_rows
-from ..common.runinfo import git_state, run_info, sha256_file
+from ..common.runinfo import check_resume, git_state, ids_sha256, repo_path, run_info, sha256_file
 from ..data.config import ROOT
 from ..llm.klasifikasi import sha256
 from ..llm.openrouter import load_llm_config
@@ -193,6 +193,9 @@ class CallRecorder(BaseCallbackHandler):
                                   else name)
             round_ = ctx.verification_round
         update = getattr(output, "update", None)
+        if name == "task" and error is None and isinstance(update, dict) and isinstance(given, dict):
+            with ctx.lock:  # sub-agen benar-benar berjalan (bukan galat validasi argumen atau sub-agen tak dikenal)
+                ctx.delegated.add(given.get("subagent_type"))
         if isinstance(update, dict):  # Command dari alat task/write_todos: ambil pesan alatnya
             messages = update.get("messages") or []
             output = messages[-1] if messages else update
@@ -212,7 +215,7 @@ def assemble(ctx: RowContext, run_id: str, wall_s: float, final_message: str | N
                     "verification_skipped": False,
                     "putusan": [{k: v.get(k) for k in ("putaran", "klasifikasi_ke", "lolos", "skema_valid", "evidence_hilang",
                                                        "alasan")} for v in ctx.verdicts]}
-    delegated = {name: f"task:{name}" in ctx.tool_names for name in SUBAGENTS}
+    delegated = {name: name in ctx.delegated for name in SUBAGENTS}
     base = {"id": ctx.row_id, "run_id": run_id, "prompt_tokens": ctx.prompt_tokens,
             "completion_tokens": ctx.completion_tokens, "cost_usd": ctx.cost_usd, "latency_s": wall_s,
             "llm_latency_s": ctx.llm_latency_s, "llm_calls": ctx.llm_calls, "tool_calls": ctx.tool_calls,
@@ -255,7 +258,8 @@ def classify_row(agent, recorder: CallRecorder, run_id: str, row: dict) -> dict:
                         error=f"batas rekursi orkestrator ({RECURSION_LIMIT} langkah) tercapai")
     except (openai.APIError, ServiceFailure) as exc:
         recorder.logger.write({"run_id": run_id, "id": row["id"], "jenis": "galat_api", "galat": safe_error(exc)})
-        raise RunAborted(f"{row['id']}: {safe_error(exc)}; run dihentikan, lanjutkan dengan --resume") from None
+        raise RunAborted(f"{row['id']}: {safe_error(exc)}; run dihentikan, jalankan ulang perintah yang sama dengan "
+                         f"--resume") from None
     messages = state.get("messages") or []
     limit_hits = sum(isinstance(m, ToolMessage) and str(m.content).startswith(LIMIT_MARKER) for m in messages)
     final = messages[-1].content if messages else None
@@ -304,7 +308,7 @@ def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: 
                                                **git_state(), "rows_done": len(done)})
     else:
         if partial.exists():
-            raise FileExistsError(f"{partial} sudah ada: lanjutkan dengan --resume atau hapus dulu")
+            raise FileExistsError(f"{partial} sudah ada: jalankan ulang perintah yang sama dengan --resume")
         info = run_info(
             "agent", config["model"], model_version=config.get("model_version"), generation=config.get("generation"),
             provider_routing=config.get("provider_routing"),
@@ -319,11 +323,15 @@ def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: 
                           "pemetaan kelas",
             knowledge_base=str(KB_PATH.relative_to(ROOT)), knowledge_base_sha256=sha256_file(KB_PATH),
             remote_tracing="dimatikan (LangSmith); catatan hanya lokal",
-            input_file=str(inputs_path.relative_to(ROOT)), input_sha256=sha256_file(inputs_path),
-            ids_file=str(ids_path.relative_to(ROOT)) if ids_path else None, rows=len(rows), output_name=name,
-            calls_file=str(calls_path.relative_to(ROOT)) if calls_path.is_relative_to(ROOT) else str(calls_path))
+            input_file=repo_path(inputs_path), input_sha256=sha256_file(inputs_path),
+            ids_file=repo_path(ids_path), rows=len(rows), row_ids_sha256=ids_sha256([r["id"] for r in rows]),
+            output_name=name, calls_file=repo_path(calls_path))
     if info["prompt_sha256"] != prompt_hashes:
         raise RuntimeError("prompt berubah sejak run ini dimulai; mulai run baru")
+    if resume:
+        check_resume(info, {"input_file": repo_path(inputs_path), "ids_file": repo_path(ids_path), "rows": len(rows),
+                            "row_ids_sha256": ids_sha256([r["id"] for r in rows]), "calls_file": repo_path(calls_path),
+                            "output_name": name})
     info_path.write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     agent = agent or build_agent(config)
     logger = CallLogger(calls_path)

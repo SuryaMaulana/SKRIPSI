@@ -192,16 +192,18 @@ def build_verifier() -> RunnableLambda:
     def run(state: dict, config: RunnableConfig) -> dict:
         ctx = context.current()
         cfg = as_subagent(config, "verifikasi")
+        with ctx.lock:
+            index, latest = len(ctx.classifications), ctx.latest_classification()
         schema = json.loads(schema_check.invoke({}, cfg))
         missing = []
         if schema["valid"]:
-            for item in ctx.latest_classification()["evidence"]:
+            for item in latest["evidence"]:
                 if not json.loads(evidence_exists.invoke({"item": item}, cfg))["ada"]:
                     missing.append(item)
         verdict = deterministic_verdict(schema, missing)
         with ctx.lock:
             verdict["putaran"] = len(ctx.verdicts) + 1
-            verdict["klasifikasi_ke"] = len(ctx.classifications)
+            verdict["klasifikasi_ke"] = index
             ctx.verdicts.append(verdict)
         return {"messages": [AIMessage(content=json.dumps({k: verdict[k] for k in ("lolos", "alasan", "putaran")},
                                                           ensure_ascii=False))]}
@@ -209,21 +211,53 @@ def build_verifier() -> RunnableLambda:
     return RunnableLambda(run, name="verifikasi")
 
 
+SEQUENTIAL_SUBAGENTS = ("klasifikasi", "verifikasi")
+BATCH_MESSAGE = ("Panggil klasifikasi dan verifikasi satu per satu, tidak dalam satu pesan; hanya pemanggilan pertama di "
+                 "pesan itu yang dijalankan.")
+
+
+def _batch_position(state, call_id: str) -> int:
+    """Urutan pemanggilan klasifikasi/verifikasi ini di antara pemanggilan sejenis pada pesan AI yang sama (0 = pertama)."""
+    messages = (state or {}).get("messages", []) if isinstance(state, dict) else getattr(state, "messages", [])
+    for message in reversed(messages or []):
+        calls = getattr(message, "tool_calls", None) or []
+        if any(c.get("id") == call_id for c in calls):
+            ordered = [c["id"] for c in calls if c.get("name") == "task"
+                       and (c.get("args") or {}).get("subagent_type") in SEQUENTIAL_SUBAGENTS]
+            return ordered.index(call_id) if call_id in ordered else 0
+    return 0
+
+
 class VerificationRoundGuard(AgentMiddleware):
-    """Menahan pemanggilan sub-agen yang melanggar batas putaran (keputusan penulis: maksimum 2 putaran)."""
+    """Menahan pemanggilan sub-agen yang melanggar batas putaran (keputusan penulis: maksimum 2 putaran).
+
+    Pemanggilan klasifikasi/verifikasi dijalankan berurutan: bila satu pesan orkestrator memuat lebih dari satu, hanya yang
+    pertama (urutan daftar) dijalankan; sisanya ditahan. Pemeriksaan dan eksekusinya dikunci per baris agar putusan guard
+    tidak bergantung pada urutan thread (alat paralel)."""
 
     def wrap_tool_call(self, request, handler):
         call = request.tool_call
-        if call.get("name") == "task":
-            args = call.get("args") or {}
-            blocked = self.blocked(args)
-            if blocked:
-                ctx = context.current()
-                with ctx.lock:
-                    ctx.guard_blocks.append({"subagen": args.get("subagent_type"), "alasan": blocked,
-                                             "putaran": ctx.verification_round})
-                return ToolMessage(content=blocked, tool_call_id=call["id"], name="task")
-        return handler(request)
+        args = call.get("args") or {}
+        if call.get("name") != "task":
+            return handler(request)
+        target = args.get("subagent_type")
+        if target not in SEQUENTIAL_SUBAGENTS:
+            return self._block_or_run(request, handler, self.blocked(args), args)
+        ctx = context.current()
+        if _batch_position(request.state, call["id"]) > 0:
+            return self._block_or_run(request, handler, BATCH_MESSAGE, args)
+        with ctx.procedure_lock:
+            return self._block_or_run(request, handler, self.blocked(args), args)
+
+    @staticmethod
+    def _block_or_run(request, handler, blocked: str | None, args: dict):
+        if not blocked:
+            return handler(request)
+        ctx = context.current()
+        with ctx.lock:
+            ctx.guard_blocks.append({"subagen": args.get("subagent_type"), "alasan": blocked,
+                                     "putaran": ctx.verification_round})
+        return ToolMessage(content=blocked, tool_call_id=request.tool_call["id"], name="task")
 
     @staticmethod
     def blocked(args: dict[str, Any]) -> str | None:

@@ -32,7 +32,7 @@ from pathlib import Path
 import httpx
 
 from ..common.inputs import SAMPLE_PATH, method_rows
-from ..common.runinfo import git_state, run_info, sha256_file
+from ..common.runinfo import check_resume, git_state, ids_sha256, repo_path, run_info, sha256_file
 from ..data.config import ROOT
 from ..llm.openrouter import OpenRouterClient, api_key, build_payload, load_llm_config, summarize
 from .llm_prompt import CLASS_LABELS, OUTPUT_SCHEMA, SYSTEM_PROMPT, prompt_sha256, user_message
@@ -126,10 +126,12 @@ class Runner:
                 else:
                     detail = json.dumps(summary["error"], ensure_ascii=True)[:300]
                     self._log(row_id, attempt, payload, call, summary, "http_error", f"HTTP {status}: {detail}")
-                    raise RunAborted(f"{row_id}: HTTP {status} ({detail}); run dihentikan, lanjutkan dengan --resume")
+                    raise RunAborted(f"{row_id}: HTTP {status} ({detail}); run dihentikan, jalankan ulang perintah "
+                                     f"yang sama dengan --resume")
             if retry < SERVICE_RETRIES:
                 self.sleep(2 ** (retry + 1))
-        raise RunAborted(f"{row_id}: kegagalan layanan menetap setelah {SERVICE_RETRIES} ulangan; lanjutkan dengan --resume")
+        raise RunAborted(f"{row_id}: kegagalan layanan menetap setelah {SERVICE_RETRIES} ulangan; jalankan ulang perintah "
+                         f"yang sama dengan --resume")
 
     def classify(self, row: dict) -> dict:
         messages = [{"role": "system", "content": SYSTEM_PROMPT},
@@ -197,18 +199,22 @@ def run(ids_path: Path | None = None, out_dir: Path = RESULTS_DIR, inputs_path: 
                                                **git_state(), "rows_done": len(done)})
     else:
         if partial.exists():
-            raise FileExistsError(f"{partial} sudah ada: lanjutkan dengan --resume atau hapus dulu")
+            raise FileExistsError(f"{partial} sudah ada: jalankan ulang perintah yang sama dengan --resume")
         info = run_info(
             "llm_single", config["model"], model_version=config.get("model_version"),
             generation=config.get("generation"), provider_routing=config.get("provider_routing"),
             pricing_usd_per_1m_tokens=config.get("pricing_usd_per_1m_tokens"),
             prompt_sha256=prompt_sha256(), system_prompt=SYSTEM_PROMPT, output_schema=OUTPUT_SCHEMA,
-            input_file=str(inputs_path.relative_to(ROOT)), input_sha256=sha256_file(inputs_path),
-            ids_file=str(ids_path.relative_to(ROOT)) if ids_path else None, rows=len(rows), output_name=name,
-            calls_file=str(calls_path.relative_to(ROOT)) if calls_path.is_relative_to(ROOT) else str(calls_path),
+            input_file=repo_path(inputs_path), input_sha256=sha256_file(inputs_path),
+            ids_file=repo_path(ids_path), rows=len(rows), row_ids_sha256=ids_sha256([r["id"] for r in rows]),
+            output_name=name, calls_file=repo_path(calls_path),
         )
     if info["prompt_sha256"] != prompt_sha256():
         raise RuntimeError("prompt berubah sejak run ini dimulai; mulai run baru")
+    if resume:
+        check_resume(info, {"input_file": repo_path(inputs_path), "ids_file": repo_path(ids_path), "rows": len(rows),
+                            "row_ids_sha256": ids_sha256([r["id"] for r in rows]), "calls_file": repo_path(calls_path),
+                            "output_name": name})
     info_path.write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     finished = {p["id"] for p in done}
     with (client or OpenRouterClient(api_key())) as client, open(calls_path, "a", encoding="utf-8") as calls, \

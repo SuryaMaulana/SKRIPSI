@@ -36,11 +36,14 @@ class RowContext:
     llm_calls: int = 0
     tool_calls: int = 0
     tool_names: list[str] = field(default_factory=list)  # urutan alat yang dipanggil (termasuk task)
+    delegated: set[str] = field(default_factory=set)  # sub-agen yang benar-benar dijalankan lewat task (tanpa galat)
     prompt_tokens: int = 0
     completion_tokens: int = 0
     cost_usd: float = 0.0
     llm_latency_s: float = 0.0
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    # klasifikasi/verifikasi dijalankan satu per satu (guard + eksekusi atomik); terpisah dari `lock` yang dipakai di dalamnya
+    procedure_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @property
     def verification_round(self) -> int:

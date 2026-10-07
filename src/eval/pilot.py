@@ -40,10 +40,16 @@ def select_split(split: str, per_class: int = PER_CLASS, random_state: int = RAN
     return [i for i in frame["id"] if i in ids]
 
 
+def default_out(split: str | None) -> Path:
+    """Berkas id bawaan: pilot uji di results/pilot/, pilihan dari split lain di results/validasi/ (tidak menimpa pilot)."""
+    return ROOT / "results" / "validasi" / f"{split}_ids.json" if split else PILOT_PATH
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Pemilihan baris pilot (5 per kelas)")
     parser.add_argument("--split", help="pilih dari srbh_<split>.parquet (mis. val), bukan test_sample_500")
-    parser.add_argument("--out", type=Path, default=PILOT_PATH)
+    parser.add_argument("--out", type=Path, help="bawaan: results/pilot/pilot_ids.json (uji) atau "
+                                                     "results/validasi/<split>_ids.json (--split)")
     args = parser.parse_args(argv)
     if args.split:
         exclude = SMOKE_TEST_IDS if args.split == "val" else ()
@@ -53,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         ids = select()
         meta = {"source": str(SAMPLE_PATH.relative_to(ROOT))}
-    out = args.out.resolve()
+    out = (args.out or default_out(args.split)).resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"ids": ids, "per_class": PER_CLASS, "random_state": RANDOM_STATE, **meta}, indent=1) + "\n",
                    encoding="utf-8")
