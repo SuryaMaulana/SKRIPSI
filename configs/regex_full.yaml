@@ -1,0 +1,56 @@
+# Varian sekunder regex_full (analisis sensitivitas, post hoc; keputusan penulis di titik B, 2026-10-07):
+# OWASP CRS 4.30.0 PL1 SEMUA kategori. Pemetaan kategori -> kelas di bawah ditulis dan di-commit SEBELUM varian
+# dijalankan. Pemetaan hanya diuji dan disesuaikan pada srbh_val; setiap penyesuaian dicatat di `adjustments` beserta
+# buktinya dari val. Varian lalu dijalankan sekali pada test_sample_500 -> results/regex_full.jsonl (post_hoc: true).
+# Pembanding utama tetap configs/regex_baseline.yaml (results/regex.jsonl tidak diubah).
+
+name: regex_full
+post_hoc: true
+inherits: configs/regex_baseline.yaml   # engine, crs (versi, URL, SHA-256), scoring, restricted_files, bas_seyyar
+
+crs:
+  categories: all                        # semua berkas REQUEST-9xx dan RESPONSE-9xx CRS 4.30.0
+  paranoia_level: 1
+  excluded_operators: [detectSQLi, detectXSS]   # tetap tanpa libinjection (bukan regex), sama dengan pembanding utama
+  # Nilai kebijakan bawaan CRS (tx.allowed_methods, tx.restricted_extensions, dst.) dibaca dari REQUEST-901 apa adanya
+  # (aturan "&TX:x @eq 0 -> setvar tx.x"), seperti pemasangan CRS tanpa crs-setup.conf yang diubah.
+
+class_map:                               # kategori -> kelas
+  "911": WEB_SCANNING                    # method enforcement (keputusan penulis)
+  "913": WEB_SCANNING
+  "930": PATH_TRAVERSAL                  # kecuali berkas terlarang tanpa traversal (restricted_files, warisan)
+  "931": PATH_TRAVERSAL
+  "932": CMD_INJECTION
+  "933": CMD_INJECTION                   # PHP injection (keputusan penulis; sejalan D5: PHP-CGI berlabel 88 -> CMD)
+  "941": XSS
+  "942": SQLI
+  bas_seyyar: WEB_SCANNING
+
+rule_class_map:                          # aturan tunggal dari kategori yang selain itu diabaikan
+  "920440": WEB_SCANNING                 # restricted file extension (keputusan penulis)
+
+ignored_categories:                      # tidak punya padanan kelas: aturannya tidak dievaluasi (dicatat di run)
+  "901": inisialisasi (bukan aturan deteksi)
+  "905": pengecualian umum (bukan aturan deteksi)
+  "920": protocol enforcement, kecuali 920440
+  "921": protocol attack (HTTP splitting/smuggling, CRLF, injeksi header, LDAP)
+  "922": serangan multipart (body tidak tercatat di log)
+  "934": serangan aplikasi generik (injeksi kode Node.js/Perl/Ruby, SSRF, prototype pollution)
+  "943": session fixation
+  "944": serangan Java (deserialisasi, JNDI, injeksi kode Java)
+  "949": evaluasi blokir (bukan aturan deteksi)
+  "950": kebocoran data pada respons (respons tidak tercatat)
+  "951": kebocoran data SQL pada respons
+  "952": kebocoran data Java pada respons
+  "953": kebocoran data PHP pada respons
+  "954": kebocoran data IIS pada respons
+  "955": web shell pada respons
+  "956": kebocoran data Ruby pada respons
+  "959": evaluasi blokir respons
+  "980": korelasi (bukan aturan deteksi)
+  "999": pengecualian setelah CRS (bukan aturan deteksi)
+
+# Aturan Baş Seyyar dkk. dan pemetaan berkas terlarang diwarisi apa adanya dari pembanding utama (keputusan asisten),
+# sehingga perbedaan kedua varian hanya pada cakupan kategori CRS.
+
+adjustments: []                          # diisi setelah pengujian di srbh_val (tanggal, bukti val, alasan)
