@@ -1,8 +1,8 @@
 {
-  "run_id": "regex_full-20261007T152855Z-dd93c9b",
+  "run_id": "regex_full-20261007T161009Z-d7fd371",
   "method": "regex_full",
-  "date_utc": "2026-10-07T15:28:55+00:00",
-  "git_commit": "dd93c9b1c8a33e3ac7d3894481525b031b6aba55",
+  "date_utc": "2026-10-07T16:10:09+00:00",
+  "git_commit": "d7fd37166f0e70c5b2223bffee28321b995c0a5d",
   "git_branch": "tahap-sistem",
   "git_dirty": false,
   "model": null,
@@ -12,7 +12,7 @@
   "post_hoc": true,
   "input_file": "data/processed/srbh_val.parquet",
   "input_sha256": "8c2f9877ffc39e054eff93618a5884d48fa57fd3350cd067a2473aee6e75ee5c",
-  "config_sha256": "4436b36ca7b1c98bd022d9e34c437a5162e3f133446171636ab460b59368044e",
+  "config_sha256": "99695f8a9c9421af79f70d74e09997d42b4c2ad93dccaf7888018eb8619374ca",
   "ruleset": {
     "engine": {
       "modsecurity": "2.9.15",
@@ -106,7 +106,7 @@
     },
     "above_pl": 131,
     "ignored_no_class": {
-      "920": 39,
+      "920": 38,
       "921": 11,
       "922": 4,
       "934": 8,
@@ -129,11 +129,11 @@
       933110,
       933220
     ],
-    "used": 84,
+    "used": 85,
     "used_by_category": {
       "911": 1,
       "913": 1,
-      "920": 1,
+      "920": 2,
       "930": 5,
       "931": 3,
       "932": 18,

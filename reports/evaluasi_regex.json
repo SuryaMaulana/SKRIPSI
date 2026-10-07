@@ -1,26 +1,29 @@
 {
  "run": {
-  "run_id": "evaluate-20261007T153026Z-675337d",
+  "run_id": "evaluate-20261007T161057Z-d7fd371",
   "method": "evaluate",
-  "date_utc": "2026-10-07T15:30:26+00:00",
-  "git_commit": "675337dce8b3d6b28653cde8569cc3cf9de68e2d",
+  "date_utc": "2026-10-07T16:10:57+00:00",
+  "git_commit": "d7fd37166f0e70c5b2223bffee28321b995c0a5d",
   "git_branch": "tahap-sistem",
-  "git_dirty": false,
+  "git_dirty": true,
   "model": null,
   "python": "3.11.13",
   "truth": "data/processed/test_sample_500.jsonl",
+  "skipped": [],
   "inputs": {
-   "regex.jsonl": {
+   "results/regex.jsonl": {
     "run_id": "regex-20261007T150817Z-497dc3d",
     "git_commit": "497dc3d5c80b44da1b8c232644ebc769dcfb23be",
     "git_dirty": false,
-    "model": null
+    "model": null,
+    "model_version": null
    },
-   "regex_full.jsonl": {
-    "run_id": "regex_full-20261007T153015Z-675337d",
-    "git_commit": "675337dce8b3d6b28653cde8569cc3cf9de68e2d",
+   "results/regex_full.jsonl": {
+    "run_id": "regex_full-20261007T161037Z-d7fd371",
+    "git_commit": "d7fd37166f0e70c5b2223bffee28321b995c0a5d",
     "git_dirty": false,
-    "model": null
+    "model": null,
+    "model_version": null
    }
   }
  },
@@ -45,6 +48,14 @@
     "macro_precision": 0.8890699695784442,
     "macro_recall": 0.7172284644194757,
     "macro_f1": 0.7168701801933989,
+    "classes_in_macro": [
+     "SQLI",
+     "XSS",
+     "PATH_TRAVERSAL",
+     "CMD_INJECTION",
+     "WEB_SCANNING",
+     "NORMAL"
+    ],
     "per_class": {
      "SQLI": {
       "precision": 1.0,
@@ -141,6 +152,7 @@
     ],
     "invalid_predictions": 0
    },
+   "evidence_literal": null,
    "macro_f1_ci95": {
     "low": 0.6224029215800236,
     "high": 0.7792694772750653,
@@ -169,6 +181,14 @@
     "macro_precision": 0.9123212086767074,
     "macro_recall": 0.8389513108614232,
     "macro_f1": 0.8202319632956581,
+    "classes_in_macro": [
+     "SQLI",
+     "XSS",
+     "PATH_TRAVERSAL",
+     "CMD_INJECTION",
+     "WEB_SCANNING",
+     "NORMAL"
+    ],
     "per_class": {
      "SQLI": {
       "precision": 1.0,
@@ -265,6 +285,7 @@
     ],
     "invalid_predictions": 0
    },
+   "evidence_literal": null,
    "macro_f1_ci95": {
     "low": 0.751974328219282,
     "high": 0.859377291410102,

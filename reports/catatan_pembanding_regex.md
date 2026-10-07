@@ -32,23 +32,28 @@ Bukti val untuk aturan kategori baru:
 
 Sebanyak 878 prediksi benar di val hanya didukung aturan kategori baru.
 
-### Temuan setelah run uji (menunggu keputusan penulis)
+### Penyesuaian setelah run uji: 920500 (keputusan penulis)
 
 Review sesudah run uji menemukan hal yang terlewat saat pengujian di val. Aturan **CRS 920500** (PL1, "Attempt to
-access a backup or working file", pola `\.[^.~]+~(?:/.*|)$`) cocok pada 36 dari 38 baris WEB_SCANNING yang masih
-lolos di val, tanpa satu pun hit pada kelas lain. Aturan itu tidak dipetakan karena kategori 920 diabaikan, kecuali
-920440 yang disebut eksplisit dalam keputusan penulis.
+access a backup or working file", pola `\.[^.~]+~(?:/.*|)$`) cocok pada 36 dari 38 baris WEB_SCANNING yang masih lolos
+di val, tanpa satu pun hit pada kelas lain. Aturan itu semula tidak dipetakan karena kategori 920 diabaikan, kecuali
+920440 yang disebut eksplisit.
 
 Alasan taksonominya sama dengan 920440: berkas cadangan/VCS tanpa traversal termasuk WEB_SCANNING (aturan T3 di
-`configs/label_mapping.yaml`). Di test_sample_500, 920500 tidak pernah cocok, sehingga memetakannya tidak mengubah
-`results/regex_full.jsonl`. Bila penulis menerimanya, perubahan itu harus dicatat sebagai penyesuaian setelah run uji.
+`configs/label_mapping.yaml`). Penulis memutuskan menambahkannya sebagai **penyesuaian setelah run uji**. Perubahan itu
+dicatat di `configs/regex_full.yaml` (`rule_class_map` dan `adjustments`, commit `d7fd371`).
+
+Dampaknya pada data uji nol: 920500 tidak cocok pada satu pun baris test_sample_500, dan prediksi run ulang
+`regex_full-20261007T161037Z-d7fd371` identik dengan run sebelumnya (diperiksa baris per baris, kecuali `run_id`). Di
+val, WEB_SCANNING yang terdeteksi naik dari 1.556 menjadi 1.592 dari 1.594 baris, dan macro-F1 val naik dari 0,713
+menjadi 0,715.
 
 ## 3. Cakupan verifikasi emulasi
 
 | konfigurasi | uji resmi CRS yang bisa dijalankan dari data log | aturan yang dipakai dengan uji / total |
 |---|---|---|
 | regex_baseline | 985/985 cocok (106 aturan, semua PL) | 55 / 71 |
-| regex_full | 1.277/1.277 cocok (124 aturan, semua PL) | 67 / 84 |
+| regex_full | 1.280/1.280 cocok (125 aturan, semua PL) | 68 / 85 |
 
 Uji yang tidak bisa dijalankan dari data log dilewati: uji yang memakai body POST, permintaan mentah, atau header yang
 tidak tercatat. Aturan yang dipakai tetapi tidak punya uji yang bisa dijalankan:
