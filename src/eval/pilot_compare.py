@@ -83,6 +83,8 @@ def _deterministic(verdict: dict) -> bool:
 def _rejection_kind(verdict: dict) -> str:
     if verdict["lolos"]:
         return "lolos"
+    if "verifikator tidak memberi putusan" in verdict["alasan"]:  # batas panggilan tercapai tanpa Verdict
+        return "verifikator tanpa putusan" + (" + evidence/skema" if _deterministic(verdict) else "")
     deterministic = _deterministic(verdict)
     if deterministic and not verdict["lolos_menurut_llm"]:
         return "evidence/skema + penilaian LLM"

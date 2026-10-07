@@ -1,0 +1,735 @@
+{
+ "keterangan": "Verifikasi adversarial temuan pilot deep agent (run agent-20261007T164716Z-725069c) oleh 6 agen independen yang membaca results/pilot/agent.jsonl dan results/agent_calls.jsonl (read-only), 2026-10-08.",
+ "hasil": [
+  {
+   "key": "parse-error",
+   "verdict": "confirmed",
+   "summary": "Klaim terkonfirmasi. Ketiga baris PARSE_ERROR hanya memakai alat berkas virtual deepagents (StateBackend) dan tidak pernah memanggil task sama sekali: bukan hanya klasifikasi, tetapi juga parser, analisis_payload, verifikasi, dan write_todos. srbh-01b00fcbf8064bef berakhir karena batas rekursi 80 langkah setelah loop 16 grep (0 pengingat, karena orkestrator tidak pernah berhenti); srbh-8002b48db2cdb197 dan srbh-a7c36c09bcd7bf3b berakhir karena orkestrator berhenti sendiri untuk ke-5 kalinya setelah 4 pengingat prosedur disisipkan dan diabaikan (orkestrator mencari 'file log' lalu meminta pengguna menempelkan log). Dari 30 baris, 9 memakai alat FS (72 diminta, 70 dieksekusi) dan pemakaian FS berkorelasi dengan kegagalan (status bukan ok 8/9 vs 8/21, p=0,017), tetapi korelasi itu terutama digerakkan oleh 3 baris PE; tanpa ketiganya tidak signifikan.",
+   "counts": {
+    "baris_parse_error": 3,
+    "baris_parse_error_dengan_task_apa_pun": 0,
+    "baris_parse_error_klasifikasi_dipanggil": 0,
+    "baris_parse_error_parser_atau_analisis_payload_dipanggil": 0,
+    "baris_parse_error_write_todos": 0,
+    "pe_01b00f_llm_calls": 20,
+    "pe_01b00f_fs_diminta": 22,
+    "pe_01b00f_fs_dieksekusi": 20,
+    "pe_01b00f_grep_diminta": 16,
+    "pe_01b00f_pengingat": 0,
+    "pe_8002b4_llm_calls": 19,
+    "pe_8002b4_fs_dieksekusi": 18,
+    "pe_8002b4_berhenti_tanpa_alat": 5,
+    "pe_8002b4_pengingat": 4,
+    "pe_a7c36c_llm_calls": 14,
+    "pe_a7c36c_fs_dieksekusi": 11,
+    "pe_a7c36c_berhenti_tanpa_alat": 5,
+    "pe_a7c36c_pengingat": 4,
+    "baris_dengan_fs_orkestrator": 9,
+    "fs_orkestrator_diminta_total": 72,
+    "fs_orkestrator_dieksekusi_total": 70,
+    "fs_diminta_di_baris_pe": 51,
+    "fs_oleh_subagen": 0,
+    "fs_ls": 23,
+    "fs_grep": 22,
+    "fs_read_file": 18,
+    "fs_edit_file": 5,
+    "fs_write_file": 2,
+    "fs_delete": 1,
+    "fs_glob": 1,
+    "fs_rows_n": 9,
+    "nonfs_rows_n": 21,
+    "fs_rows_status_bukan_ok": 8,
+    "nonfs_rows_status_bukan_ok": 8,
+    "fs_rows_label_salah": 6,
+    "nonfs_rows_label_salah": 5,
+    "fs_rows_E_salah_C_benar": 4,
+    "nonfs_rows_E_salah_C_benar": 0,
+    "fisher_p_parse_error": 0.0207,
+    "fisher_p_status_bukan_ok": 0.0169,
+    "fisher_p_label_salah": 0.0419,
+    "fisher_p_E_salah_C_benar": 0.0046,
+    "fisher_p_C_salah": 1,
+    "fisher_p_status_bukan_ok_tanpa_pe": 0.0768,
+    "fisher_p_label_salah_tanpa_pe": 0.3191,
+    "baris_payload_injeksi_di_user_agent": 3
+   },
+   "rows": [
+    {
+     "id": "srbh-01b00fcbf8064bef",
+     "finding": "Hanya orkestrator yang aktif: 20 panggilan LLM dan 20 rekaman alat. Tidak ada rekaman parser, analisis_payload, klasifikasi, atau verifikasi; tidak ada task dan tidak ada write_todos. Urutan permintaan: (1) [ls('/'), read_file('/tmp/log.txt')], hasilnya 'No files found' dan \"Error: File '/tmp/log.txt' not found\". (2) write_file('/tmp/log.txt') berisi salinan log dengan UA yang diubah menjadi '\"<script>alert(1);</script>\"' (UA asli: \"'\\\"<script>alert(1);</script>\"), hasilnya 'Updated file /tmp/log.txt'. (3) [edit_file '<log>'->'', edit_file '</log>'->'']: yang pertama menghasilkan \"Error: String not found in file: '<log>'\"; yang kedua ditolak middleware deepagents dengan 'Error: parallel file mutations to the same path are not allowed.' tanpa menjalankan alat, sehingga tidak tercatat. (4) read_file('/tmp/log.txt'). (5) 16 grep berputar pada tiga pola: '500' 6x, 'POST /blog/wp-login.php?action=lostpassword' 5x, '<script>alert(1);</script>' 5x. Jumlah diminta: ls 1, read_file 2, write_file 1, edit_file 2, grep 16 (total 22). Jumlah dieksekusi: edit_file 1, grep 15 (total 20, sesuai alat_dipanggil). Ke-20 respons ber-finish_reason=tool_calls, sehingga ProcedureGuard tidak pernah terpicu (0 pengingat, tidak ada yang diabaikan). Baris berakhir karena GraphRecursionError dengan detail 'batas rekursi orkestrator (80 langkah) tercapai'; grep ke-16 (16:52:04.997Z) tidak sempat dieksekusi. Ini konsisten dengan 1 node before_agent + 20 x (model + 2 after_model: ProcedureGuard dan TodoList) + 19 node alat = 80 superstep."
+    },
+    {
+     "id": "srbh-8002b48db2cdb197",
+     "finding": "Hanya orkestrator yang aktif: 19 LLM dan 18 alat; tidak ada task maupun write_todos. Sebelum berhenti pertama: ls('/') 7x, read_file('/') 2x, dan read_file('/log.txt') 1x, semuanya 'No files found' atau 'Error: File ... not found'. Setelah itu orkestrator 5x berhenti tanpa alat (finish_reason=stop), misalnya 'Sepertinya saya tidak dapat menemukan file log yang dimaksud di sistem... salin baris log tersebut langsung di sini'. Empat pengingat 'PENGINGAT PROSEDUR: Belum ada keluaran klasifikasi. Panggil sub-agen klasifikasi...' terbukti disisipkan sebagai pesan human di prompt berikutnya, dan keempatnya diabaikan: setiap kali dijawab [read_file('/log.txt'), ls('/')], lalu berhenti lagi. Total: ls 11, read_file 7 (diminta = dieksekusi). Baris berakhir karena orkestrator berhenti untuk ke-5 kalinya setelah jatah MAX_REMINDERS=4 habis, dengan detail 'orkestrator selesai tanpa memanggil klasifikasi'. Bukan karena batas rekursi. Pesan akhir: 'Saya masih belum dapat mengakses file log yang dimaksud... salin baris log tersebut langsung di sini'."
+    },
+    {
+     "id": "srbh-a7c36c09bcd7bf3b",
+     "finding": "Hanya orkestrator yang aktif: 14 LLM dan 11 alat; tidak ada task maupun write_todos. Sebelum berhenti pertama: [ls('/'), read_file('/log.txt')], glob('*.log', '/'), read_file('/var/logs/access.log'), read_file('log.txt'), dan read_file('./log.txt'); semuanya tidak ditemukan. Orkestrator 5x berhenti tanpa alat, misalnya 'Saya tidak dapat menemukan file log yang relevan di sistem...'. Empat pengingat disisipkan dan diabaikan: dijawab sekali [read_file('./log.txt'), ls('/')], lalu read_file('./log.txt') 3x, dan setiap kali berhenti lagi. Total: ls 2, read_file 8, glob 1. Baris berakhir karena orkestrator berhenti untuk ke-5 kalinya setelah 4 pengingat habis ('orkestrator selesai tanpa memanggil klasifikasi'), bukan karena batas rekursi. Pesan akhir: 'Saya belum menerima file log yang diperlukan. Silakan salin dan tempel baris log secara langsung di sini'."
+    },
+    {
+     "id": "agregat_30_baris",
+     "finding": "Di 9 dari 30 baris orkestrator memanggil alat FS: 72 panggilan diminta, 70 dieksekusi (ls 23, grep 22, read_file 18, edit_file 5, write_file 2, delete 1, glob 1). Sebanyak 51 dari 72 (71%) terjadi di 3 baris PE. Sub-agen parser dan analisis_payload juga diberi 7 alat FS, tetapi tidak pernah memakainya (0). Di kesembilan baris itu alat FS sudah muncul pada respons orkestrator pertama, sedangkan 21 baris lain langsung membuka dengan task:parser/analisis_payload. Enam baris FS lainnya pulih dan mendelegasikan setelah 1-6 giliran: srbh-08bedb024d7ae9ea (7 FS termasuk delete; verification_failed, benar), srbh-39eb58ec5a725284 (5; VF, benar), srbh-098b9c2443ef7421 (4x ls; VF, benar), srbh-e96613aeb264209a (2x ls; ok, salah), srbh-601629e62f22a62d (ls+grep; VF, salah), srbh-fae0e1ba315fa2c1 (1 edit_file; VF, salah)."
+    },
+    {
+     "id": "korelasi_fs_kegagalan",
+     "finding": "Perbandingan baris FS (n=9) dengan non-FS (n=21): PARSE_ERROR 3/9 vs 0/21 (Fisher p=0,021); status bukan ok 8/9 vs 8/21 (p=0,017); label salah 6/9 vs 5/21 (p=0,042); E salah padahal C benar 4/9 vs 0/21 (p=0,005). Keempat baris yang di laporan disebut 'E salah di baris yang C benar' semuanya baris FS. Baris FS tidak lebih sulit bagi C (C pilot salah 2/9 vs 5/21, p=1,0). Namun bila 3 baris PE dikeluarkan, asosiasinya tidak signifikan: status bukan ok 5/6 vs 8/21 (p=0,077), label salah 3/6 vs 5/21 (p=0,32). Jadi korelasinya nyata tetapi terutama digerakkan oleh baris PE. Sampelnya kecil (n=30) dan ujinya berganda."
+    },
+    {
+     "id": "pemicu_user_agent",
+     "finding": "Ketiga baris PE adalah satu-satunya baris (3/30) dengan payload injeksi di kolom User-Agent. srbh-01b00fcbf8064bef dan srbh-8002b48db2cdb197 ber-UA \"'\\\"<script>alert(1);</script>\"; srbh-a7c36c09bcd7bf3b ber-UA \"() { :;}; echo 'X-Powered-By: ShellShock-Vulnerable'\". Enam baris FS lain ber-UA browser biasa dan semuanya pulih. Log lengkap terbukti ada di pesan human pertama (substring raw_log_masked), dan C dengan model yang sama mengklasifikasi ketiganya dengan benar (XSS, XSS, CMD_INJECTION). Ini kandidat pemicu salah baca, tetapi n=3 terlalu kecil untuk menyimpulkan sebab."
+    },
+    {
+     "id": "desain_guard",
+     "finding": "Alat FS tersedia di setiap panggilan orkestrator, karena definisi alat sha f824e74dd0a6 memuat ls, read_file, write_file, edit_file, delete, glob, grep, task, write_todos; HarnessProfile hanya mengecualikan execute, dan backend default deepagents adalah StateBackend() virtual. Tidak ada mekanisme yang membatasi alat FS: ProcedureGuard hanya terpicu pada respons tanpa panggilan alat (karena itu tidak pernah aktif di srbh-01b00fcbf8064bef) dan dibatasi 4 pengingat, sedangkan VerificationRoundGuard hanya memeriksa task (ditahan_guard = [] di ketiga baris PE). Total pengingat dalam run ini 18, dan 8 di antaranya berada di baris PE."
+    },
+    {
+     "id": "metode",
+     "finding": "Rekaman difilter dengan run_id=agent-20261007T164716Z-725069c (1172 rekaman; tidak ada llm_galat atau galat_api). Run lain, agent-20261007T164625Z-2efbd87, tidak memuat ketiga id ini. agent.run.json mencatat orchestrator_recursion_limit=80, procedure_reminders=4, dan recursion_limit_rows=1. Skrip bantu (read-only): <direktori_sementara>/verify/parse_error/pe_fs_all.py, pe_detail.py, pe_seq_fs.py, pe_stats.py, pe_ua.py."
+    }
+   ],
+   "corrections": [
+    "Daftar alat FS di klaim tidak lengkap. Orkestrator punya 7 alat berkas deepagents (ls, read_file, write_file, edit_file, delete, glob, grep); delete terlewat dan dipakai 1x di srbh-08bedb024d7ae9ea, yang bukan baris PE. Kesimpulan untuk ketiga baris PE tidak berubah.",
+    "Ungkapan 'disebabkan oleh pemakaian alat FS' hanya benar sebagai mekanisme proksimat. Di srbh-8002b48db2cdb197 dan srbh-a7c36c09bcd7bf3b, orkestrator salah membaca tugas: ia mengira log ada di sebuah berkas, lalu berhenti sendiri dan meminta pengguna menempelkan log, padahal log ada di <log>...</log>. Di srbh-01b00fcbf8064bef orkestrator memegang log (menyalinnya ke /tmp/log.txt) tetapi terjebak loop grep. Pemicu akarnya belum terbukti; satu-satunya ciri yang sama persis dengan ketiga baris PE adalah payload injeksi di User-Agent (3/30).",
+    "Mekanisme berakhirnya baris berbeda: hanya srbh-01b00fcbf8064bef yang kena batas rekursi 80 langkah. Dua baris lainnya berakhir karena orkestrator berhenti setelah jatah 4 pengingat habis. Selain itu, ketiga baris tidak memanggil sub-agen apa pun (bukan hanya klasifikasi), dan alat_dipanggil di agent.jsonl hanya menghitung alat yang dieksekusi: baris srbh-01b00fcbf8064bef meminta edit_file 2x dan grep 16x, tetapi yang tercatat edit_file 1 dan grep 15."
+   ]
+  },
+  {
+   "key": "verifier-llm",
+   "verdict": "confirmed",
+   "summary": "Klaimnya benar, dan saya tidak berhasil membantahnya. Dari 43 putusan verifikasi di 27 baris, tepat 4 penolakan murni berasal dari penilaian LLM verifikator, sementara skemanya valid dan semua evidence literal. Hasil ini sudah dihitung ulang dengan src/common/evidence.py dan menghasilkan 0 ketidakcocokan. Keempat penolakan itu ada di srbh-08bedb024d7ae9ea p1 dan p2, srbh-eafc5a26bcac8907 p1, serta srbh-53dcb82282e959b9 p2. Semuanya menolak label yang sama dengan label kebenaran, jadi 0 dibenarkan dan 4 salah tolak. Di srbh-08bedb024d7ae9ea, LLM dua kali menolak dengan alasan payload ter-URL-encode bukan XSS. Alasan itu bertentangan dengan definisi XSS di prompt verifikator sendiri (\"varian ter-encode (%3Cscript%3E)\"), dan di putaran 2 LLM juga mengarang bahwa schema_check menyatakan evidence tidak ditemukan. Sebaliknya, ada 14 putusan di 9 baris di mana LLM menjawab lolos tetapi pemeriksaan deterministik menolak karena evidence tidak literal. Pada 13 di antaranya, LLM sudah menerima ada:false dari alatnya sendiri, dan 4 di antaranya menyetujui label NORMAL yang salah (kebenarannya WEB_SCANNING).",
+   "counts": {
+    "putusan_total": 43,
+    "baris_dengan_putusan": 27,
+    "putusan_ditolak": 29,
+    "baris_ditolak": 16,
+    "tolak_llm_saja": 4,
+    "baris_tolak_llm_saja": 3,
+    "tolak_llm_saja_dibenarkan": 0,
+    "tolak_llm_saja_salah": 4,
+    "llm_lolos_det_tolak": 14,
+    "baris_llm_lolos_det_tolak": 9,
+    "llm_lolos_det_tolak_label_benar": 10,
+    "llm_lolos_det_tolak_label_salah": 4,
+    "llm_lolos_padahal_alat_ada_false": 13,
+    "tolak_llm_dan_det": 11,
+    "tolak_tanpa_putusan_llm": 1,
+    "putusan_lolos": 14,
+    "putusan_lolos_label_salah": 5,
+    "ketidakcocokan_hitung_ulang": 0,
+    "lapis_urldecode_08bedb": 2
+   },
+   "rows": [
+    {
+     "id": "metode",
+     "finding": "Run agent-20261007T164716Z-725069c terdiri atas 1172 record di agent_calls.jsonl dan 30 baris di agent.jsonl. Setiap pemanggilan verifikator saya pisahkan (pesan prompt 2 = awal), lalu JSON <klasifikasi> yang benar-benar diverifikasi saya ambil dari pesan human. Skema dan evidence saya hitung ulang dengan replika parse_output dan evidence_exists dari src/common/evidence.py terhadap raw_log_masked di test_sample_500. Hasilnya dicocokkan dengan alasan yang tercatat dan dengan tool call Verdict LLM: 0 ketidakcocokan. Kategori 4/14/11/14 sama dengan reports/pilot_agent.md. Skrip ada di <direktori_sementara>/verify/analyze.py."
+    },
+    {
+     "id": "srbh-08bedb024d7ae9ea#p1",
+     "finding": "TOLAK LLM SAJA, SALAH TOLAK. Label kebenaran XSS, label yang diverifikasi XSS, evidence [\"<script>\",\"alert(1);\"]. Alat yang dilihat verifikator: schema_check valid:true, evidence_exists ada:true untuk kedua item (masing-masing dicek 2x). Log mentah 'GET /blog/%2527%2522%253Cscript%253Ealert%25281%2529%253B%253C%252Fscript%253E/...' menjadi '\\'\"<script>alert(1);</script>' setelah 2 lapis URL-decode. Alasan LLM: '...tidak secara eksplisit mengandung tag <script> atau alert(1); dalam bentuk yang langsung dapat dieksekusi, melainkan dalam bentuk URL encoded.' Alasan ini bertentangan dengan system prompt verifikator (sha 2450f60b…), yang menulis 'XSS ... Ciri: <script>, ..., varian ter-encode (%3Cscript%3E)'."
+    },
+    {
+     "id": "srbh-08bedb024d7ae9ea#p2",
+     "finding": "TOLAK LLM SAJA, SALAH TOLAK. Klasifikasi ke-2 memakai evidence yang sama dengan confidence turun dari 0.9 ke 0.8, dan keluaran alatnya identik (valid:true, ada:true x2). Alasan LLM: '...URL encoding dari skrip berbahaya, bukan skrip langsung yang dieksekusi. Selain itu, schema_check menunjukkan bahwa evidence tidak ditemukan secara harfiah dalam log.' Kalimat kedua mengarang, karena bertentangan dengan keluaran alat yang diterima verifikator. Akibatnya status akhir verification_failed padahal label akhir XSS benar (C juga XSS), dengan biaya 28 panggilan LLM, $0.0044, dan 51,2 s."
+    },
+    {
+     "id": "srbh-eafc5a26bcac8907#p1",
+     "finding": "TOLAK LLM SAJA, SALAH TOLAK. Label kebenaran SQLI, label SQLI, evidence 'SELECT * FROM (SELECT(SLEEP(5)))fZFA'. Evidence ini literal setelah 1 lapis decode dengan '+' sebagai spasi; log mentah '/blog+AND+%28SELECT+*+FROM+%28SELECT%28SLEEP%285%29%29%29fZFA%29/index.php/...'. Hasil alat: valid:true, ada:true. Alasan LLM bertentangan dengan dirinya sendiri: '...label yang diberikan adalah 'SQLI' yang benar, namun ada ketidaksesuaian dalam penilaian sebelumnya. Perlu verifikasi ulang.' Putaran 2 lolos dan status ok, label tidak berubah. Kerugiannya hanya satu putaran klasifikasi dan verifikasi tambahan."
+    },
+    {
+     "id": "srbh-53dcb82282e959b9#p2",
+     "finding": "TOLAK LLM SAJA, SALAH TOLAK. Label kebenaran PATH_TRAVERSAL, label PATH_TRAVERSAL, evidence '/..%2F..%2F...%2Fetc%2Fpasswd' (16x) yang literal di log mentah 'GET /..%2F..%2F...%2Fetc%2Fpasswd/wp-content/...'. Hasil alat: valid:true, ada:true. Alasan LLM bertentangan dengan dirinya sendiri: '...namun label yang diberikan adalah PATH_TRAVERSAL dan tidak ada indikasi label salah.' Status akhir verification_failed padahal label benar. Penolakan putaran 1 memang sah secara deterministik (evidence non-literal 'Path Traversal Attack (/../) or (/.../) detected in request URI')."
+    },
+    {
+     "id": "srbh-f60769f8678a6831#p1",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK. Label NORMAL benar. Evidence yang hilang: 'path: /blog/index.php/tag/nihil-alias-ab/feed/' (awalan nama kolom membuatnya tidak literal). LLM menerima ada:false dari evidence_exists tetapi tetap lolos."
+    },
+    {
+     "id": "srbh-f60769f8678a6831#p2",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK. Label NORMAL benar. Evidence hilang berupa narasi: 'Permintaan ke URL feed RSS yang wajar tanpa indikasi serangan'. LLM menerima ada:false tetapi tetap lolos. Status baris verification_failed."
+    },
+    {
+     "id": "srbh-0c2ab3c6ff0f0cef#p1",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK. Label NORMAL benar. Evidence hilang berupa narasi: 'Tidak ada pola mencurigakan dalam path atau user agent'. LLM menerima ada:false tetapi tetap lolos."
+    },
+    {
+     "id": "srbh-0c2ab3c6ff0f0cef#p2",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK. Label NORMAL benar. Evidence narasi yang sama hilang lagi. LLM menerima ada:false tetapi tetap lolos. Status verification_failed."
+    },
+    {
+     "id": "srbh-fae0e1ba315fa2c1#p2",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK, LABEL SALAH. Label NORMAL, kebenarannya WEB_SCANNING (log 'MKCOL /blog/index.php/.../feed/'). Evidence hilang: 'Method is not allowed by policy', yaitu pesan aturan CRS. LLM menyetujui NORMAL padahal definisi kelas menyebut MKCOL sebagai ciri WEB_SCANNING, dan di p1 LLM sendiri menolak NORMAL."
+    },
+    {
+     "id": "srbh-aa5f0e59a07f196a#p1",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK. Label NORMAL benar. Tiga evidence hilang karena berawalan 'path: ', 'referer: ', dan 'user_agent: '. LLM menerima ada:false untuk ketiganya tetapi tetap lolos."
+    },
+    {
+     "id": "srbh-aa5f0e59a07f196a#p2",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK. Label NORMAL benar. Tiga item berawalan nama kolom yang sama hilang lagi. LLM menerima ada:false tetapi tetap lolos. Status verification_failed."
+    },
+    {
+     "id": "srbh-39eb58ec5a725284#p1",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK. Label NORMAL benar. Evidence hilang: 'path: /blog/wp-content/uploads/...-300x200.jpg' dan 'user_agent: Mozilla/5.0 ...'. LLM menerima ada:false tetapi tetap lolos."
+    },
+    {
+     "id": "srbh-39eb58ec5a725284#p2",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK. Label NORMAL benar. Kedua item yang sama hilang lagi. LLM menerima ada:false tetapi tetap lolos. Status verification_failed."
+    },
+    {
+     "id": "srbh-30cb1c9ddb21b535#p1",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK, LABEL SALAH. Label NORMAL, kebenarannya WEB_SCANNING (log 'TRACK /blog/index.php/...'). Evidence hilang: 'Method: TRACK'. LLM menerima ada:false tetapi tetap menyetujui NORMAL, padahal TRACK tercantum sebagai ciri WEB_SCANNING."
+    },
+    {
+     "id": "srbh-30cb1c9ddb21b535#p2",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK, LABEL SALAH. Evidence hilang: 'Method: TRACK' dan narasi 'Tidak ada bukti penyisipan SQL, ...'. LLM menulis '...serta schema_check valid' lalu lolos. Status verification_failed dengan label salah."
+    },
+    {
+     "id": "srbh-c75bb11bfd646555#p1",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK. Label PATH_TRAVERSAL benar. Evidence hilang berupa pesan CRS: 'Path Traversal Attack (/../) or (/.../)'. LLM tidak menyalin item ini apa adanya; ia mengecek '/../' dan '/..%2F' (ada:true), sehingga tidak pernah melihat ada:false. Ini satu-satunya dari 14 putusan di mana LLM tidak menerima ada:false. Putaran 2 lolos, status ok."
+    },
+    {
+     "id": "srbh-601629e62f22a62d#p2",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK, LABEL SALAH. Label NORMAL, kebenarannya WEB_SCANNING (log 'UNLOCK /blog/wp-includes/js/media-views.min.js?ver=4.9.5'). Evidence hilang: 'Method is not allowed by policy'. Di p1 LLM menolak NORMAL karena metode tidak standar, tetapi di p2 justru menyetujui NORMAL."
+    },
+    {
+     "id": "srbh-b90bd4ea89d4b716#p2",
+     "finding": "LLM LOLOS, DETERMINISTIK TOLAK. Label NORMAL benar. Evidence hilang: 'path: /blog/index.php/wp-json/oembed/%29/embed' dan 'query: format=xml&url=...'. LLM menerima ada:false tetapi tetap lolos. Pada p1 baris ini verifikator tidak memberi putusan (batas_panggilan_verifikator=1, 10x schema_check dan 10x evidence_exists). Laporan menghitung p1 sebagai 'evidence/skema + penilaian LLM', padahal sebenarnya tidak ada penilaian LLM."
+    },
+    {
+     "id": "konteks-arah-kesalahan",
+     "finding": "Penilaian LLM verifikator tidak pernah menjadi satu-satunya penyebab tertolaknya label yang salah: semua 4 penolakan LLM-saja jatuh pada label yang benar. Sebaliknya, 5 dari 14 putusan lolos menyetujui label salah: aec85e4d p1 (NORMAL, kebenaran PATH_TRAVERSAL); 36368afe p1, 3e7a9f92 p1, dan fa2a8c60 p1 (PATH_TRAVERSAL, kebenaran CMD_INJECTION); serta e96613ae p2 (PATH_TRAVERSAL, kebenaran WEB_SCANNING). Di srbh-1567934be785b9ae p1, LLM salah menyalin item (17x '..%2F' padahal aslinya 16x) dan menerima ada:false, tetapi tetap menulis 'evidence ditemukan'. Putusannya lolos hanya karena pemeriksaan deterministik menemukan item aslinya."
+    }
+   ],
+   "corrections": [
+    "Frasa 'literal after URL-decoding' kurang presisi. Payload di srbh-08bedb024d7ae9ea ter-encode ganda ('%253Cscript%253E', 'alert%25281%2529%253B'), sehingga '<script>' dan 'alert(1);' baru literal setelah 2 lapis URL-decode. Setelah lapis 1 masih berbentuk '%3Cscript%3E'.",
+    "'Rejected twice because the verifier believed URL-encoded payloads are not XSS' hanya tepat sepenuhnya untuk putaran 1. Di putaran 2 verifikator juga menambahkan alasan karangan: 'schema_check menunjukkan bahwa evidence tidak ditemukan secara harfiah dalam log'. Padahal alat yang diterimanya di putaran itu menjawab valid:true dan ada:true untuk kedua item.",
+    "'At least one such rejection was wrong' terlalu lemah. Keempat penolakan LLM-saja salah tolak (label yang diverifikasi = label kebenaran di semua kasus). Dua lainnya, srbh-eafc5a26bcac8907 p1 dan srbh-53dcb82282e959b9 p2, bahkan memakai alasan yang bertentangan dengan dirinya sendiri karena menyatakan labelnya benar."
+   ]
+  },
+  {
+   "key": "evidence-patterns",
+   "verdict": "confirmed",
+   "summary": "Klaim terkonfirmasi. Dari 44 klasifikasi E yang direkonstruksi (78 item evidence, 39 non-literal), item non-literal terbagi menjadi: (b) prefiks kolom log 18, (c) salinan keluaran alat 15, (a) kalimat deskriptif 5, dan lain-lain 1 (payload yang diformat ulang). Sebanyak 28 dari 39 item itu ada pada prediksi NORMAL. Ada 25 penolakan deterministik; semuanya karena evidence tidak ditemukan dan tidak satu pun karena schema_check. Dari 25 itu, 24 seluruhnya disebabkan item a/b/c, atau 22 bila (c) dibatasi pada pesan CRS dan kunci scanner_indicators. Ke-14 penolakan saat LLM verifikator menjawab 'lolos' semuanya a/b/c. Pembanding C pada 30 baris yang sama sama sekali tidak punya item (b) atau (c). Non-literal C berupa payload yang disalin keliru (6 dari 11 di run penuh; 5 dari 10 di run pilot), string kosong pada NORMAL (4; 3), dan teks definisi kelas dari prompt (1; 2).",
+   "counts": {
+    "klasifikasi_E_direkonstruksi": 44,
+    "item_evidence_E_semua_klasifikasi": 78,
+    "item_literal_E": 39,
+    "item_nonliteral_E": 39,
+    "nonliteral_a_deskriptif": 5,
+    "nonliteral_b_prefiks_kolom_log": 18,
+    "nonliteral_c_salinan_keluaran_alat": 15,
+    "nonliteral_c_pesan_CRS": 9,
+    "nonliteral_c_kunci_scanner_indicators": 2,
+    "nonliteral_c_prefiks_kunci_alat_irisan_b": 2,
+    "nonliteral_c_nilai_cocok_CRS_lowercase": 2,
+    "nonliteral_lain_payload_diformat_ulang": 1,
+    "item_NORMAL": 31,
+    "nonliteral_NORMAL": 28,
+    "nonliteral_NORMAL_a": 4,
+    "nonliteral_NORMAL_b": 17,
+    "nonliteral_NORMAL_c": 7,
+    "item_WEB_SCANNING": 4,
+    "nonliteral_WEB_SCANNING_c": 4,
+    "item_SQLI": 14,
+    "nonliteral_SQLI": 4,
+    "nonliteral_SQLI_b": 1,
+    "nonliteral_SQLI_c": 2,
+    "nonliteral_SQLI_lain": 1,
+    "item_PATH_TRAVERSAL": 18,
+    "nonliteral_PATH_TRAVERSAL": 3,
+    "nonliteral_PATH_TRAVERSAL_a": 1,
+    "nonliteral_PATH_TRAVERSAL_c": 2,
+    "item_XSS": 9,
+    "nonliteral_XSS": 0,
+    "item_CMD_INJECTION": 2,
+    "nonliteral_CMD_INJECTION": 0,
+    "putusan_verifikasi": 43,
+    "penolakan_total": 29,
+    "penolakan_hanya_penilaian_LLM": 4,
+    "penolakan_deterministik": 25,
+    "penolakan_deterministik_schema_gagal": 0,
+    "penolakan_deterministik_semua_item_abc_tafsiran_luas": 24,
+    "penolakan_deterministik_semua_item_abc_tafsiran_sempit": 22,
+    "penolakan_deterministik_di_luar_abc": 1,
+    "penolakan_deterministik_murni_a": 3,
+    "penolakan_deterministik_murni_b": 9,
+    "penolakan_deterministik_murni_c": 10,
+    "penolakan_deterministik_a_plus_b": 1,
+    "penolakan_deterministik_a_plus_c": 1,
+    "penolakan_deterministik_saat_LLM_lolos": 14,
+    "penolakan_deterministik_saat_LLM_lolos_semua_abc": 14,
+    "penolakan_deterministik_label_NORMAL": 17,
+    "penolakan_deterministik_label_SQLI": 4,
+    "penolakan_deterministik_label_WEB_SCANNING": 2,
+    "penolakan_deterministik_label_PATH_TRAVERSAL": 2,
+    "baris_dengan_penolakan_deterministik": 14,
+    "baris_verification_failed": 13,
+    "baris_verification_failed_hanya_deterministik_di_putaran_akhir": 8,
+    "selisih_evidence_hilang_rekonstruksi_vs_alasan_tercatat": 0,
+    "E_final_item": 44,
+    "E_final_nonliteral": 16,
+    "E_final_nonliteral_a": 3,
+    "E_final_nonliteral_b": 8,
+    "E_final_nonliteral_c": 4,
+    "E_final_nonliteral_lain": 1,
+    "C_penuh_item": 46,
+    "C_penuh_nonliteral": 11,
+    "C_penuh_payload_disalin_keliru": 6,
+    "C_penuh_string_kosong": 4,
+    "C_penuh_teks_definisi_kelas_prompt": 1,
+    "C_penuh_kategori_b": 0,
+    "C_penuh_kategori_c": 0,
+    "C_pilot_item": 46,
+    "C_pilot_nonliteral": 10,
+    "C_pilot_payload_disalin_keliru": 5,
+    "C_pilot_string_kosong": 3,
+    "C_pilot_teks_definisi_kelas_prompt": 2,
+    "baris_nonliteral_C_penuh": 10,
+    "baris_nonliteral_E_semua_klasifikasi": 14,
+    "irisan_baris_nonliteral_C_penuh_dan_E": 5
+   },
+   "rows": [
+    {
+     "id": "metode",
+     "finding": "Ada 44 respons jenis=llm subagen=klasifikasi untuk run_id agent-20261007T164716Z-725069c. Semuanya valid (finish_reason stop, tanpa ulangan parse) dan cocok 1:1 dengan keluaran alat task:klasifikasi serta masukan <klasifikasi> verifikator. Daftar evidence hilang dihitung ulang dengan evidence_exists dan cocok persis dengan 25 dari 25 alasan deterministik di agent.jsonl (0 selisih). graph.py dan evidence.py tidak berubah sejak commit 725069c. Skrip: <direktori_sementara>/verify/analyze.py"
+    },
+    {
+     "id": "agregat-E",
+     "finding": "Item non-literal per label: NORMAL 28/31 (a 4, b 17, c 7); WEB_SCANNING 4/4 (c 4); SQLI 4/14 (b 1, c 2, lain 1); PATH_TRAVERSAL 3/18 (a 1, c 2); XSS 0/9; CMD_INJECTION 0/2. Per penolakan deterministik: murni a 3, murni b 9, murni c 10, a+b 1, a+c 1, lain 1. Sebanyak 17 dari 25 penolakan deterministik terjadi pada klasifikasi berlabel NORMAL."
+    },
+    {
+     "id": "srbh-0c2ab3c6ff0f0cef",
+     "finding": "(a) NORMAL. Klasifikasi ke-1 dan ke-2 identik: 'Tidak ada pola mencurigakan dalam path atau user agent'. Hasilnya 2 penolakan deterministik, padahal LLM verifikator menjawab lolos di kedua putaran. Umpan balik tidak memperbaiki evidence."
+    },
+    {
+     "id": "srbh-f60769f8678a6831",
+     "finding": "Klasifikasi ke-1 bertipe (b): 'path: /blog/index.php/tag/nihil-alias-ab/feed/' (nilainya literal bila prefiks dibuang). Setelah umpan balik, klasifikasi ke-2 beralih ke (a): 'Permintaan ke URL feed RSS yang wajar tanpa indikasi serangan'. Dua penolakan deterministik, LLM lolos di keduanya."
+    },
+    {
+     "id": "srbh-30cb1c9ddb21b535",
+     "finding": "(b) 'Method: TRACK' di klasifikasi ke-1 dan ke-2, ditambah (a) 'Tidak ada bukti penyisipan SQL, skrip XSS, path traversal, command injection, atau pemindaian' di klasifikasi ke-2. Label NORMAL, kebenaran WEB_SCANNING. Pada baris yang sama, C memberi dua string kosong ''."
+    },
+    {
+     "id": "srbh-aa5f0e59a07f196a",
+     "finding": "(b) 6 item, identik di klasifikasi ke-1 dan ke-2: 'path: /blog/wp-content/uploads/2020/6-2/...png', 'referer: http://test-site.com/blog/index.php/2020/04/04/hic-porro-nihil-non-rerum/embed/', 'user_agent: Mozilla/5.0 (X11; ...'. Semua nilai setelah prefiks literal (berlaku untuk ke-18 item b)."
+    },
+    {
+     "id": "srbh-39eb58ec5a725284",
+     "finding": "(b) 4 item 'path: /blog/wp-content/uploads/2020/04/...jpg' dan 'user_agent: Mozilla/5.0 ...', sama di klasifikasi ke-1 dan ke-2, menghasilkan 2 penolakan deterministik dengan LLM lolos. C penuh di baris ini memakai string kosong '' sebagai salah satu evidence."
+    },
+    {
+     "id": "srbh-b90bd4ea89d4b716",
+     "finding": "(b) 4 item 'path: /blog/index.php/wp-json/oembed/%29/embed' dan 'query: format=xml&url=http%3A%2F%2Ftest-site.com...' (sama di klasifikasi ke-1 dan ke-2). Di putaran 1, LLM verifikator tidak memberi putusan."
+    },
+    {
+     "id": "srbh-89e8529757199934",
+     "finding": "Klasifikasi ke-1 bertipe (b): 'path: /blog/index.php/2020%25%27+UNION+ALL+SELECT+NULL%2C...'. Klasifikasi ke-2: 'UNION ALL SELECT NULL, NULL, NULL, ...'. Ini satu-satunya penolakan deterministik di luar a/b/c: spasi disisipkan, sedangkan log terdekode berisi 'NULL,NULL,NULL'. C juga non-literal di baris ini: 'UNION SELECT' (kata ALL hilang)."
+    },
+    {
+     "id": "srbh-fae0e1ba315fa2c1",
+     "finding": "(c) 'Method is not allowed by policy' sama persis dengan pesan CRS 911100 di pattern_hits (cocok 'MKCOL'), muncul di klasifikasi ke-1 dan ke-2. Item 'MKCOL' di klasifikasi ke-1 literal. Label NORMAL, kebenaran WEB_SCANNING. Penolakan putaran 2 terjadi saat LLM menjawab lolos."
+    },
+    {
+     "id": "srbh-601629e62f22a62d",
+     "finding": "(c) Pola sama dengan baris sebelumnya: 'Method is not allowed by policy' (911100, cocok 'UNLOCK') di klasifikasi ke-1 dan ke-2; 'UNLOCK' literal. C memakai '' ditambah 'UNLOCK /blog/wp-includes/js/media-views.min.js?ver=4.9.5 HTTP/1.1'."
+    },
+    {
+     "id": "srbh-daf276f8cabe83d8",
+     "finding": "(c) 'User-Agent associated with security scanner' adalah potongan pesan CRS 913100 'Found User-Agent associated with security scanner'. 'metode non_standar null' dan 'ekstensi cadangan null' adalah rekonstruksi '\"metode_non_standar\": null' dan '\"ekstensi_cadangan\": null' dari scanner_indicators. C justru menyalin teks definisi kelas di prompt: 'user agent pemindai (Nmap, zgrab, sqlmap)' (src/llm/klasifikasi.py baris 29)."
+    },
+    {
+     "id": "srbh-e96613aeb264209a",
+     "finding": "Klasifikasi ke-1 (NORMAL) berisi (c) 'Restricted File Access Attempt' (930130) serta 'tag: attack-lfi' dan 'cocok: .htaccess' (prefiks kunci keluaran alat, irisan b dan c; nilai 'attack-lfi' tidak ada di log). Klasifikasi ke-2 hanya memakai '.htaccess' yang literal, sehingga lolos, tetapi labelnya PATH_TRAVERSAL sedangkan kebenaran WEB_SCANNING."
+    },
+    {
+     "id": "srbh-53dcb82282e959b9",
+     "finding": "(c)+(a): 'Path Traversal Attack (/../) or (/.../) detected in request URI' adalah pesan 930100/930110 ditambah teks, dan 'encoded path segments indicating traversal attempt' adalah satu-satunya item (a) yang bukan NORMAL. Klasifikasi ke-2 literal ('/..%2F..%2F...etc%2Fpasswd'), tetapi ditolak oleh penilaian LLM."
+    },
+    {
+     "id": "srbh-c75bb11bfd646555",
+     "finding": "(c) 'Path Traversal Attack (/../) or (/.../)' sama persis dengan pesan CRS. Di klasifikasi ke-1, LLM menjawab lolos tetapi pemeriksaan deterministik menolak. Klasifikasi ke-2 memakai '/..%2F' dan path literal, statusnya ok."
+    },
+    {
+     "id": "srbh-098b9c2443ef7421",
+     "finding": "'select+count(*)' (klasifikasi ke-1 dan ke-2) disalin dari nilai cocok CRS 932130 '>(select+count(*)' yang sudah di-lowercase. Log berisi 'SELECT+COUNT%28*%29', yang terdekode menjadi 'SELECT+COUNT(*)', dan evidence_exists peka huruf besar/kecil. Ini subjenis (c) yang tidak disebut klaim (nilai cocok, bukan pesan aturan). 'ELT(6565=6565,1)' dan 'UNION+SELECT' literal."
+    },
+    {
+     "id": "srbh-08bedb024d7ae9ea",
+     "finding": "Pembanding: C penuh '<script>alert%81%29%3B</script>' (lapis decode tercampur, dan '%81' tidak ada di log), C pilot '<script>alert%81%29%3B%3C%2Fscript%3E'. E memakai '<script>' dan 'alert(1);' yang literal; kedua penolakannya murni penilaian LLM, bukan deterministik. Pola serupa di srbh-e6417922b662e2ac (C '<script>alert%28%29;', E literal)."
+    },
+    {
+     "id": "srbh-01b00fcbf8064bef",
+     "finding": "Pembanding: C menulis \"'<script>alert(1);</script>'\", sedangkan user agent di log adalah '\\'\"<script>alert(1);</script>' (tanda kutip ganda hilang). Payload disalin keliru; sama di srbh-8002b48db2cdb197. E berstatus PARSE_ERROR di kedua baris (tanpa klasifikasi), jadi tidak ada evidence E."
+    },
+    {
+     "id": "srbh-1567934be785b9ae",
+     "finding": "E memanggil klasifikasi dua kali di putaran 0 (klasifikasi ke-1 tidak diverifikasi), dan keduanya literal. C penuh non-literal karena salah menghitung pengulangan '..%2F' (15, sedangkan log 16); C pilot (16) literal."
+    },
+    {
+     "id": "srbh-b37943f5082e45b8",
+     "finding": "C pilot menyalin definisi kelas dari prompt: 'URL eksternal ber-skema (http://...) di segmen path' (src/llm/klasifikasi.py baris 23). E memakai '%255C..%255C' yang literal."
+    },
+    {
+     "id": "agregat-C",
+     "finding": "C (30 baris yang sama), run penuh: 11/46 non-literal = 6 payload disalin keliru (XSS 4, PATH_TRAVERSAL 1, SQLI 1), 4 string kosong (semua NORMAL), 1 teks definisi prompt (WEB_SCANNING). Run pilot: 10/46 = 5 payload, 3 string kosong, 2 teks prompt. Kategori b dan c = 0. Pada keluaran final E: 16/44 non-literal = b 8, c 4, a 3, lain 1. Jenis (b) dan (c) hanya muncul pada agen yang menerima konteks alat terstruktur."
+    }
+   ],
+   "corrections": [
+    "Kategori (c) lebih luas daripada contoh dalam klaim. Selain pesan aturan CRS dan kunci scanner_indicators, (c) juga mencakup nilai 'cocok' CRS yang sudah ditransformasi menjadi huruf kecil: 'select+count(*)' (srbh-098b9c2443ef7421, 2 penolakan) diambil dari cocok '>(select+count(*)', sedangkan log berisi 'SELECT+COUNT%28*%29'. (c) juga mencakup item berprefiks kunci keluaran alat ('tag: attack-lfi', 'cocok: .htaccess', srbh-e96613aeb264209a) yang beririsan dengan (b). Dengan tafsiran (c) yang sempit, porsinya 22/25, bukan 24/25.",
+    "Ketiga jenis tidak setara bobotnya. (a) adalah yang terkecil: 5 dari 39 item, terlibat di 5 dari 25 penolakan, dan hanya 3 penolakan yang murni (a). Penyebab dominan adalah (b) (18 item, 10 penolakan) dan (c) (15 item, 11 penolakan). Satu item (a) juga bukan prediksi NORMAL: 'encoded path segments indicating traversal attempt' (PATH_TRAVERSAL, srbh-53dcb82282e959b9).",
+    "Satu penolakan deterministik berada di luar ketiga jenis: srbh-89e8529757199934 putaran 2, 'UNION ALL SELECT NULL, NULL, ...' (spasi disisipkan; log terdekode 'NULL,NULL,...')."
+   ]
+  },
+  {
+   "key": "label-change",
+   "verdict": "confirmed",
+   "summary": "Klaim terkonfirmasi oleh rekonstruksi dari agent_calls.jsonl. Dari 16 baris yang menjalani 2 putaran, klasifikasi ke-2 mengulang label ke-1 di 15 baris. Satu-satunya perubahan (srbh-e96613aeb264209a, NORMAL→PATH_TRAVERSAL, label benar WEB_SCANNING) berpindah dari salah ke salah, sehingga akurasi 16 baris tetap 12/16 dan akurasi 30 baris tetap 19/30 (macro-F1 0,624 vs 0,625 bila putaran 2 dihapus). Putaran 2 (putaran_verifikasi=1) memakan 95 panggilan LLM, 266.905 token, $0,01345 (16,1% biaya run) dan 150,2 s waktu dinding (17,0%). Latensi median run naik dari 22,7 s menjadi 28,2 s. Nuansanya: 9 dari 16 penolakan putaran 1 tidak mempersoalkan label sama sekali. Putaran 2 juga tidak murni biaya: keluaran klasifikasi berbeda di 16/16 baris dan 3 baris menjadi ok, salah satunya label yang salah.",
+   "counts": {
+    "baris_2_putaran": 16,
+    "label_sama_k1_k2": 15,
+    "label_berubah": 1,
+    "perubahan_menjadi_benar": 0,
+    "perubahan_salah_ke_salah": 1,
+    "benar_k1_dari_16": 12,
+    "benar_k2_dari_16": 12,
+    "akurasi_30_akhir": 19,
+    "akurasi_30_tanpa_putaran2": 19,
+    "macro_f1_akhir": 0.624,
+    "macro_f1_tanpa_putaran2": 0.625,
+    "k2_menerima_umpan_balik": 16,
+    "keluaran_k1_identik_k2": 0,
+    "penolakan_p1_menantang_label": 7,
+    "penolakan_p1_menantang_label_dengan_benar": 3,
+    "penolakan_p1_menantang_label_keliru_atau_kontradiktif": 4,
+    "penolakan_p1_tanpa_tantangan_label": 9,
+    "penolakan_total": 29,
+    "penolakan_putaran2_tanpa_putaran3": 13,
+    "status_menjadi_ok_setelah_putaran2": 3,
+    "tetap_verification_failed": 13,
+    "evidence_literal_item_k1": 9,
+    "evidence_item_k1": 32,
+    "evidence_literal_item_k2": 8,
+    "evidence_item_k2": 24,
+    "baris_evidence_semua_literal_k1": 2,
+    "baris_evidence_semua_literal_k2": 5,
+    "rasio_evidence_literal_akhir": 0.636,
+    "rasio_evidence_literal_tanpa_putaran2": 0.558,
+    "putaran2_panggilan_llm": 95,
+    "putaran2_panggilan_orkestrator": 38,
+    "putaran2_panggilan_klasifikasi": 16,
+    "putaran2_panggilan_verifikasi": 41,
+    "putaran2_prompt_tokens": 260481,
+    "putaran2_completion_tokens": 6424,
+    "putaran2_total_tokens": 266905,
+    "putaran2_biaya_usd": 0.01345,
+    "putaran2_latensi_llm_s": 149.6,
+    "putaran2_waktu_dinding_s": 150.2,
+    "putaran2_waktu_dinding_median_per_baris_s": 9.4,
+    "putaran2_porsi_latensi_baris_median_pct": 27,
+    "porsi_panggilan_run_pct": 16.9,
+    "porsi_token_run_pct": 15.6,
+    "porsi_biaya_run_pct": 16.1,
+    "porsi_waktu_dinding_run_pct": 17,
+    "batas_atas_p_ge1_panggilan": 116,
+    "batas_atas_p_ge1_token": 373993,
+    "batas_atas_p_ge1_biaya_usd": 0.01731,
+    "batas_atas_p_ge1_latensi_llm_s": 181.4,
+    "run_total_panggilan_llm": 563,
+    "run_total_biaya_usd": 0.08336,
+    "run_total_waktu_dinding_s": 883.6,
+    "latensi_median_run_akhir_s": 28.22,
+    "latensi_median_run_tanpa_putaran2_s": 22.68,
+    "panggilan_llm_per_baris_akhir": 18.8,
+    "panggilan_llm_per_baris_tanpa_putaran2": 15.6,
+    "ulangan_parse_klasifikasi": 0,
+    "baris_2_invokasi_klasifikasi_dalam_1_putaran": 1,
+    "baris_parse_error_tanpa_klasifikasi": 3
+   },
+   "rows": [
+    {
+     "id": "srbh-e96613aeb264209a",
+     "finding": "SATU-SATUNYA perubahan label: NORMAL (conf 0,2) -> PATH_TRAVERSAL (conf 0,8), benar WEB_SCANNING, jadi salah->salah. Log: \"GET /blog/index.php/author/tomas/.htaccess HTTP/1.1\" 404. Putusan 1 LLM: \"'NORMAL' tidak sesuai ... kemungkinan serangan LFI\", dan klasifikator mengikuti petunjuk LFI itu. Evidence 0/3 literal menjadi ['.htaccess'] 1/1. Putusan 2 lolos, sehingga status ok untuk label salah. Putaran 2: 5 LLM, 13.523/577 token, $0,00081, 8,0 s."
+    },
+    {
+     "id": "srbh-fae0e1ba315fa2c1",
+     "finding": "NORMAL(0,2) -> NORMAL(0,2), benar WEB_SCANNING (log \"MKCOL /blog/index.php/2020/04/04/hic-porro-nihil-non-rerum/feed/\"). Putusan 1 LLM menantang label dengan BENAR (\"metode MKCOL yang tidak umum ... sedangkan klasifikasi menyatakan NORMAL\"), tetapi label tidak berubah. Evidence k2 membuang 'MKCOL' (literal) dan menyisakan 'Method is not allowed by policy' (tidak literal). LLM putusan 2 malah lolos; status verification_failed. Putaran 2: 5 LLM, $0,00097, 7,7 s."
+    },
+    {
+     "id": "srbh-601629e62f22a62d",
+     "finding": "NORMAL(0,2) -> NORMAL(0,2), benar WEB_SCANNING (log \"UNLOCK /blog/wp-includes/js/media-views.min.js?ver=4.9.5\" 405). Putusan 1 LLM menantang label dengan BENAR (\"Label 'NORMAL' tidak sesuai dengan evidence 'UNLOCK'\"), tetapi label tetap. Evidence k2 membuang 'UNLOCK' (literal); LLM putusan 2 lolos; tetap verification_failed. Putaran 2: 6 LLM, $0,00072, 13,1 s."
+    },
+    {
+     "id": "srbh-30cb1c9ddb21b535",
+     "finding": "NORMAL -> NORMAL, benar WEB_SCANNING (log \"TRACK /blog/index.php/...\"). Putusan 1: LLM lolos; tolak deterministik karena 'Method: TRACK' tidak literal, jadi label tidak dipersoalkan. Evidence k2 menambah kalimat bebas yang juga tidak literal; tetap salah dan gagal. Putaran 2: 5 LLM, $0,00064, 6,6 s."
+    },
+    {
+     "id": "srbh-08bedb024d7ae9ea",
+     "finding": "XSS(0,9) -> XSS(0,8), benar XSS. Putusan 1 LLM menantang label secara KELIRU (\"Klasifikasi XSS tidak sesuai ... URL encoded\") walaupun evidence <script>, alert(1); 2/2 literal. Label benar dipertahankan; putusan 2 tetap tolak oleh LLM; verification_failed. Putaran 2: 6 LLM, 16.761/340 token, $0,00079, 11,6 s."
+    },
+    {
+     "id": "srbh-53dcb82282e959b9",
+     "finding": "PATH_TRAVERSAL -> PATH_TRAVERSAL, benar. Putusan 1 LLM menantang label secara keliru. Evidence 0/2 literal (pesan CRS) menjadi 1/1 literal ('/..%2F..%2F...'), tetapi LLM putusan 2 tetap tolak; verification_failed. Putaran 2: 6 LLM, $0,00082, 8,8 s."
+    },
+    {
+     "id": "srbh-098b9c2443ef7421",
+     "finding": "SQLI -> SQLI, benar. Putusan 1 LLM menantang label secara keliru (\"Label 'SQLI' tidak konsisten\"). Evidence k2 memburuk, dari 2/3 literal menjadi 0/1: 'ELT(6565=6565,1)' dan 'UNION+SELECT' dibuang, 'select+count(*)' yang tidak literal tetap ada. Status gagal. Putaran 2: 6 LLM, $0,00085, 7,2 s."
+    },
+    {
+     "id": "srbh-eafc5a26bcac8907",
+     "finding": "SQLI -> SQLI, benar. Alasan putusan 1 LLM kontradiktif (\"label yang diberikan adalah 'SQLI' yang benar, namun ada ketidaksesuaian\"). Evidence k2 berubah menjadi 'SLEEP(5)','SELECT * FROM' (semua literal). Putusan 2 lolos, jadi status menjadi ok; manfaatnya hanya status, label sama. Putaran 2: 6 LLM, $0,00095, 9,2 s."
+    },
+    {
+     "id": "srbh-c75bb11bfd646555",
+     "finding": "PATH_TRAVERSAL -> PATH_TRAVERSAL, benar. Putusan 1: LLM lolos, tolak deterministik karena 'Path Traversal Attack (/../) or (/.../)' tidak literal. Evidence 1/2 menjadi 2/2 literal; putusan 2 lolos, status menjadi ok (hanya status). Putaran 2: 7 LLM, 20.047/601 token, $0,00103, 11,5 s."
+    },
+    {
+     "id": "srbh-89e8529757199934",
+     "finding": "SQLI -> SQLI, benar. Penolakan 1 menyangkut evidence/skema, bukan label. Evidence k2 memburuk, dari 1/2 menjadi 0/1: 'UNION+ALL+SELECT' yang literal dibuang dan diganti 'UNION ALL SELECT NULL, NULL, ...' yang tidak literal. Status gagal. Putaran 2: 7 LLM, $0,00079, 10,8 s."
+    },
+    {
+     "id": "srbh-daf276f8cabe83d8",
+     "finding": "WEB_SCANNING -> WEB_SCANNING, benar. Penolakan 1 soal evidence; evidence 0/3 menjadi 0/1 ('User-Agent associated with security scanner'); gagal. Putaran 2: 5 LLM, $0,00060, 5,9 s."
+    },
+    {
+     "id": "srbh-f60769f8678a6831",
+     "finding": "NORMAL -> NORMAL, benar. Putusan 1: LLM lolos, tolak deterministik (evidence 'path: /blog/index.php/tag/nihil-alias-ab/feed/' tidak literal). Evidence k2 berupa kalimat bebas yang juga tidak literal; gagal. Putaran 2: 6 LLM, $0,00076, 10,4 s."
+    },
+    {
+     "id": "srbh-0c2ab3c6ff0f0cef",
+     "finding": "NORMAL -> NORMAL, benar. Hanya penolakan deterministik; evidence identik di k1 dan k2 ('Tidak ada pola mencurigakan dalam path atau user agent', tidak literal); gagal. Putaran 2: 6 LLM, $0,00080, 7,9 s."
+    },
+    {
+     "id": "srbh-aa5f0e59a07f196a",
+     "finding": "NORMAL -> NORMAL (conf 0,9 -> 0,95), benar. Hanya penolakan deterministik; evidence identik, 3 item berawalan 'path:'/'referer:'/'user_agent:' dengan 0 literal; gagal. Putaran 2: 6 LLM, 16.702/673 token, $0,00102, 11,1 s."
+    },
+    {
+     "id": "srbh-39eb58ec5a725284",
+     "finding": "NORMAL -> NORMAL, benar. Hanya penolakan deterministik; evidence identik 0/2 literal; gagal. Putaran 2: 6 LLM, 20.734/469 token, $0,00099, 9,7 s."
+    },
+    {
+     "id": "srbh-b90bd4ea89d4b716",
+     "finding": "NORMAL(0,9) -> NORMAL(0,2), benar. Putusan 1: \"verifikator tidak memberi putusan\" ditambah evidence tidak literal. Evidence identik 0/2; gagal. Putaran 2: 7 LLM, $0,00091, 10,9 s."
+    },
+    {
+     "id": "srbh-1567934be785b9ae",
+     "finding": "Catatan metode: baris 1 putaran, tetapi klasifikasi dipanggil 2 kali di putaran_verifikasi=0. Orkestrator memanggil klasifikasi dan verifikasi bersamaan, lalu klasifikasi lagi dengan masukan identik (1742 token). Kedua keluaran PATH_TRAVERSAL. Pengelompokan per putaran menyatukan keduanya, tetapi tidak menyembunyikan perubahan label. Di run ini tidak ada ulangan parse."
+    },
+    {
+     "id": "srbh-01b00fcbf8064bef, srbh-8002b48db2cdb197, srbh-a7c36c09bcd7bf3b",
+     "finding": "PARSE_ERROR dengan 0 panggilan LLM klasifikasi (klasifikasi tidak pernah dipanggil), sehingga tidak relevan untuk perubahan label antarputaran."
+    }
+   ],
+   "corrections": [
+    "'Verification rejections almost never change the label' benar secara angka (1/16), tetapi penyebabnya sebagian struktural. 9 dari 16 penolakan putaran 1 tidak mempersoalkan label: hanya evidence/skema (f60769, 0c2ab3, aa5f0e, 39eb58, 30cb1c, c75bb1, daf276, 89e852) atau verifikator tanpa putusan (b90bd4), jadi label tetap memang wajar. Dari 7 penolakan yang menantang label, 1 mengubah label (14%). Dari 3 tantangan yang benar (fae0e1, e96613, 601629: NORMAL padahal WEB_SCANNING), tidak ada yang berhasil dibetulkan.",
+    "13 dari 29 penolakan adalah penolakan putaran 2 yang menurut desain tidak bisa mengubah label (tidak ada putaran 3). Perubahan label hanya bisa diukur pada 16 penolakan putaran 1.",
+    "'Mostly adds cost/latency' tepat untuk label/akurasi: tanpa putaran 2 akurasi tetap 19/30 dan macro-F1 0,625 vs 0,624. Namun putaran 2 tidak murni biaya. Keluaran k1 dan k2 tidak identik di 16/16 baris (evidence/confidence/explanation berubah), dan 3 baris berubah dari ditolak menjadi ok (eafc5a, c75bb1, e96613). Salah satunya, e96613, adalah label salah yang kini tercatat terverifikasi.",
+    "Efek pada metrik evidence literal: rasio item literal pada keluaran akhir 28/44=0,636 vs 29/52=0,558 bila k1 dipakai. Kenaikan itu datang dari pembuangan item (32 menjadi 24 item di 16 baris), sedangkan jumlah item literal justru turun (9 menjadi 8). Di 4 baris, item literal dibuang (fae0e1 'MKCOL', 601629 'UNLOCK', 098b9c 'ELT(6565=6565,1)'/'UNION+SELECT', 89e852 'UNION+ALL+SELECT').",
+    "Besaran biaya bergantung definisi 'putaran 2'. Bila hanya putaran_verifikasi=1 (dispatch ulang + klasifikasi ke-2 + verifikasi ke-2): 95 LLM, 266.905 token, $0,01345, 150,2 s waktu dinding. Bila p>=1, yang ikut menghitung panggilan penutup yang juga ada di baris 1 putaran (rata-rata 1 panggilan, ±$0,000156 per baris): 116 LLM, 373.993 token, $0,01731."
+   ]
+  },
+  {
+   "key": "e-vs-c",
+   "verdict": "confirmed",
+   "summary": "Klaim terbukti. Di 30 baris pilot, E tidak pernah benar di baris yang salah menurut C. Hasil ini sama terhadap C full maupun C pilot. E salah tepat di 4 baris yang benar menurut C: fae0e1ba (permintaan MKCOL, E menjawab NORMAL), lalu 01b00fcb, 8002b48d, dan a7c36c09 yang ketiganya PARSE_ERROR. Skornya E 19/30, C 23/30, dan label E sama dengan C di 24/30 baris. Ketiga PARSE_ERROR itu bukan kegagalan parse dari sub-agen klasifikasi. Orkestrator tidak pernah memanggil sub-agen mana pun karena sibuk dengan alat berkas virtual, dan ketiga baris itu tepat baris yang payload-nya ada di User-Agent. C pilot dan C full hanya berbeda label di 1 baris (e96613ae: PATH_TRAVERSAL vs NORMAL, keduanya salah). Prompt kedua run identik, jadi bedanya berasal dari nondeterminisme API.",
+   "counts": {
+    "baris_pilot": 30,
+    "E_benar": 19,
+    "C_full_benar": 23,
+    "C_pilot_benar": 23,
+    "E_benar_C_salah": 0,
+    "E_salah_C_benar": 4,
+    "E_sama_C_full": 24,
+    "E_beda_C_full": 6,
+    "keduanya_salah": 7,
+    "keduanya_salah_label_beda": 2,
+    "E_sama_C_pilot": 23,
+    "E_PARSE_ERROR": 3,
+    "E_PARSE_ERROR_tanpa_panggilan_task": 3,
+    "baris_payload_UA": 3,
+    "C_pilot_vs_full_label_beda": 1,
+    "C_pilot_vs_full_confidence_beda": 2,
+    "C_pilot_vs_full_evidence_beda": 9,
+    "C_pilot_vs_full_explanation_beda": 20,
+    "evidence_literal_C_full_ok": 35,
+    "evidence_literal_C_pilot_ok": 36,
+    "evidence_literal_E_ok": 28,
+    "evidence_total_C": 46,
+    "evidence_total_E": 44
+   },
+   "rows": [
+    {
+     "id": "srbh-fae0e1ba315fa2c1",
+     "finding": "Label benar WEB_SCANNING. Log: \"MKCOL /blog/index.php/2020/04/04/hic-porro-nihil-non-rerum/feed/ HTTP/1.1\" 200. C full dan C pilot sama-sama WEB_SCANNING 0.8. E menjawab NORMAL 0.2 dengan status verification_failed. Semua alat menangkap sinyalnya: validate_fields melapor 'metode di luar RFC 9110/5789: MKCOL', pattern_match melapor CRS 911100 'Method is not allowed by policy' (cocok MKCOL), scanner_indicators melapor metode_non_standar 'MKCOL', lookup_owasp(WEB_SCANNING) menyebut MKCOL, dan analisis_payload menyimpulkan 'kemungkinan besar ... pemindaian web'. Masukan klasifikasi hanya memuat <pattern_hits> 911100 dan <scanner_indicators> metode_non_standar MKCOL. Keluaran validate_fields, lookup_owasp, dan narasi analisis_payload tidak diteruskan, sesuai classifier_input di prompts.py. Klasifikasi ke-1 tetap menjawab NORMAL 0.2 dengan evidence ['Method is not allowed by policy','MKCOL']. Verifikasi putaran 1 menolak: LLM menulis '...sedangkan klasifikasi menyatakan NORMAL', ditambah alasan deterministik 'evidence tidak ditemukan di baris log: Method is not allowed by policy'. Klasifikasi ke-2 tetap NORMAL 0.2 dan justru membuang 'MKCOL', satu-satunya evidence literal. Di putaran 2, LLM verifikator meloloskan walau evidence_exists mengembalikan ada=false, lalu aturan deterministik membalik putusan menjadi tolak. Panggilan klasifikasi ke-3 ditahan guard."
+    },
+    {
+     "id": "srbh-01b00fcbf8064bef",
+     "finding": "Label benar XSS, payload ada di UA: \"'\\\"<script>alert(1);</script>\". C full XSS 0.8, C pilot XSS 0.9. Status E PARSE_ERROR dengan detail 'batas rekursi orkestrator (80 langkah) tercapai'. klasifikasi_dipanggil=0 dan tidak ada satu pun panggilan task. Urutan di log: ls '/', read_file '/tmp/log.txt' (not found), write_file /tmp/log.txt, edit_file, lalu grep berulang 15 kali dengan pola '<script>alert(1);</script>', 'POST /blog/wp-login.php?action=lostpassword', dan '500' sampai batas rekursi. Totalnya 20 panggilan LLM dan 0 pengingat karena orkestrator tidak pernah mencoba berhenti. prompt_tokens 97.243, tertinggi dari 30 baris."
+    },
+    {
+     "id": "srbh-8002b48db2cdb197",
+     "finding": "Label benar XSS, UA \"'\\\"<script>alert(1);</script>\". C full dan C pilot XSS 0.9. Status E PARSE_ERROR dengan detail 'orkestrator selesai tanpa memanggil klasifikasi'. Alatnya hanya ls 11 kali dan read_file 7 kali ('/', '/log.txt'), tanpa task. Baris log utuh sebenarnya ada di <log> pada pesan awal. Meski begitu, orkestrator berhenti 5 kali dengan pesan seperti 'tidak dapat menemukan file log ... salin baris log tersebut langsung di sini'. Empat pengingat 'Belum ada keluaran klasifikasi...' disuntikkan (MAX_REMINDERS=4) sampai habis."
+    },
+    {
+     "id": "srbh-a7c36c09bcd7bf3b",
+     "finding": "Label benar CMD_INJECTION, UA Shellshock \"() { :;}; echo 'X-Powered-By: ShellShock-Vulnerable'\". C full dan C pilot CMD_INJECTION 0.9. Status E PARSE_ERROR dengan detail 'orkestrator selesai tanpa memanggil klasifikasi'. Alatnya ls 2 kali, read_file 8 kali ('/log.txt', '/var/logs/access.log', './log.txt'), dan glob '*.log' sekali, tanpa task. Orkestrator berhenti 5 kali ('Saya belum menerima file log yang diperlukan. Silakan salin dan tempel baris log...') dan 4 pengingat habis."
+    },
+    {
+     "id": "srbh-aec85e4d0aa12577",
+     "finding": "Kedua metode salah dengan label berbeda. Label benar PATH_TRAVERSAL (RFI 'loggedout=HTTP%3A%2F%2Fwww.google.com%2F'). C full dan C pilot WEB_SCANNING 0.8 dengan alasan wp-login.php dan UA umum. E NORMAL 0.8 dengan status ok. Laporan alat: pattern_match 0 aturan cocok (CRS tidak menangkap RFI), scanner_indicators probe_berkas ['/wp-login.php'], dan decode query menjadi 'loggedout=HTTP://www.google.com/'. Klasifikasi melihat semua itu tetapi menjawab 'permintaan normal ... parameter yang di-encode'. Verifikasi meloloskannya karena evidence literal ada dan LLM menilainya konsisten. Ini menunjukkan verifikasi hanya memeriksa konsistensi, bukan kebenaran label."
+    },
+    {
+     "id": "srbh-fa2a8c6062469836",
+     "finding": "Kedua metode salah dengan label berbeda. Label benar CMD_INJECTION ('action=lostpassword%27%26cat+%2Fetc%2Fpasswd%26%27'). C full dan C pilot SQLI 0.8 ('penyisipan sintaks SQL'). E PATH_TRAVERSAL 0.9 dengan status ok. pattern_match melapor 930120 'OS File Access Attempt' (attack-lfi) dan 932160 'Remote Command Execution: Unix Shell Code Found' (attack-rce), keduanya cocok 'etc/passwd'. Decode query menghasilkan \"action=lostpassword'&cat /etc/passwd&'\". Klasifikasi memilih PATH_TRAVERSAL walaupun penjelasannya sendiri menyebut 'indikasi eksekusi perintah sistem'. Verifikasi meloloskannya dalam 1 putaran."
+    },
+    {
+     "id": "srbh-e96613aeb264209a",
+     "finding": "Ini satu-satunya beda label antara C pilot dan C full. Label benar WEB_SCANNING ('GET /blog/index.php/author/tomas/.htaccess' 404). C full PATH_TRAVERSAL 0.8, C pilot NORMAL 0.8. Prompt kedua run identik: sha prompt sama di llm_single_calls.jsonl, dan prompt_sha256, model, seed 42, serta temperature 0 sama di run.json. Jadi bedanya berasal dari nondeterminisme API. Jawaban E PATH_TRAVERSAL, sama dengan C full dan sama-sama salah. Klasifikasi ke-1 menjawab NORMAL 0.2 dengan evidence berupa teks alat yang tidak literal ('Restricted File Access Attempt', 'tag: attack-lfi', 'cocok: .htaccess'). LLM verifikator menolak dengan alasan 'Evidence mengindikasikan kemungkinan serangan LFI'. Klasifikasi ke-2 lalu berganti ke PATH_TRAVERSAL ['.htaccess'] dan lolos. Alat juga mengarah ke LFI: CRS 930130 bertag attack-lfi, sedangkan scanner_indicators probe_berkas kosong. Ini satu-satunya baris yang labelnya berubah setelah penolakan, dan berubahnya dari salah ke salah."
+    },
+    {
+     "id": "pola-PARSE_ERROR",
+     "finding": "Ketiga baris PARSE_ERROR (01b00fcb, 8002b48d, a7c36c09) adalah tepat tiga baris pilot dengan template_key 'ua:' (payload di User-Agent). Ke-27 baris lain semuanya memanggil sub-agen. Sebagian baris lain juga memulai dengan alat berkas: 08bedb02 (5 panggilan), 39eb58ec (5), 098b9c24 (4), e96613ae (2), 601629e6 (2), dan fae0e1ba (edit_file sekali). Semuanya tetap mendelegasikan setelah itu. Korelasinya 3/3, tetapi n kecil sehingga ini belum bukti sebab-akibat. Untuk mode kegagalan ini log hanya menunjukkan orkestrator gpt-4.1-nano mencari 'file log' di sistem berkas virtual."
+    },
+    {
+     "id": "C-pilot-vs-C-full",
+     "finding": "Run yang dibandingkan: C pilot llm_single-20261007T161103Z-d03363c dan C full llm_single-20261007T161203Z-6ce9f30, pada 30 baris. Label beda 1 (e96613ae). Confidence beda 2: 01b00fcb 0.8 menjadi 0.9, daf276f8 0.9 menjadi 0.8. Evidence beda di 9 baris dan explanation beda di 20 baris. Akurasi keduanya 23/30, semua status ok, dan evidence literal 35/46 vs 36/46. Jika E dibandingkan dengan C pilot hasilnya tetap 0 baris E benar & C salah dan 4 baris E salah & C benar (baris yang sama), sedangkan E=C turun ke 23/30. Script pemeriksaan ada di <direktori_sementara>/verify/evc/ (compare.py, trace.py, cpc.py, fsfirst.py)."
+    }
+   ],
+   "corrections": [
+    "Ketiga PARSE_ERROR (01b00fcb, 8002b48d, a7c36c09) bukan kegagalan parse JSON dari sub-agen klasifikasi. klasifikasi_dipanggil=0 dan tidak ada panggilan task sama sekali. Detail 01b00fcb adalah 'batas rekursi orkestrator (80 langkah) tercapai', sedangkan dua baris lain 'orkestrator selesai tanpa memanggil klasifikasi'. Penyebabnya kegagalan orkestrasi, bukan klasifikasi.",
+    "Daftar 'E salah, C benar' sudah lengkap dengan 4 baris; 8002b48d dan a7c36c09 memang termasuk. Namun E dan C berbeda label di 6 baris. Dua yang tidak disebut klaim, aec85e4d (C WEB_SCANNING, E NORMAL, benar PATH_TRAVERSAL) dan fa2a8c60 (C SQLI, E PATH_TRAVERSAL, benar CMD_INJECTION), sama-sama salah dengan label berbeda.",
+    "Pada fae0e1ba, kesalahan E tidak berasal dari alat. Semua alat menangkap MKCOL dan masukan klasifikasi memuat metode_non_standar 'MKCOL'. Kesalahannya ada di keputusan sub-agen klasifikasi, dan umpan balik verifikator tidak memperbaikinya."
+   ]
+  },
+  {
+   "key": "completeness",
+   "verdict": "refuted",
+   "summary": "Klaim kelengkapan terbantah. Selain empat mode yang disebut, log run agent-20261007T164716Z-725069c memuat beberapa mode kegagalan lain yang signifikan. (a) LLM verifikator meloloskan evidence non-literal pada 14 putusan di 9 baris, 13 di antaranya sesudah evidence_exists miliknya sendiri menjawab \"ada\": false; yang menyelamatkan hanya pemeriksaan deterministik, dan 5 baris berstatus ok tetap berlabel salah. (b) Orkestrator mencoba berhenti dini atau mengklasifikasi sendiri (10 pengingat di 8 baris) dan memanggil sub-agen di luar urutan (9 ditahan guard). (c) Verifikator berputar memanggil alat sampai batas 15 panggilan model (b90bd4) dan dua kali mengeluarkan Verdict ganda. (d) Ada kebingungan label sistematis CMD_INJECTION→PATH_TRAVERSAL (3) dan WEB_SCANNING→NORMAL (3) yang menjelaskan 6 dari 11 kesalahan E. Tidak ditemukan llm_galat/galat_api, galat alat, finish_reason length, explanation non-Indonesia, maupun salah atribusi sub-agen.",
+   "counts": {
+    "putusan_verifikasi_total": 43,
+    "verifier_llm_lolos_padahal_evidence_nonliteral_putusan": 14,
+    "verifier_llm_lolos_padahal_evidence_nonliteral_baris": 9,
+    "verifier_llm_lolos_setelah_melihat_ada_false": 13,
+    "baris_ok_total": 14,
+    "baris_ok_label_salah": 5,
+    "baris_verification_failed_label_benar": 10,
+    "pengingat_prosedur_total": 18,
+    "pengingat_di_baris_bukan_parse_error": 10,
+    "baris_dengan_pengingat_bukan_parse_error": 8,
+    "berhenti_setelah_klasifikasi_tanpa_verifikasi": 6,
+    "klasifikasi_sendiri_oleh_orkestrator": 3,
+    "pengingat_diabaikan_di_baris_derailment": 8,
+    "ditahan_guard_total": 9,
+    "guard_klasifikasi_ke3": 4,
+    "guard_verifikasi_ulang": 3,
+    "guard_verifikasi_sebelum_klasifikasi": 2,
+    "batas_panggilan_subagen_tercapai": 1,
+    "panggilan_llm_verifikator_b90bd4_p1": 15,
+    "galat_verdict_ganda": 2,
+    "schema_check_dipanggil": 64,
+    "schema_check_invalid": 0,
+    "putusan_klaim_skema_gagal_palsu": 4,
+    "evidence_exists_duplikat": 36,
+    "invokasi_verifier_argumen_bukan_item": 4,
+    "pesan_akhir_bukan_salinan_json_dari_27": 20,
+    "pesan_akhir_bertentangan_dengan_hasil": 2,
+    "deskripsi_parser_payload_tanpa_log": 18,
+    "deskripsi_parser_payload_total": 53,
+    "salinan_log_diubah_di_deskripsi_task": 0,
+    "parser_keluaran_prosa_dari_26": 22,
+    "parser_menilai_serangan": 3,
+    "scanner_indicators_dilewati_dari_27": 4,
+    "baris_pakai_write_todos": 1,
+    "cmd_injection_jadi_path_traversal": 3,
+    "web_scanning_jadi_normal": 3,
+    "kesalahan_e_total": 11,
+    "baris_putaran2_ulang_item_hilang_dari_14": 9,
+    "baris_putaran2_buang_item_literal": 4,
+    "llm_galat": 0,
+    "galat_api": 0,
+    "alat_dengan_galat": 0,
+    "finish_reason_length": 0,
+    "explanation_non_indonesia": 0,
+    "salah_atribusi_subagen": 0
+   },
+   "rows": [
+    {
+     "id": "VERIFIER-LOLOS-KELIRU (f60769, 0c2ab3, fae0e1, aa5f0e, 39eb58, 30cb1c, 601629, b90bd4, c75bb1)",
+     "finding": "LLM verifikator menyatakan lolos padahal ada evidence non-literal pada 14 putusan di 9 baris. Jumlah ini persis kategori 'evidence/skema (deterministik): 14' di laporan. Pada 13 putusan, LLM sudah melihat keluaran evidence_exists \"ada\": false. Contoh 30cb1c: item 'Method: TRACK' → ada:false, tetapi alasannya 'Klasifikasi NORMAL sesuai dengan evidence dan definisi kelas'. Ini kebalikan mode (2) dan lebih sering daripada penolakan oleh LLM saja (4). Semuanya dibatalkan oleh verdict_from."
+    },
+    {
+     "id": "OK-TAPI-SALAH (aec85e, 36368a, e96613, 3e7a9f, fa2a8c)",
+     "finding": "Lima dari 14 baris berstatus ok berlabel salah: aec85e NORMAL padahal benar PATH_TRAVERSAL ('loggedout=HTTP%3A%2F%2Fwww.google.com%2F'); 36368a, 3e7a9f, fa2a8c PATH_TRAVERSAL padahal benar CMD_INJECTION; e96613 PATH_TRAVERSAL padahal benar WEB_SCANNING ('/.htaccess'). Akurasi baris ok 9/14 (64%), lebih rendah daripada baris verification_failed 10/13 (77%). Jadi status verifikasi tidak menandakan kebenaran label."
+    },
+    {
+     "id": "srbh-b90bd4ea89d4b716",
+     "finding": "Batas panggilan model sub-agen tercapai (batas_panggilan_verifikator=1). Verifikator putaran 1 menghabiskan 15 panggilan LLM berisi schema_check 10× (semua valid:true) dan evidence_exists 10× untuk 2 item (8 duplikat, semua ada:false) tanpa pernah memanggil Verdict, sehingga putusannya 'verifikator tidak memberi putusan'. pilot_compare memasukkannya ke 'evidence/skema + penilaian LLM' padahal tidak ada penilaian LLM. Teks 'Model call limits exceeded' tidak muncul di agent_calls.jsonl (0 rekaman). Pemborosan juga terjadi di baris lain: 36 panggilan evidence_exists duplikat dan 64 schema_check untuk 43 putusan."
+    },
+    {
+     "id": "VERDICT-GANDA (89e852, 601629)",
+     "finding": "Galat structured output verifikator terjadi 2×. srbh-89e8529757199934 putaran 1 (L745) mengeluarkan dua Verdict yang bertentangan dalam satu respons: lolos:false 'Keluaran schema_check gagal...' dan lolos:true 'Evidence UNION+ALL+SELECT ditemukan...'; setelah diulang, verifikator memilih false. srbh-601629e62f22a62d putaran 2 (L1059) mengeluarkan dua Verdict identik. Pesan 'Error: Model incorrectly returned multiple structured responses (Verdict, Verdict)' hanya muncul di prompt berikutnya, tidak sebagai rekaman alat."
+    },
+    {
+     "id": "VERIFIER-ALASAN-HALUSINASI (08bedb, daf276, 89e852, 098b9c, 1567934)",
+     "finding": "Seluruh 64 panggilan schema_check menjawab valid:true, tetapi 4 putusan mengklaim skema gagal: 08bedb p2, daf276 p1 ('tidak lolos schema check'), 89e852 p1 ('schema_check gagal'), dan 098b9c p1 ('schema_check tidak valid'). Di 08bedb p2 semua evidence_exists juga ada:true, namun alasannya 'schema_check menunjukkan bahwa evidence tidak ditemukan secara harfiah'. Di 1567934 p1 alasannya 'evidence ditemukan' padahal alat menjawab ada:false."
+    },
+    {
+     "id": "VERIFIER-ARGUMEN-SALAH (aa5f0e, 1567934, c75bb1, fa2a8c)",
+     "finding": "Verifikator memberi evidence_exists argumen yang bukan item evidence: aa5f0e p2 memeriksa seluruh baris log; 1567934 p1 salah menyalin item (17 segmen '..%2F', padahal item berisi 16) sehingga dapat ada:false; c75bb1 p1 memeriksa '/../' 3× alih-alih item 'Path Traversal Attack (/../) or (/.../)', lalu LLM meloloskan; fa2a8c p1 menambah varian ter-encode (tidak berbahaya). Dua item evidence tidak pernah diperiksa LLM. Tidak ada galat validasi argumen."
+    },
+    {
+     "id": "ORKESTRATOR-BERHENTI-DINI (08bedb, f60769, aa5f0e, 1567934, 39eb58, 53dcb8, c75bb1, b90bd4)",
+     "finding": "Di luar 3 baris PARSE_ERROR, orkestrator mencoba berhenti sebelum prosedur selesai 10× di 8 baris; semuanya dipatuhi setelah pengingat. Rinciannya: 3× sebelum ada klasifikasi (08bedb 'Saya akan mulai dengan menulis rencana...', aa5f0e, 1567934), 6× setelah klasifikasi tanpa verifikasi (f60769, aa5f0e, 39eb58, 53dcb8, c75bb1, b90bd4), dan 1× setelah ditolak tanpa mengulang (39eb58). Tiga kasus adalah klasifikasi oleh orkestrator sendiri, melanggar aturan 'Anda tidak mengklasifikasi sendiri': aa5f0e L344/L348 berupa JSON {\"label\": \"normal\"} dengan evidence karangan, dan 1567934 L423 berupa {\"label\": \"Path Traversal Attempt\"} berbahasa Inggris."
+    },
+    {
+     "id": "GUARD-URUTAN-SALAH (f60769, 0c2ab3, fae0e1, 1567934, eafc5a, 30cb1c, 89e852, 601629)",
+     "finding": "VerificationRoundGuard menahan 9 pemanggilan sub-agen di 8 baris: 4× klasifikasi ke-3 setelah batas 2 putaran (0c2ab3, fae0e1, 89e852, 601629), 3× verifikasi ulang atas klasifikasi yang sudah diputus (0c2ab3, eafc5a, 30cb1c), dan 2× verifikasi sebelum ada klasifikasi (f60769; 1567934 memanggilnya paralel dengan klasifikasi). Setelah setiap penahanan orkestrator patuh dan tidak ada penahanan berulang. Namun di 1567934 orkestrator lalu memanggil klasifikasi lagi, menghasilkan klasifikasi duplikat yang identik (klasifikasi_dipanggil=2 tanpa penolakan). Kesembilan panggilan yang ditahan tidak tercatat sebagai rekaman 'alat'."
+    },
+    {
+     "id": "PESAN-AKHIR (098b9c, 39eb58, f60769, aa5f0e, 1567934)",
+     "finding": "Langkah 6 ('salin JSON klasifikasi terakhir apa adanya') dilanggar di 20 dari 27 baris (19 berupa prosa, 1 JSON yang diubah). Isinya bisa bertentangan dengan hasil yang tercatat: 098b9c menutup dengan 'log ini diklasifikasikan sebagai \"Normal\"' padahal labelnya SQLI (dan benar); 39eb58 menyebut 'diverifikasi sebagai benar' padahal kedua putusan menolak; f60769 menulis 'tidak lolos... Namun... tetap dianggap sesuai'; aa5f0e mengubah label menjadi 'normal'; 1567934 menulis 'Path Traversal Attempt'. Metrik tidak terpengaruh karena label diambil dari sub-agen Klasifikasi."
+    },
+    {
+     "id": "KEBINGUNGAN CMD_INJECTION→PATH_TRAVERSAL (36368a, 3e7a9f, fa2a8c)",
+     "finding": "Tiga dari 5 baris CMD_INJECTION diberi label PATH_TRAVERSAL: 36368a 'c=0%7C%7Ccat+%2Fetc%2Fpasswd', 3e7a9f '%26cat+%2Fetc%2Fpasswd%26', fa2a8c '%27%26cat+%2Fetc%2Fpasswd%26%27'. Padahal pattern_match memberi 932160 attack-rce selain 930120 attack-lfi, dan explanation klasifikasi sendiri menyebut 'perintah eksekusi'. Ketiganya lolos verifikasi (status ok)."
+    },
+    {
+     "id": "KEBINGUNGAN WEB_SCANNING→NORMAL (fae0e1, 30cb1c, 601629)",
+     "finding": "Tiga dari 5 baris WEB_SCANNING dengan metode non-standar ('MKCOL', 'TRACK', 'UNLOCK') diberi label NORMAL. Padahal aturan 911100 'Method is not allowed by policy' cocok, scanner_indicators.metode_non_standar terisi (fae0e1, 601629), dan MKCOL/TRACK tertulis eksplisit di definisi WEB_SCANNING. Di fae0e1 dan 601629 verifikator LLM menolak NORMAL di putaran 1, lalu meloloskan NORMAL yang sama di putaran 2 (flip-flop). fae0e1 adalah regresi terhadap C (C=WEB_SCANNING). Mode ini bersama kebingungan CMD_INJECTION→PATH_TRAVERSAL menjelaskan 6 dari 11 kesalahan E, sedangkan empat mode dalam klaim hanya menjelaskan 3 PARSE_ERROR."
+    },
+    {
+     "id": "PUTARAN2-EVIDENCE (fae0e1, 601629, 89e852, 098b9c, dll.)",
+     "finding": "Umpan balik soal evidence tidak dipakai. Dari 14 baris yang evidence-nya non-literal di putaran 1, 9 mengulang item yang sudah ditandai hilang, dan hanya 3 yang menjadi literal penuh (53dcb8, c75bb1, e96613). Empat baris justru membuang item literal dan mempertahankan yang non-literal: fae0e1 membuang 'MKCOL', 601629 membuang 'UNLOCK', 89e852 membuang 'UNION+ALL+SELECT', 098b9c membuang 'ELT(6565=6565,1)' dan 'UNION+SELECT'. Temuan ini tumpang-tindih dengan mode (3)/(4), tetapi rumusan (4) hanya menyangkut label."
+    },
+    {
+     "id": "KEPATUHAN-SUBAGEN (parser, analisis_payload)",
+     "finding": "Parser: 22 dari 26 keluaran berupa prosa, bukan 'JSON ringkas'; 3 keluaran menilai serangan meski dilarang (098b9c 'upaya SQL injection', 08bedb 'encoding URL yang mencurigakan', 601629 'Tidak ada indikasi serangan yang jelas'). analisis_payload: scanner_indicators tidak dipanggil di 4 dari 27 baris (721f5c, eafc5a, 30cb1c, 3e7a9f). Di 30cb1c masukan klasifikasi berisi <scanner_indicators>{}</scanner_indicators> untuk permintaan 'TRACK' (label akhir NORMAL, padahal benar WEB_SCANNING). Argumen alat analisis_payload selalu valid."
+    },
+    {
+     "id": "DESKRIPSI-TUGAS (39eb58, e96613, b90bd4, 601629, 1567934)",
+     "finding": "Sebanyak 18 dari 53 deskripsi tugas untuk parser/analisis_payload tidak menyertakan baris log, melanggar langkah 2. Empat deskripsi menyerahkan seluruh prosedur ke parser: 39eb58 dan e96613 menyalin prosedur orkestrator, b90bd4 'Koordinasikan sub-agen...', dan 601629 (berbahasa Inggris) 'Parse..., classify..., and verify'. Di 1567934 tugas 'Menguraikan baris log' dikirim ke analisis_payload, dan parser tidak pernah dipanggil. Tidak ada salinan log yang diubah di deskripsi tugas (35/35 verbatim); satu-satunya salinan yang berubah ada di write_file 01b00f, yang termasuk mode (1)."
+    },
+    {
+     "id": "WRITE_TODOS-DAN-PROMPT",
+     "finding": "write_todos hanya dipakai di 1 dari 30 baris (08bedb), berisi satu todo hampa: 'Tulis rencana langkah-langkah klasifikasi log.'. Prompt sistem orkestrator yang benar-benar terkirim adalah ORCHESTRATOR_PROMPT ditambah blok deepagents 'For simple objectives ... NOT use this tool', yang bertentangan dengan langkah 1. agent.run.json hanya mencatat prompt tulisan penulis (sha 3369279c…), bukan yang terkirim (sha 40d9df57…). Deskripsi alat berkas berbahasa Inggris juga mendorong eksplorasi berkas ('You should almost ALWAYS use this tool...')."
+    },
+    {
+     "id": "MODE-1-CAKUPAN (01b00f, 8002b4, a7c36c)",
+     "finding": "Termasuk mode (1) tetapi lebih parah dari sekadar 'derailment'. Di 01b00f orkestrator memanggil grep 15× secara bergiliran untuk 3 pola yang sama sampai batas rekursi 80 langkah, menyalin log dengan tanda kutip yang berubah (UA '\"\\'\\\\\"<script>...' menjadi '\\'\"<script>...'), dan satu edit_file paralel ditolak ('parallel file mutations to the same path are not allowed') tanpa rekaman alat. Di 8002b4 dan a7c36c orkestrator meminta pengguna 'salin baris log tersebut langsung di sini', dan 8 dari 8 pengingat diabaikan. Total 70 panggilan alat berkas di 9 baris."
+    },
+    {
+     "id": "NIHIL (pemeriksaan negatif)",
+     "finding": "Tidak ditemukan: llm_galat 0, galat_api 0, field galat alat 0, finish_reason 'length' 0 (keluaran maksimum 520 token), explanation non-Indonesia 0/44 klasifikasi dan 0/27 akhir (bahasa Inggris hanya ada di teks internal orkestrator 601629 dan 1567934), serta salah atribusi sub-agen 0 (hash prompt sistem cocok di 563/563 rekaman LLM, dan alat cocok dengan sub-agennya). Rekaman tiap baris tidak bersisipan dengan baris lain, dan biaya/token per baris cocok dengan agent.jsonl."
+    }
+   ],
+   "corrections": [
+    "Pernyataan 'tidak ada mode kegagalan penting lain' salah. Ada setidaknya: verifikator LLM meloloskan secara keliru, orkestrator berhenti dini atau mengklasifikasi sendiri, pemanggilan sub-agen di luar urutan yang ditahan guard, loop alat verifikator sampai batas panggilan model, galat Verdict ganda, pesan akhir orkestrator yang bertentangan dengan hasil, kebingungan label sistematis, dan ketidakpatuhan sub-agen terhadap prompt.",
+    "Mode (2) hanya separuh gambaran. LLM verifikator juga keliru ke arah sebaliknya: meloloskan evidence non-literal pada 14 putusan di 9 baris (13 sesudah melihat ada:false), dan 5 baris berlabel salah berstatus ok. Penolakan oleh LLM saja hanya 4.",
+    "Batas panggilan sub-agen (1 kejadian, srbh-b90bd4ea89d4b716, 15 panggilan LLM tanpa Verdict) dan galat Verdict ganda (89e852, 601629) adalah kegagalan tersendiri, bukan bagian dari empat mode.",
+    "Empat mode dalam klaim hanya menjelaskan 3 dari 11 kesalahan label E (PARSE_ERROR karena mode 1). Enam kesalahan lain berasal dari kebingungan CMD_INJECTION→PATH_TRAVERSAL (36368a, 3e7a9f, fa2a8c) dan WEB_SCANNING→NORMAL (fae0e1, 30cb1c, 601629).",
+    "Mode (4) terlalu sempit. Putaran kedua juga hampir tidak memperbaiki evidence: 9 dari 14 baris mengulang item yang sudah ditandai hilang, 4 baris membuang item literal, dan satu-satunya perubahan label (e96613, NORMAL→PATH_TRAVERSAL) berpindah dari salah ke salah.",
+    "reports/pilot_agent.md memasukkan putusan tanpa penilaian LLM (b90bd4 putaran 1, 'verifikator tidak memberi putusan' akibat batas panggilan) ke kategori 'evidence/skema + penilaian LLM'.",
+    "agent.run.json tidak mencatat prompt orkestrator yang sebenarnya terkirim: blok write_todos dari deepagents, yang bertentangan dengan langkah 1, tidak ikut tercatat. Dokumentasi prompt untuk lampiran karena itu tidak lengkap."
+   ]
+  }
+ ]
+}

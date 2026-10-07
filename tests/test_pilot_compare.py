@@ -64,3 +64,9 @@ def test_rejection_kind_does_not_trust_llm_text_that_mimics_tool_reasons():
     assert pc._rejection_kind(tool) == "evidence/skema (deterministik)"
     structured = {"lolos": False, "lolos_menurut_llm": False, "skema_valid": True, "evidence_hilang": ["x"], "alasan": []}
     assert pc._rejection_kind(structured) == "evidence/skema + penilaian LLM"
+
+
+def test_rejection_without_a_verifier_verdict_is_its_own_category():
+    no_verdict = {"lolos": False, "lolos_menurut_llm": False,
+                  "alasan": ["verifikator tidak memberi putusan", "evidence tidak ditemukan di baris log: x"]}
+    assert pc._rejection_kind(no_verdict) == "verifikator tanpa putusan + evidence/skema"

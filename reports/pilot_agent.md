@@ -54,7 +54,7 @@ Run E: `agent-20261007T164716Z-725069c` (commit 725069c, dirty=False, model open
 ## Verifikasi (E)
 
 - Status: ok 14, verification_failed 13, verification_skipped 0, PARSE_ERROR 3
-- Putusan verifikasi: 43; ditolak 29 kali di 16 baris (penilaian LLM verifikator: 4, evidence/skema (deterministik): 14, evidence/skema + penilaian LLM: 11).
+- Putusan verifikasi: 43; ditolak 29 kali di 16 baris (penilaian LLM verifikator: 4, evidence/skema (deterministik): 14, evidence/skema + penilaian LLM: 10, verifikator tanpa putusan + evidence/skema: 1).
 - Baris dengan 2 putaran: 16; label berubah setelah penolakan: 1 baris.
 - Pengingat prosedur: 18; pemanggilan sub-agen yang ditahan guard: 9; batas panggilan sub-agen tercapai: 1.
 - E benar di baris yang C salah: 0 (—); E salah di baris yang C benar: 4 (`srbh-fae0e1ba315fa2c1`, `srbh-01b00fcbf8064bef`, `srbh-8002b48db2cdb197`, `srbh-a7c36c09bcd7bf3b`).
