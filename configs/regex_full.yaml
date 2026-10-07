@@ -53,4 +53,19 @@ ignored_categories:                      # tidak punya padanan kelas: aturannya 
 # Aturan Baş Seyyar dkk. dan pemetaan berkas terlarang diwarisi apa adanya dari pembanding utama (keputusan asisten),
 # sehingga perbedaan kedua varian hanya pada cakupan kategori CRS.
 
-adjustments: []                          # diisi setelah pengujian di srbh_val (tanggal, bukti val, alasan)
+adjustments:                             # hasil pengujian di srbh_val (bukan di data uji)
+  - date: "2026-10-07"
+    split: "srbh_val, 40.816 baris; run regex_full-20261007T152855Z-dd93c9b (results/tuning/regex_full_val.jsonl)"
+    decision: tidak ada penyesuaian pemetaan
+    evidence: >-
+      Aturan kategori baru pada val: 911100 -> WEB_SCANNING mendukung 732 prediksi benar dan 0 salah; 920440 ->
+      WEB_SCANNING 320 benar dan 16 salah (PATH_TRAVERSAL -> WEB_SCANNING: probe RFI di path berakhiran
+      "www.google.com", basename ".com" termasuk tx.restricted_extensions); 933120/933140 -> CMD_INJECTION masing-masing
+      64 benar dan 0 salah. 878 prediksi benar hanya didukung aturan kategori baru. Kesalahan lain berasal dari aturan
+      kategori utama yang sama dengan pembanding utama (932130: 259 SQLI -> CMD_INJECTION; 932160: 33 PATH_TRAVERSAL ->
+      CMD_INJECTION) dan tidak diubah agar varian hanya berbeda pada cakupan kategori.
+    engine_fix: >-
+      Run val pertama (da9dace) memperlihatkan 920440 tidak pernah cocok karena aksi setvar (tx.extension) belum
+      diemulasi. Diperbaiki di commit dd93c9b; ini perbaikan emulasi, bukan perubahan pemetaan, dan diverifikasi
+      1267/1267 uji regresi resmi CRS untuk semua aturan regex_full. Pembanding utama tidak berubah (985/985, hasil
+      identik).
