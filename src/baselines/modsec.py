@@ -22,7 +22,7 @@ SecPcreMatchLimit (`re` tanpa batas backtracking).
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from typing import Callable
 
@@ -1186,7 +1186,7 @@ class Evaluator:
         for k, link in enumerate(rule.links):
             if drop and k == 0:
                 kept = tuple(t for t in link.targets if (t.collection, t.selector) not in drop)
-                link = Link(kept, link.operator, link.argument, link.negated, link.transforms, link.multi_match, link.capture)
+                link = replace(link, targets=kept)  # pertahankan semua field lain (setvars, dst.)
             matches = self._link(link, coll, state)
             if not matches:
                 return None

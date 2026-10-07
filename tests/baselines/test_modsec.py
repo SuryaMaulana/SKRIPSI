@@ -254,3 +254,14 @@ def test_unresolved_macros_expand_to_empty_like_modsecurity():
     coll = m.collections(m.Request("GET", "/p?a=x&b=", "HTTP/1.1", {}))
     hit = m.Evaluator({}).evaluate(rule, coll)  # makro kosong: a="x" != "" cocok (negasi), b="" tidak
     assert hit is not None and hit.variable == "ARGS:a"
+
+
+def test_target_removal_keeps_setvars_of_the_rebuilt_link():
+    first = Link((Target("REQUEST_BASENAME"), Target("REQUEST_FILENAME")), "rx", r"\.([^.]+)$", False, (), False, True,
+                 ("tx.extension=.%{tx.1}/",))
+    second = Link((Target("TX", "EXTENSION"),), "within", "%{tx.restricted_extensions}", False, (), False, False)
+    rule = _rule(first, second, rule_id=920440)
+    removal = TargetRemoval(1, _link([Target("REQUEST_METHOD")], "rx", "."), "id", "920440", Target("REQUEST_FILENAME"))
+    ev = m.Evaluator({}, [removal], tx_defaults={"restricted_extensions": ".bak/"})
+    coll = m.collections(m.Request("GET", "/get/foo.bak", "HTTP/1.1", {}))
+    assert ev.evaluate(rule, coll, ev.active_removals(coll)) is not None  # setvar tetap jalan meski target dibuang

@@ -104,8 +104,8 @@ class OpenRouterClient:
         latency = time.perf_counter() - start
         try:
             body = resp.json()
-        except json.JSONDecodeError:
-            body = {"raw_text": resp.text}
+        except ValueError:  # bukan JSON, atau bukan UTF-8 (UnicodeDecodeError)
+            body = {"raw_text": resp.content.decode("utf-8", "replace")}
         return {"http_status": resp.status_code, "latency_s": latency, "response": body}
 
 
@@ -135,5 +135,8 @@ def summarize(call: dict, rates: dict[str, Decimal] | None = None) -> dict:
         "cost_usd_from_rates": from_rates,
         "finish_reason": choice.get("finish_reason"),
         "content": (choice.get("message") or {}).get("content"),
+        "refusal": (choice.get("message") or {}).get("refusal"),
         "error": body.get("error"),
+        "choice_error": choice.get("error"),  # galat tingkat pilihan (OpenRouter), mis. galat hulu saat generasi
+        "non_json_body": "raw_text" in body,
     }

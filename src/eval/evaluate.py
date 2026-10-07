@@ -50,10 +50,16 @@ class Method:
     post_hoc: bool
     run: dict = field(default_factory=dict)
     rows: list[dict] = field(default_factory=list)
+    tag: str = ""  # pembeda bila dua berkas bernama sama (mis. results/pilot/llm_single.jsonl -> "pilot")
 
     @property
     def display(self) -> str:
-        return f"{self.name} (post hoc)" if self.post_hoc else self.name
+        name = f"{self.name} [{self.tag}]" if self.tag else self.name
+        return f"{name} (post hoc)" if self.post_hoc else name
+
+    @property
+    def relpath(self) -> str:
+        return str(self.path.relative_to(ROOT)) if self.path.is_relative_to(ROOT) else str(self.path)
 
 
 def load_truth(source: str = "sample") -> Truth:
@@ -83,7 +89,8 @@ def load_method(path: Path) -> Method:
     run_path = path.with_name(path.name.removesuffix(".jsonl") + ".run.json")
     run = json.loads(run_path.read_text(encoding="utf-8")) if run_path.exists() else {}
     post_hoc = any(r.get("post_hoc") for r in rows) or bool(run.get("post_hoc"))
-    return Method(path.name.removesuffix(".jsonl"), path, {r["id"]: r["label"] for r in rows}, post_hoc, run, rows)
+    tag = "" if path.parent.resolve() == RESULTS_DIR.resolve() else path.parent.name
+    return Method(path.name.removesuffix(".jsonl"), path, {r["id"]: r["label"] for r in rows}, post_hoc, run, rows, tag)
 
 
 # --------------------------------------------------------------------------------------------------- metrik
@@ -112,18 +119,23 @@ def per_class(cm: np.ndarray) -> dict[str, np.ndarray]:
 
 
 def macro_f1(t: np.ndarray, p: np.ndarray) -> float:
-    return float(per_class(confusion(t, p))["f1"].mean())
+    pc = per_class(confusion(t, p))
+    return float(pc["f1"][pc["support"] > 0].mean())
 
 
 def multiclass(t: np.ndarray, p: np.ndarray) -> dict:
+    """Makro dirata-rata atas 6 kelas; pada subset yang tidak memuat semua kelas, hanya atas kelas yang punya baris
+    (`classes_in_macro` mencatatnya) agar kelas yang tidak diuji tidak masuk sebagai F1 = 0."""
     cm = confusion(t, p)
     pc = per_class(cm)
+    present = pc["support"] > 0
     return {
         "n": int(len(t)),
         "accuracy": float((t == p).mean()),
-        "macro_precision": float(pc["precision"].mean()),
-        "macro_recall": float(pc["recall"].mean()),
-        "macro_f1": float(pc["f1"].mean()),
+        "macro_precision": float(pc["precision"][present].mean()),
+        "macro_recall": float(pc["recall"][present].mean()),
+        "macro_f1": float(pc["f1"][present].mean()),
+        "classes_in_macro": [c for c, ok in zip(CLASSES, present) if ok],
         "per_class": {c: {k: float(v[i]) for k, v in pc.items()} for i, c in enumerate(CLASSES)},
         "confusion": cm.tolist(),
         "invalid_predictions": int((p == OTHER).sum()),
@@ -147,7 +159,7 @@ def binary(t: np.ndarray, p: np.ndarray) -> dict:
         "precision": precision,
         "recall": recall,
         "f1": 2 * precision * recall / (precision + recall) if precision + recall else 0.0,
-        "fpr": fp / (fp + tn) if fp + tn else 0.0,
+        "fpr": fp / (fp + tn) if fp + tn else None,  # None = tidak ada baris NORMAL di cakupan
     }
 
 
@@ -220,8 +232,8 @@ def render(results: list[dict], methods: list[Method], truth: Truth) -> str:
     out = [f"Sumber label: {truth.source}. Prediksi di luar 6 kelas dihitung salah.", ""]
     out += ["Tabel 4.2 — deteksi biner (serangan vs NORMAL)", ""]
     out.append(_table(["metode", "cakupan", "accuracy", "precision", "recall", "F1", "FPR"],
-                      [[r["method"], r["coverage"], *(_f(r["binary"][k]) for k in ("accuracy", "precision", "recall", "f1", "fpr"))]
-                       for r in results]))
+                      [[r["method"], r["coverage"], *(_f(r["binary"][k]) for k in ("accuracy", "precision", "recall", "f1")),
+                        "—" if r["binary"]["fpr"] is None else _f(r["binary"]["fpr"])] for r in results]))
     out += ["", "Tabel 4.3 — klasifikasi 6 kelas", ""]
     rows = []
     for r in results:
@@ -230,6 +242,11 @@ def render(results: list[dict], methods: list[Method], truth: Truth) -> str:
         rows.append([r["method"], r["coverage"], _f(m["accuracy"]), _f(m["macro_precision"]), _f(m["macro_recall"]),
                      _f(m["macro_f1"]), interval])
     out.append(_table(["metode", "cakupan", "accuracy", "macro-P", "macro-R", "macro-F1", "IK 95% macro-F1"], rows))
+    for r in results:
+        used = r["multiclass"]["classes_in_macro"]
+        if len(used) < K:
+            out.append(f"\nCatatan: {r['method']} — makro dirata-rata atas {len(used)} kelas yang ada di cakupan "
+                       f"({', '.join(used)}).")
     out += ["", "F1 per kelas", ""]
     out.append(_table(["metode", *CLASSES], [[r["method"], *(_f(r["multiclass"]["per_class"][c]["f1"]) for c in CLASSES)]
                                              for r in results]))
@@ -253,14 +270,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rules", action="store_true", help="tampilkan aturan pendorong salah kelas (metode aturan)")
     parser.add_argument("--out", type=Path, help="simpan juga tabel Markdown + JSON ringkasan ke path ini (.md)")
     args = parser.parse_args(argv)
-    files = args.files or default_files()
+    candidates = args.files or default_files()
+    skipped = [p for p in candidates if not is_prediction_file(p) or p.stat().st_size == 0]
+    files = [p for p in candidates if p not in skipped]
     truth = load_truth(args.truth)
     methods = [load_method(p) for p in files]
+    names = [m.display for m in methods]
+    for m in methods:  # dua berkas bernama sama di folder yang sama -> pakai path sebagai pembeda
+        if names.count(m.display) > 1:
+            m.tag = m.relpath
     results = [evaluate(m, truth, ci=args.truth == "sample") for m in methods]
-    info = run_info("evaluate", None, truth=truth.source,
-                    inputs={m.path.name: {k: m.run.get(k) for k in ("run_id", "git_commit", "git_dirty", "model")}
+    info = run_info("evaluate", None, truth=truth.source, skipped=[str(p) for p in skipped],
+                    inputs={m.relpath: {k: m.run.get(k) for k in ("run_id", "git_commit", "git_dirty", "model",
+                                                                  "model_version")}
                             for m in methods})
-    text = f"Evaluasi {info['run_id']} (commit {str(info['git_commit'])[:7]}, dirty={info['git_dirty']})\n\n" + render(results, methods, truth)
+    text = f"Evaluasi {info['run_id']} (commit {str(info['git_commit'])[:7]}, dirty={info['git_dirty']})\n\n"
+    if skipped:
+        text += f"Dilewati (bukan berkas prediksi atau kosong): {', '.join(str(p) for p in skipped)}\n\n"
+    text += render(results, methods, truth)
     if args.rules:
         for m in methods:
             ranked = rule_errors(m, truth)

@@ -49,12 +49,17 @@ def verify(root: Path, categories: list[str], excluded_operators: set[str], max_
     evaluator = Evaluator({f: load_data_file(root / "rules", f) for f in sorted(files)}, report.removals, unicode_map,
                           tx_defaults(root / "rules"))
     stats: Counter = Counter()
+    mismatched: list[dict] = []
     per_rule: dict[int, list[int]] = {}
     disagreements = []
     test_files = [p for c in categories for p in sorted((root / "tests" / "regression" / "tests").glob(f"REQUEST-{c}-*/*.yaml"))]
     for path in test_files:
         doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         rule_id = str(doc.get("rule_id") or path.stem)
+        if rule_id != path.stem and path.stem.isdigit() and int(path.stem) in by_id and not (
+                rule_id.isdigit() and int(rule_id) in by_id):
+            mismatched.append({"file": path.name, "rule_id": rule_id})  # mis. 933200.yaml berisi rule_id 9331200
+            rule_id = path.stem
         rule = by_id.get(int(rule_id)) if rule_id.isdigit() else None
         if rule is None or rule.paranoia > max_pl:
             continue
@@ -92,7 +97,12 @@ def verify(root: Path, categories: list[str], excluded_operators: set[str], max_
                 if got != expect:
                     disagreements.append({"rule": rule.id, "test_id": test.get("test_id"), "expected_match": expect,
                                           "uri": str(inp.get("uri"))[:200]})
-    return {"stats": dict(stats), "rules_tested": len(per_rule), "disagreements": disagreements}
+    candidates = [r for r in rules if r.paranoia <= max_pl and not any(link.operator in excluded_operators for link in r.links)
+                  and all(is_applicable(link) for link in r.links)]
+    return {"stats": dict(stats), "rules_tested": len(per_rule), "disagreements": disagreements,
+            "tests_per_rule": {str(k): sum(v) for k, v in sorted(per_rule.items())},
+            "rules_without_runnable_tests": sorted(str(r.id) for r in candidates if r.id not in per_rule),
+            "test_rule_id_mismatch": mismatched}
 
 
 def main(argv: list[str] | None = None) -> int:
