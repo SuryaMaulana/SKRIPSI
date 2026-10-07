@@ -235,3 +235,22 @@ def test_applicability_ignores_unlogged_data():
     assert not m.is_applicable(_link([Target("TX", "x")], "endsWith", "%{request_headers.host}"))
     assert m.is_applicable(_link([Target("REQUEST_HEADERS", "User-Agent")], "rx", "x"))
     assert not m.is_applicable(_link([Target("REQUEST_HEADERS", "X-Filename")], "rx", "x"))
+
+
+def test_setvar_in_chain_starter_feeds_the_chained_link():
+    """Pola CRS 920440: link pertama menangkap ekstensi dan setvar tx.extension, link berantai memeriksa TX:EXTENSION."""
+    first = Link((Target("REQUEST_BASENAME"),), "rx", r"\.([^.]+)$", False, ("urlDecodeUni",), False, True,
+                 ("tx.extension=.%{tx.1}/",))
+    second = Link((Target("TX", "EXTENSION"),), "within", "%{tx.restricted_extensions}", False, ("lowercase",), False,
+                  False)
+    rule = _rule(first, second, rule_id=920440)
+    ev = m.Evaluator({}, tx_defaults={"restricted_extensions": ".bak/ .swp/ .log/"})
+    hit = lambda target: ev.evaluate(rule, m.collections(m.Request("GET", target, "HTTP/1.1", {}))) is not None
+    assert hit("/x/index.php.BAK") and hit("/blog.log") and not hit("/index.php") and not hit("/noext")
+
+
+def test_unresolved_macros_expand_to_empty_like_modsecurity():
+    rule = _rule(_link([Target("ARGS")], "streq", "%{tx.tidak_ada}", negated=True))
+    coll = m.collections(m.Request("GET", "/p?a=x&b=", "HTTP/1.1", {}))
+    hit = m.Evaluator({}).evaluate(rule, coll)  # makro kosong: a="x" != "" cocok (negasi), b="" tidak
+    assert hit is not None and hit.variable == "ARGS:a"

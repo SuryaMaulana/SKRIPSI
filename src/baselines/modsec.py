@@ -1055,6 +1055,8 @@ def _expand(text: str, coll: dict, state: _State) -> str:
             value = state.tx.get(name[3:].lower())
         elif upper == "MATCHED_VAR":
             value = state.matched[-1].value if state.matched else None
+        elif upper == "MATCHED_VAR_NAME":
+            value = state.matched[-1].variable if state.matched else None
         elif upper.startswith("REQUEST_HEADERS."):
             key = name.split(".", 1)[1].lower()
             value = next((v for k, v in coll.get("REQUEST_HEADERS", []) if k.lower() == key), None)
@@ -1170,6 +1172,8 @@ class Evaluator:
                     hit, data = not hit, ""
                 if hit:
                     matches.append(Match(name, candidate, data))
+                    if link.setvars:
+                        _run_setvars(link.setvars, coll, state, matches)
         return matches
 
     def evaluate(self, rule: Rule, coll: dict, removals: list[TargetRemoval] | None = None) -> Match | None:
@@ -1190,6 +1194,27 @@ class Evaluator:
                 first = matches
             state.matched = matches
         return first[0]
+
+
+def _run_setvars(setvars: tuple[str, ...], coll: dict, state: _State, matches: list[Match]) -> None:
+    """Aksi setvar pada koleksi TX, dijalankan per kecocokan seperti msre_perform_nondisruptive_actions (re.c):
+    "tx.x=nilai" (makro diperluas, termasuk pada nama), "tx.x=+n"/"tx.x=-n" (aritmetika), "!tx.x" (hapus).
+    Variabel di luar TX (IP, SESSION, ...) tidak dipakai aturan deteksi dan diabaikan."""
+    previous, state.matched = state.matched, matches  # MATCHED_VAR(_NAME) = kecocokan terakhir link ini
+    for spec in setvars:
+        delete = spec.startswith("!")
+        name, _, expr = spec.lstrip("!").partition("=")
+        collection, _, key = _expand(name, coll, state).partition(".")
+        if collection.lower() != "tx" or not key:
+            continue
+        key = key.lower()
+        if delete:
+            state.tx.pop(key, None)
+        elif expr[:1] in "+-" and expr[1:2] != "":
+            state.tx[key] = str(_atoi(state.tx.get(key, "0")) + int(expr[0] + str(_atoi(_expand(expr[1:], coll, state)))))
+        else:
+            state.tx[key] = _expand(expr, coll, state)
+    state.matched = previous
 
 
 @lru_cache(maxsize=None)

@@ -8,6 +8,7 @@ atau tidak (no_expect_ids / no_log_contains). Jalankan: make verify-crs -> resul
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import sys
@@ -18,9 +19,9 @@ import yaml
 
 from ..common.runinfo import run_info
 from ..data.config import ROOT
-from .crs import ensure_crs, load_data_file, load_rules, tree_digest, tx_defaults
+from .crs import available_categories, ensure_crs, load_data_file, load_rules, tree_digest, tx_defaults
 from .modsec import Evaluator, Request, collections, compile_pcre, is_applicable, to_bytes_str
-from .regex_baseline import CONFIG_PATH, engine_unicode_map, load_config
+from .regex_baseline import CONFIG_PATH, engine_unicode_map, load_config, mapped_class
 
 LOGGED = {"user-agent", "referer"}
 IGNORED_HEADERS = {"host", "accept", "connection", "accept-encoding", "accept-language", "accept-charset",
@@ -38,8 +39,11 @@ def _expected(rule_id: int, output: dict) -> bool | None:
 
 
 def verify(root: Path, categories: list[str], excluded_operators: set[str], max_pl: int = 4,
-           unicode_map: list[int] | None = None) -> dict:
+           unicode_map: list[int] | None = None, keep=None) -> dict:
+    """`keep(rule)` membatasi aturan yang diuji (mis. hanya aturan yang dipetakan ke kelas oleh varian regex_full)."""
     rules, report = load_rules(root / "rules", categories)
+    if keep is not None:
+        rules = [r for r in rules if keep(r)]
     by_id = {r.id: r for r in rules}
     files = {f for r in rules for link in r.links if link.operator in ("pmFromFile", "pmf") for f in link.argument.split()}
     evaluator = Evaluator({f: load_data_file(root / "rules", f) for f in sorted(files)}, report.removals, unicode_map,
@@ -91,19 +95,25 @@ def verify(root: Path, categories: list[str], excluded_operators: set[str], max_
     return {"stats": dict(stats), "rules_tested": len(per_rule), "disagreements": disagreements}
 
 
-def main() -> int:
-    config = load_config(CONFIG_PATH)
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Cocokkan emulasi CRS dengan uji regresi resmi CRS")
+    parser.add_argument("--config", type=Path, default=CONFIG_PATH)
+    args = parser.parse_args(argv)
+    config = load_config(args.config.resolve())
+    name = config.get("name", "regex")
     crs = config["crs"]
     root = ensure_crs(crs["version"], crs["url"], crs["sha256"])
-    result = verify(root, [str(c) for c in crs["categories"]], set(crs["excluded_operators"]),
-                    unicode_map=engine_unicode_map(config))
-    info = run_info("crs_regression", None, engine=config["engine"], crs_version=crs["version"],
-                    crs_sha256=crs["sha256"], rules_dir_sha256=tree_digest(root / "rules"), **result)
-    out = ROOT / "results" / "crs_regression.json"
+    categories = available_categories(root / "rules") if crs["categories"] == "all" else [str(c) for c in crs["categories"]]
+    result = verify(root, categories, set(crs["excluded_operators"]), unicode_map=engine_unicode_map(config),
+                    keep=lambda rule: mapped_class(rule, config) is not None)
+    info = run_info("crs_regression", None, config_file=str(args.config), engine=config["engine"],
+                    crs_version=crs["version"], crs_sha256=crs["sha256"], rules_dir_sha256=tree_digest(root / "rules"),
+                    **result)
+    out = ROOT / "results" / ("crs_regression.json" if name == "regex" else f"crs_regression_{name}.json")
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     s = result["stats"]
-    print(f"[verify-crs] CRS {crs['version']}: {s.get('agree', 0)}/{s.get('tested', 0)} uji cocok "
+    print(f"[verify-crs] {name}, CRS {crs['version']}: {s.get('agree', 0)}/{s.get('tested', 0)} uji cocok "
           f"({result['rules_tested']} aturan, semua PL); dilewati: "
           f"{ {k: v for k, v in s.items() if k.startswith('skip')} } -> {out.relative_to(ROOT)}")
     return 0 if not result["disagreements"] else 1

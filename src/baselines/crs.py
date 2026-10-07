@@ -54,6 +54,7 @@ class Link:
     transforms: tuple[str, ...]
     multi_match: bool
     capture: bool
+    setvars: tuple[str, ...] = ()  # aksi setvar apa adanya, mis. "tx.extension=.%{tx.1}/" (dijalankan saat link cocok)
 
 
 @dataclass(frozen=True)
@@ -381,8 +382,9 @@ def _link(words: list[str], actions: list[tuple[str, str | None]]) -> Link:
         if a == "t" and v:
             transforms = [] if v == "none" else transforms + [v]
     names = {a for a, _ in actions}
+    setvars = tuple(v for a, v in actions if a == "setvar" and v)
     return Link(parse_targets(words[1]), name, argument, negated, tuple(transforms), "multiMatch" in names,
-                "capture" in names)
+                "capture" in names, setvars)
 
 
 def _removals(chain: list) -> list[TargetRemoval]:
