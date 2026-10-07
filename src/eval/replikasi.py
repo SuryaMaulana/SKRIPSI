@@ -1,10 +1,13 @@
-"""Agregasi replikasi run LLM (keputusan penulis 2026-10-08): C dan E dijalankan beberapa kali pada 500 baris yang sama
-(run berbeda, seed sama) karena label dapat berubah antar run walau temperature 0. Untuk setiap metrik dilaporkan rerata
-dan rentang min-maks atas run; tabel utama memakai rerata.
+"""Laporan evaluasi utama (keputusan penulis 2026-10-08): C dan E masing-masing 3 run dengan konfigurasi final (batas
+max_tokens 4.096) pada 500 baris yang sama, seed sama, run berbeda (results/llm_single_r1..3.jsonl, results/agent_r1..3.jsonl).
+Untuk setiap metrik dilaporkan rerata dan rentang min-maks atas ketiga run; tabel utama memakai rerata.
 
-- Kelompok run: berkas utama (results/llm_single.jsonl, results/agent.jsonl) + replikasi results/replikasi/<nama>_r*.jsonl.
-  Semua run satu kelompok wajib berkonfigurasi identik (model, versi model, parameter generasi, routing, hash prompt, berkas
-  masukan); bila tidak, agregasi dihentikan.
+- Semua run satu kelompok wajib berkonfigurasi identik (model, versi model, parameter generasi termasuk max_tokens,
+  routing, hash prompt, berkas masukan); bila tidak, agregasi dihentikan. Run lama ada di results/archive/ (catatan
+  rekayasa, tidak masuk tabel).
+- Keluaran degeneratif = panggilan LLM yang terpotong di max_tokens (finish_reason=length, TRUNCATED): jumlah kejadian,
+  baris terdampak, dan outcome baris terdampak per run.
+- Latensi per panggilan LLM diambil dari log panggilan tiap run (calls_file di run.json), terpisah dari latensi per baris.
 - IK 95% macro-F1 rerata run: bootstrap klaster yang sama dengan evaluate.py (templat diresampel di dalam kelas, 1.000 kali,
   random_state=42); pada tiap draw, macro-F1 setiap run dihitung pada baris yang sama lalu dirata-rata atas run.
 - Confusion matrix rerata = rerata jumlah sel atas run.
@@ -40,14 +43,14 @@ from .evaluate import (
     multiclass,
 )
 
-REPLICATION_DIR = RESULTS_DIR / "replikasi"
-GROUPS = {"llm_single": "llm_single", "agent": "agent"}  # nama metode -> nama berkas utama
+REPLICATION_DIR = RESULTS_DIR  # run resmi: results/<nama>_r<n>.jsonl
+GROUPS = {"llm_single": "llm_single", "agent": "agent"}  # nama metode -> awalan berkas run
 CONFIG_KEYS = ("model", "model_version", "generation", "provider_routing", "prompt_sha256", "input_sha256")
 SINGLE_RUN = ("regex", "regex_full")
 
 
 def group_files(name: str, main_dir: Path = RESULTS_DIR, replication_dir: Path = REPLICATION_DIR,
-                include_main: bool = True) -> list[Path]:
+                include_main: bool = False) -> list[Path]:
     files = [main_dir / f"{name}.jsonl"] if include_main else []
     files += sorted(replication_dir.glob(f"{name}_r*.jsonl"), key=lambda p: (len(p.name), p.name))
     return [p for p in files if p.exists() and p.stat().st_size > 0 and not p.name.endswith("_calls.jsonl")]
@@ -67,6 +70,36 @@ def _pct(values: list[float], q: float) -> float | None:
     if not values:
         return None
     return float(np.percentile(values, q * 100))
+
+
+def call_latencies(method: Method) -> list[float]:
+    """Latensi setiap panggilan LLM run ini dari log panggilannya (C: semua rekaman; E: rekaman jenis llm)."""
+    calls_file = method.run.get("calls_file")
+    if not calls_file:
+        return []
+    path = Path(calls_file) if Path(calls_file).is_absolute() else ROOT / calls_file
+    if not path.exists():
+        return []
+    out = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            record = json.loads(line)
+            if record.get("run_id") != method.run.get("run_id") or record.get("latency_s") is None:
+                continue
+            if record.get("jenis", "llm") == "llm":
+                out.append(record["latency_s"])
+    return out
+
+
+def degenerate(method: Method, truth) -> dict:
+    """Keluaran degeneratif (TRUNCATED) dan outcome baris terdampak."""
+    rows = [r for r in method.rows if r["id"] in truth.labels]
+    hit = [r for r in rows if r.get("truncated_calls", 0) > 0]
+    return {"kejadian": sum(r.get("truncated_calls", 0) for r in rows), "baris_terdampak": len(hit),
+            "terdampak_ok": sum(r["status"] == "ok" for r in hit),
+            "terdampak_verification_failed": sum(r["status"] == "verification_failed" for r in hit),
+            "terdampak_parse_error": sum(r["status"] == "PARSE_ERROR" for r in hit),
+            "terdampak_label_benar": sum(r["label"] == truth.labels[r["id"]] for r in hit)}
 
 
 def run_metrics(method: Method, truth) -> dict:
@@ -96,6 +129,11 @@ def run_metrics(method: Method, truth) -> dict:
             "biaya_per_1000_baris_usd": 1000 * sum(r["cost_usd"] for r in rows) / len(rows),
             "panggilan_llm_rerata": statistics.mean(r.get("llm_calls", r.get("attempts", 1)) for r in rows),
         })
+    calls = call_latencies(method)
+    if calls:
+        out.update({"latensi_panggilan_median_s": _pct(calls, 0.5), "latensi_panggilan_p95_s": _pct(calls, 0.95)})
+    if rows and "truncated_calls" in rows[0]:
+        out.update({f"degeneratif_{k}": v for k, v in degenerate(method, truth).items()})
     if rows and "tool_calls" in rows[0]:  # deep agent
         out.update({
             "pemanggilan_alat_rerata": statistics.mean(r["tool_calls"] for r in rows),
@@ -192,11 +230,24 @@ def render(groups: dict[str, dict]) -> str:
     if with_cost:
         out += ["", "Tabel 4.4 — token, latensi, dan biaya per baris (deskriptif)", ""]
         keys = ("token_masukan_rerata", "token_keluaran_rerata", "panggilan_llm_rerata", "latensi_median_s", "latensi_p95_s",
-                "biaya_per_1000_baris_usd")
-        digits = (0, 0, 1, 2, 2, 4)
-        out.append(_table(["metode", "token masuk", "token keluar", "panggilan LLM", "latensi median (s)", "latensi p95 (s)",
+                "latensi_panggilan_median_s", "latensi_panggilan_p95_s", "biaya_per_1000_baris_usd")
+        digits = (0, 0, 1, 2, 2, 2, 2, 4)
+        out.append(_table(["metode", "token masuk", "token keluar", "panggilan LLM", "latensi baris median (s)",
+                           "latensi baris p95 (s)", "latensi per panggilan median (s)", "latensi per panggilan p95 (s)",
                            "biaya per 1.000 baris ($)"],
-                          [[label[n], *(_cell(groups[n]["metrics"][k], d) for k, d in zip(keys, digits))] for n in with_cost]))
+                          [[label[n], *(_cell(groups[n]["metrics"].get(k, {"mean": None}), d) for k, d in zip(keys, digits))]
+                           for n in with_cost]))
+        out.append("Latensi baris = waktu dinding satu baris (E: seluruh orkestrasi); latensi per panggilan = satu panggilan "
+                   "LLM dari log panggilan.")
+    with_deg = [n for n in names if "degeneratif_kejadian" in groups[n]["metrics"]]
+    if with_deg:
+        out += ["", "Keluaran degeneratif — panggilan LLM terpotong di max_tokens (TRUNCATED), per run", ""]
+        keys = ("kejadian", "baris_terdampak", "terdampak_ok", "terdampak_verification_failed", "terdampak_parse_error",
+                "terdampak_label_benar")
+        out.append(_table(["metode", "kejadian", "baris terdampak", "outcome: ok", "outcome: verification_failed",
+                           "outcome: PARSE_ERROR", "label benar (baris terdampak)"],
+                          [[label[n], *(_cell(groups[n]["metrics"][f"degeneratif_{k}"], 1) for k in keys)]
+                           for n in with_deg]))
     for n in names:
         g = groups[n]
         if len(g["runs"]) > 1:
@@ -222,7 +273,6 @@ def render(groups: dict[str, dict]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Agregasi replikasi: rerata dan rentang min-maks per metrik")
     parser.add_argument("--replication-dir", type=Path, default=REPLICATION_DIR)
-    parser.add_argument("--replications-only", action="store_true", help="tanpa run utama (hanya results/replikasi/)")
     parser.add_argument("--out", type=Path, help="simpan Markdown + JSON ke path ini (.md)")
     args = parser.parse_args(argv)
     truth = load_truth("sample")
@@ -233,7 +283,7 @@ def main(argv: list[str] | None = None) -> int:
             method = load_method(path)
             groups[method.display] = aggregate([method], truth)
     for name, base in GROUPS.items():
-        files = group_files(base, replication_dir=args.replication_dir, include_main=not args.replications_only)
+        files = group_files(base, replication_dir=args.replication_dir)
         if not files:
             continue
         methods = [load_method(p) for p in files]

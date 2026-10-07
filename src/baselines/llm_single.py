@@ -138,18 +138,24 @@ class Runner:
                     {"role": "user", "content": user_message(row["raw_log_masked"])}]
         payload = build_payload(self.config, messages, OUTPUT_SCHEMA, "klasifikasi_log")
         self._spent = {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_s": 0.0}
+        truncated = 0
         for attempt in range(1, PARSE_ATTEMPTS + 1):
             call, summary = self._call(row["id"], attempt, payload)
             output, reason = parse_output(summary["content"])
-            if output is not None and summary["finish_reason"] not in (None, "stop"):
+            if summary["finish_reason"] == "length":  # terpotong di batas max_tokens (keputusan penulis 2026-10-08)
+                truncated += 1
+                output, reason = None, f"TRUNCATED: finish_reason length (max_tokens {payload.get('max_tokens')})"
+            elif output is not None and summary["finish_reason"] not in (None, "stop"):
                 output, reason = None, f"finish_reason {summary['finish_reason']}"
             if summary["refusal"]:
                 output, reason = None, f"penolakan: {str(summary['refusal'])[:200]}"
-            self._log(row["id"], attempt, payload, call, summary, "ok" if output else "parse_error", reason)
+            outcome = "ok" if output else ("TRUNCATED" if summary["finish_reason"] == "length" else "parse_error")
+            self._log(row["id"], attempt, payload, call, summary, outcome, reason)
             if output is not None:
-                return {"id": row["id"], **output, "status": "ok", "attempts": attempt, **self._spent}
+                return {"id": row["id"], **output, "status": "ok", "attempts": attempt, "truncated_calls": truncated,
+                        **self._spent}
         return {"id": row["id"], "label": "PARSE_ERROR", "status": "PARSE_ERROR", "attempts": PARSE_ATTEMPTS,
-                **self._spent}
+                "truncated_calls": truncated, "detail": reason, **self._spent}
 
 
 def _percentile(values: list[float], q: float) -> float | None:

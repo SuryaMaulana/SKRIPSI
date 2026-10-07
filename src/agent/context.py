@@ -33,6 +33,7 @@ class RowContext:
     verdicts: list[dict] = field(default_factory=list)  # satu per putaran verifikasi
     guard_blocks: list[dict] = field(default_factory=list)  # pemanggilan sub-agen yang ditahan VerificationRoundGuard
     reminders: list[str] = field(default_factory=list)  # pengingat ProcedureGuard saat orkestrator hendak berhenti
+    truncations: list[dict] = field(default_factory=list)  # panggilan LLM yang terpotong di max_tokens (TRUNCATED)
     llm_calls: int = 0
     tool_calls: int = 0
     tool_names: list[str] = field(default_factory=list)  # urutan alat yang dipanggil (termasuk task)

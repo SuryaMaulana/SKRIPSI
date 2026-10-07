@@ -54,6 +54,7 @@ from .graph import (
     REQUEST_TIMEOUT_S,
     SUBAGENT_MODEL_CALLS,
     ServiceFailure,
+    TruncatedOutput,
     build_agent,
 )
 from .prompts import CLASSIFIER_PROMPT, ORCHESTRATOR_PROMPT, PARSER_PROMPT, PAYLOAD_PROMPT
@@ -165,6 +166,7 @@ class CallRecorder(BaseCallbackHandler):
             "prompt_tokens": usage.get("prompt_tokens"), "completion_tokens": usage.get("completion_tokens"),
             "cached_tokens": (usage.get("prompt_tokens_details") or {}).get("cached_tokens"),
             "cost_usd": usage.get("cost"), "latency_s": round(latency, 3), "finish_reason": meta.get("finish_reason"),
+            "status_panggilan": "TRUNCATED" if meta.get("finish_reason") == "length" else "ok",
             "served_model": output.get("model_name"), "upstream_provider": output.get("upstream_provider"),
             "system_fingerprint": output.get("system_fingerprint"), "parameter": params, "prompt": prompt,
             "respons": _message(message) if message is not None else generation.text,
@@ -228,6 +230,7 @@ def assemble(ctx: RowContext, run_id: str, wall_s: float, final_message: str | N
             "delegasi": {**delegated, "keempat_subagen": all(delegated.values())},
             "alat_dipanggil": dict(Counter(ctx.tool_names)),
             "ditahan_guard": ctx.guard_blocks, "pengingat_prosedur": ctx.reminders, "batas_panggilan_subagen": limit_hits,
+            "truncated_calls": len(ctx.truncations), "truncations": ctx.truncations,
             "attempts": ctx.attempt}
     if error:
         base["detail"] = error
@@ -260,6 +263,8 @@ def classify_row(agent, recorder: CallRecorder, run_id: str, row: dict) -> dict:
     except GraphRecursionError:
         return assemble(ctx, run_id, time.perf_counter() - start, None,
                         error=f"batas rekursi orkestrator ({RECURSION_LIMIT} langkah) tercapai")
+    except TruncatedOutput as exc:  # label klasifikasi valid terakhir tetap dipakai; tanpa itu -> PARSE_ERROR
+        return assemble(ctx, run_id, time.perf_counter() - start, None, error=str(exc))
     except (openai.APIError, ServiceFailure) as exc:
         recorder.logger.write({"run_id": run_id, "id": row["id"], "jenis": "galat_api", "galat": safe_error(exc)})
         raise RunAborted(f"{row['id']}: {safe_error(exc)}; run dihentikan, jalankan ulang perintah yang sama dengan "
@@ -282,6 +287,8 @@ def summarize_rows(done: list[dict]) -> dict:
             "subagent_limit_hits": sum(p["batas_panggilan_subagen"] for p in done),
             "delegated_all_four": sum(p["delegasi"]["keempat_subagen"] for p in done),
             "recursion_limit_rows": sum("batas rekursi" in (p.get("detail") or "") for p in done),
+            "truncated_calls": sum(p.get("truncated_calls", 0) for p in done),
+            "rows_with_truncation": sum(p.get("truncated_calls", 0) > 0 for p in done),
             "llm_calls_mean": sum(p["llm_calls"] for p in done) / n,
             "tool_calls_mean": sum(p["tool_calls"] for p in done) / n}
 

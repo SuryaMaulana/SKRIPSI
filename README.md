@@ -16,13 +16,14 @@ make golden-check   # B: bandingkan port ModSecurity dengan vektor emas harness 
 make regex-full-val # B: varian sekunder regex_full (CRS PL1 semua kategori) pada srbh_val -> results/tuning/
 make regex-full     # B: regex_full sekali pada test_sample_500 -> results/regex_full.jsonl (post_hoc=true)
 make llm-single-pilot # C: LLM tunggal pada 30 baris pilot (5 per kelas) -> results/pilot/
-make llm-single       # C: LLM tunggal pada 500 baris -> results/llm_single.jsonl (+ llm_single_calls.jsonl)
+make run-c R=1        # C: run resmi ke-1 (1-3) pada 500 baris -> results/llm_single_r1.jsonl (+ _calls.jsonl)
 make agent-pilot      # E: deep agent pada 30 baris pilot yang sama -> results/pilot/agent.jsonl
 make agent-val        # E: validasi deep agent v2 (K1-K3) + LLM tunggal pada 30 baris srbh_val -> results/validasi/
-make agent            # E: deep agent pada 500 baris -> results/agent.jsonl (+ agent_calls.jsonl)
-make replikasi        # C dan E masing-masing 3 run lagi pada 500 baris yang sama -> results/replikasi/
-make eval             # D: Tabel 4.2-4.5 per run (reports/evaluasi.md) + rerata dan rentang min-maks atas
-                      #    run berkonfigurasi sama (reports/evaluasi_replikasi.md; tabel utama = rerata)
+make run-e R=1        # E: run resmi ke-1 (1-3) pada 500 baris -> results/agent_r1.jsonl (+ _calls.jsonl)
+make runs-c / runs-e  # ketiga run resmi C / E berurutan (boleh dijalankan paralel antar run)
+make eval             # D: laporan utama reports/evaluasi.md = rerata (min-maks) atas 3 run C dan 3 run E untuk
+                      #    Tabel 4.2-4.5, F1 per kelas, confusion matrix rerata, frekuensi keluaran degeneratif;
+                      #    rincian per run di reports/evaluasi_per_run.md
 ```
 
 Run LLM (C dan E) yang terhenti karena galat API dilanjutkan dengan menjalankan ulang perintah yang sama persis ditambah
@@ -30,6 +31,12 @@ Run LLM (C dan E) yang terhenti karena galat API dilanjutkan dengan menjalankan 
 --resume`); runner menolak bila masukan, daftar baris, log panggilan, atau nama keluaran berbeda dari run awal. Baris yang
 terkena galat API tidak dinilai salah. Kunci `OPENROUTER_API_KEY` hanya dibaca dari `.env` di dalam kode dan tidak pernah dicatat; tracing
 LangSmith dimatikan, semua catatan panggilan tetap lokal.
+
+Protokol akhir (keputusan penulis 2026-10-08): semua panggilan LLM C dan E memakai max_tokens 4.096 (configs/llm.yaml;
+pengaman kegagalan, bukan biaya). Panggilan yang terpotong dicatat TRUNCATED, diulang sekali, lalu PARSE_ERROR bila tetap
+tidak valid. C dan E masing-masing dijalankan 3 kali pada 500 baris yang sama (seed sama); tabel utama memakai rerata.
+Run lama (C 500 tanpa batas, pilot E v1, validasi v2, E 500 tanpa batas parsial) ada di results/archive/ dan dibahas di
+reports/catatan_rekayasa.md; tidak masuk tabel.
 
 Aturan umum tahap sistem: semua metode membaca kolom masukan yang sama dari `test_sample_500.jsonl` lewat
 `src/common/inputs.py` (tanpa `label`/`template_key`); setiap run mencatat tanggal, commit git, dan nama model
@@ -58,12 +65,13 @@ Berkas di `data/raw/` tidak pernah diubah; pipeline memverifikasi MD5 sebelum me
 | `configs/llm.yaml` | model (openai/gpt-4.1-nano-2025-04-14), tarif per 1M token, hasil cek API |
 | `results/regex.jsonl`, `results/regex.run.json` | prediksi pembanding regex per baris + metadata run |
 | `results/regex_full.jsonl`, `results/regex_full.run.json` | varian sekunder regex_full (post hoc) |
-| `results/llm_single.jsonl`, `results/llm_single.run.json` | LLM tunggal: label, confidence, evidence, explanation, token, biaya, latensi |
-| `results/llm_single_calls.jsonl` | setiap panggilan API LLM tunggal: prompt, respons mentah, token, biaya |
-| `results/agent.jsonl`, `results/agent.run.json` | deep agent: label akhir, status verifikasi, token, biaya, latensi per baris |
-| `results/agent_calls.jsonl` | setiap panggilan LLM dan alat deep agent: sub-agen, token, biaya, latensi, putaran verifikasi |
-| `results/pilot/` | pilot 30 baris (5 per kelas) untuk C dan E |
-| `reports/evaluasi*.md/.json` | keluaran skrip evaluasi (langkah D) |
+| `results/llm_single_r{1,2,3}.jsonl` + `.run.json` | LLM tunggal, 3 run resmi: label, confidence, evidence, explanation, token, biaya, latensi |
+| `results/llm_single_r{1,2,3}_calls.jsonl` | setiap panggilan API LLM tunggal per run: prompt, respons mentah, token, biaya, TRUNCATED |
+| `results/agent_r{1,2,3}.jsonl` + `.run.json` | deep agent, 3 run resmi: label akhir, status verifikasi, delegasi, token, biaya, latensi |
+| `results/agent_r{1,2,3}_calls.jsonl` | setiap panggilan LLM dan alat deep agent per run: sub-agen, token, biaya, latensi, putaran |
+| `results/archive/` | run lama (catatan rekayasa): C tanpa batas, pilot v1, validasi v2, E 500 tanpa batas parsial |
+| `reports/evaluasi.md/.json` | laporan evaluasi utama (rerata dan rentang atas 3 run) |
+| `reports/evaluasi_per_run.md/.json` | rincian evaluasi per run dan aturan pendorong salah kelas regex |
 
 ## Struktur
 

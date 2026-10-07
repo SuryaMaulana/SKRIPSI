@@ -94,7 +94,8 @@ def test_parse_failure_is_retried_once_then_marked_parse_error():
     runner, calls, _, _ = _runner([_response("x"), _response(json.dumps(GOOD), finish="length")])
     result = runner.classify(ROW)
     assert result["label"] == "PARSE_ERROR" and result["status"] == "PARSE_ERROR" and result["attempts"] == 2
-    assert [r["outcome"] for r in _records(calls)] == ["parse_error", "parse_error"]
+    assert [r["outcome"] for r in _records(calls)] == ["parse_error", "TRUNCATED"]  # terpotong di max_tokens
+    assert result["truncated_calls"] == 1 and result["detail"].startswith("TRUNCATED")
 
 
 def test_service_errors_are_retried_with_backoff_and_client_errors_abort_the_run():
@@ -156,3 +157,16 @@ def test_table_2_1_traits_are_complete_and_shared_with_the_agent():
         assert not traits.rstrip().endswith((",", "`")), label
     assert "argumen PHP-CGI -d allow_url_include" in dict((r[0], r[3]) for r in TABLE_2_1)["CMD_INJECTION"]
     assert "6. Tulis explanation dalam bahasa Indonesia." in SYSTEM_PROMPT
+
+
+def test_max_tokens_from_the_config_is_sent_and_truncated_twice_is_parse_error():
+    from src.llm.openrouter import build_payload
+
+    config = {**CONFIG, "generation": {**CONFIG["generation"], "max_tokens": 4096}}
+    assert build_payload(config, [])["max_tokens"] == 4096 and "max_tokens" not in build_payload(CONFIG, [])
+    runner, calls, sent, _ = _runner([_response("{", finish="length"), _response("{", finish="length")])
+    runner.config = config
+    result = runner.classify(ROW)
+    assert result["status"] == "PARSE_ERROR" and result["truncated_calls"] == 2
+    assert [r["outcome"] for r in _records(calls)] == ["TRUNCATED", "TRUNCATED"]
+    assert all(body["max_tokens"] == 4096 for body in sent)

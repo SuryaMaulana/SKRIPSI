@@ -1,4 +1,5 @@
 import ast
+import os
 import json
 import uuid
 from collections import Counter
@@ -594,3 +595,36 @@ def test_invalid_tool_calls_are_logged_with_a_bounded_prefix():
     m = Msg("", invalid_tool_calls=[{"name": "task", "args": "{" + " " * 5000, "id": "x", "error": "JSON", "type": "invalid_tool_call"}])
     logged = ar._message(m)["invalid_tool_calls"][0]
     assert logged["args_len"] == 5001 and len(logged["args_prefix"]) == 2000 and logged["error"] == "JSON"
+
+
+def _cut(content=""):
+    return AIMessage(content, response_metadata={"finish_reason": "length"})
+
+
+def test_make_model_sends_the_same_max_tokens_parameter_as_c():
+    config = {"model": "openai/gpt-4.1-nano", "generation": {"temperature": 0, "seed": 42, "max_tokens": 4096},
+              "provider_routing": {"order": ["openai"]}}
+    model = g.make_model(config, "orkestrator", "sk-test")
+    assert model.extra_body["max_tokens"] == 4096 and model.max_tokens is None  # bukan max_completion_tokens
+
+
+def test_orchestrator_truncated_twice_stops_the_row_as_parse_error(ctx, monkeypatch):
+    scripts = {"orkestrator": [_cut(), _cut()], "parser": [], "analisis_payload": [], "klasifikasi": []}
+    agent = _graph_with_scripts(monkeypatch, scripts)
+    out = ar.classify_row(agent, ar.CallRecorder(CallLogger(Path(os.devnull))), "run-1", {"id": "srbh-1", "raw_log_masked": LOG})
+    assert out["status"] == "PARSE_ERROR" and "TRUNCATED" in out["detail"] and out["truncated_calls"] == 2
+    assert [t["subagen"] for t in out["truncations"]] == ["orkestrator", "orkestrator"]
+
+
+def test_truncation_once_is_retried_and_recorded(ctx, monkeypatch):
+    scripts = {"orkestrator": [_cut(), _task("klasifikasi", 1), _task("verifikasi", 2), AIMessage("selesai")],
+               "parser": [], "analisis_payload": [], "klasifikasi": [AIMessage(json.dumps(GOOD))]}
+    agent = _graph_with_scripts(monkeypatch, scripts)
+    agent.invoke({"messages": [HumanMessage(f"<log>{LOG}</log>")]}, {"recursion_limit": 40})
+    assert len(ctx.truncations) == 1 and ctx.verdicts[-1]["lolos"]
+
+
+def test_classifier_truncated_twice_records_a_parse_error_classification(ctx):
+    node = g.build_classifier(GenericFakeChatModel(messages=iter([_cut(json.dumps(GOOD)), _cut("{")])))
+    node.invoke({"messages": []})
+    assert ctx.classifications[-1]["_parse_error"].startswith("TRUNCATED") and len(ctx.truncations) == 2

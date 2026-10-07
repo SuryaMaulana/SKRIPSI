@@ -6,11 +6,18 @@ model: openai/gpt-4.1-nano
 generation:
   temperature: 0
   seed: 42
+  # Batas token keluaran untuk SEMUA panggilan LLM di C dan E (orkestrator, sub-agen, klasifikasi): pengaman kegagalan
+  # (keluaran degeneratif sampai 32.768 token), bukan pertimbangan biaya. Keputusan penulis 2026-10-08. Keluaran normal
+  # jauh di bawahnya (maks. +-2.400 token). Panggilan yang terpotong (finish_reason=length) dicatat TRUNCATED, diulang
+  # sekali, lalu PARSE_ERROR bila tetap tidak valid.
+  max_tokens: 4096
 provider_routing:
   order:
   - openai
   allow_fallbacks: false
   require_parameters: true
+generation_notes:
+  max_tokens: pengaman kegagalan (keluaran degeneratif), bukan biaya; keputusan penulis 2026-10-08
 model_version: openai/gpt-4.1-nano-2025-04-14
 pricing_usd_per_1m_tokens:
   input: 0.1

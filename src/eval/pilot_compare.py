@@ -20,6 +20,7 @@ from ..data.config import ROOT
 from ..llm.klasifikasi import CLASS_LABELS
 
 RESULTS = ROOT / "results"
+ARCHIVE = RESULTS / "archive"  # pilot v1 dan run tanpa batas max_tokens (catatan rekayasa)
 
 
 def _rows(path: Path) -> dict[str, dict]:
@@ -208,12 +209,12 @@ def compare(ids_path: Path, agent_path: Path, singles: list[tuple[str, Path]], c
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Perbandingan per baris deep agent (E) vs LLM tunggal (C)")
-    parser.add_argument("--ids", type=Path, default=RESULTS / "pilot" / "pilot_ids.json")
-    parser.add_argument("--agent", type=Path, default=RESULTS / "pilot" / "agent.jsonl")
-    parser.add_argument("--single", type=Path, default=RESULTS / "llm_single.jsonl")
-    parser.add_argument("--single-pilot", type=Path, default=RESULTS / "pilot" / "llm_single.jsonl",
+    parser.add_argument("--ids", type=Path, default=ARCHIVE / "pilot" / "pilot_ids.json")
+    parser.add_argument("--agent", type=Path, default=ARCHIVE / "pilot" / "agent.jsonl")
+    parser.add_argument("--single", type=Path, default=ARCHIVE / "c_tanpa_batas" / "llm_single.jsonl")
+    parser.add_argument("--single-pilot", type=Path, default=ARCHIVE / "pilot" / "llm_single.jsonl",
                         help="kolom C tambahan (kosongkan dengan --single-pilot '' bila tidak ada)")
-    parser.add_argument("--calls", type=Path, default=RESULTS / "agent_calls.jsonl")
+    parser.add_argument("--calls", type=Path, default=ARCHIVE / "agent_calls_tanpa_batas.jsonl")
     parser.add_argument("--truth", default="test", help="test (test_sample_500) atau nama split, mis. val")
     parser.add_argument("--title", default="Pilot deep agent vs LLM tunggal")
     parser.add_argument("--out", type=Path)

@@ -65,5 +65,24 @@ def test_group_files_finds_main_and_numbered_replications(tmp_path):
                  "rep/agent_r1_calls.jsonl", "rep/llm_single_r1.jsonl"):
         (tmp_path / path).write_text(json.dumps({"id": "x", "label": "NORMAL"}) + "\n")
     files = rp.group_files("agent", tmp_path, tmp_path / "rep")
-    assert [p.name for p in files] == ["agent.jsonl", "agent_r1.jsonl", "agent_r2.jsonl", "agent_r10.jsonl"]
-    assert [p.name for p in rp.group_files("agent", tmp_path, tmp_path / "rep", include_main=False)][0] == "agent_r1.jsonl"
+    assert [p.name for p in files] == ["agent_r1.jsonl", "agent_r2.jsonl", "agent_r10.jsonl"]  # run resmi saja
+    assert [p.name for p in rp.group_files("agent", tmp_path, tmp_path / "rep", include_main=True)][0] == "agent.jsonl"
+
+
+def test_degenerate_outputs_and_call_latency_are_reported_per_run(tmp_path, monkeypatch):
+    truth = _truth()
+    calls = tmp_path / "calls.jsonl"
+    calls.write_text("".join(json.dumps(r) + "\n" for r in [
+        {"run_id": "r1", "jenis": "llm", "latency_s": 1.0}, {"run_id": "r1", "jenis": "llm", "latency_s": 3.0},
+        {"run_id": "r1", "jenis": "alat", "latency_s": 0.1}, {"run_id": "lain", "jenis": "llm", "latency_s": 99.0}]))
+    method = _method(truth, {"SQLI-0"}, run={"run_id": "r1", "model": "m", "calls_file": str(calls)})
+    for row in method.rows:
+        row["truncated_calls"] = 0
+    method.rows[0].update(truncated_calls=2, status="PARSE_ERROR", label="PARSE_ERROR")
+    method.rows[1].update(truncated_calls=1)
+    metrics = rp.run_metrics(method, truth)
+    assert rp.call_latencies(method) == [1.0, 3.0] and metrics["latensi_panggilan_median_s"] == 2.0
+    assert metrics["degeneratif_kejadian"] == 3 and metrics["degeneratif_baris_terdampak"] == 2
+    assert metrics["degeneratif_terdampak_parse_error"] == 1 and metrics["degeneratif_terdampak_ok"] == 1
+    text = rp.render({"llm_single": rp.aggregate([method], truth)})
+    assert "Keluaran degeneratif" in text and "latensi per panggilan median" in text

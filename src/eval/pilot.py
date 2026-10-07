@@ -17,7 +17,7 @@ import pandas as pd
 from ..common.inputs import SAMPLE_PATH, split_path
 from ..data.config import CLASSES, RANDOM_STATE, ROOT
 
-PILOT_PATH = ROOT / "results" / "pilot" / "pilot_ids.json"
+PILOT_PATH = ROOT / "results" / "pilot" / "pilot_ids.json"  # pilot v1 kini di results/archive/pilot/
 PER_CLASS = 5
 # baris srbh_val yang sudah dipakai uji asap deep agent (2026-10-07): tidak ikut validasi agar tidak pernah dilihat
 SMOKE_TEST_IDS = ("srbh-39d12485e402cc62", "srbh-187f9f0e43273cb1", "srbh-7ac0a8cdf16e2eee", "srbh-24574608e4559ffd")

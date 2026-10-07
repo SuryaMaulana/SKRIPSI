@@ -64,11 +64,13 @@ def per_token_rates(info: dict) -> dict[str, Decimal]:
 
 def build_payload(config: dict, messages: list[dict], schema: dict | None = None, schema_name: str = "output",
                   max_tokens: int | None = None) -> dict:
-    """Badan permintaan chat completions dari configs/llm.yaml: model, temperature, seed, routing, structured output."""
+    """Badan permintaan chat completions dari configs/llm.yaml: model, temperature, seed, batas token keluaran
+    (generation.max_tokens; argumen max_tokens menimpanya), routing, structured output."""
     generation = config.get("generation") or {}
     payload: dict = {"model": config["model"], "messages": messages, "temperature": generation.get("temperature", 0)}
     if generation.get("seed") is not None:
         payload["seed"] = generation["seed"]
+    max_tokens = max_tokens if max_tokens is not None else generation.get("max_tokens")
     if max_tokens is not None:
         payload["max_tokens"] = max_tokens
     if schema is not None:

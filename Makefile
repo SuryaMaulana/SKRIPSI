@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 RAW := data/raw/srbh2020/data_capec_multilabel.csv
 
-.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot llm-single agent-pilot agent-val agent replikasi-c replikasi-e replikasi
+.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot agent-pilot agent-val run-c run-e runs-c runs-e
 
 help:
 	@echo "make setup     buat .venv (Python 3.11) dan pasang dependensi terkunci"
@@ -20,11 +20,11 @@ help:
 	@echo "make regex-full varian regex_full pada test_sample_500 -> results/regex_full.jsonl (post_hoc)"
 	@echo "make eval      D: Tabel 4.2/4.3, F1 per kelas, confusion matrix, IK 95% untuk semua results/*.jsonl"
 	@echo "make llm-single-pilot C: LLM tunggal pada 30 baris pilot (5 per kelas) -> results/pilot/"
-	@echo "make llm-single C: LLM tunggal pada 500 baris -> results/llm_single.jsonl (panggilan: results/llm_single_calls.jsonl)"
+	@echo "make run-c R=n   C: run resmi ke-n (1-3) pada 500 baris -> results/llm_single_rn.jsonl (+ _calls.jsonl)"
 	@echo "make agent-pilot E: deep agent pada 30 baris pilot yang sama dengan C -> results/pilot/"
 	@echo "make agent-val    E: validasi deep agent v2 + LLM tunggal pada 30 baris srbh_val -> results/validasi/"
-	@echo "make agent        E: deep agent pada 500 baris -> results/agent.jsonl (panggilan: results/agent_calls.jsonl)"
-	@echo "make replikasi    C dan E masing-masing 3 run lagi pada 500 baris yang sama -> results/replikasi/"
+	@echo "make run-e R=n   E: run resmi ke-n (1-3) pada 500 baris -> results/agent_rn.jsonl (+ _calls.jsonl)"
+	@echo "make runs-c / runs-e  ketiga run resmi C / E berurutan"
 
 setup:
 	@if command -v uv >/dev/null 2>&1; then \
@@ -76,15 +76,12 @@ regex-full:
 	$(PY) -m src.baselines.regex_baseline --config configs/regex_full.yaml
 
 eval:
-	$(PY) -m src.eval.evaluate --rules --out reports/evaluasi.md
-	$(PY) -m src.eval.replikasi --out reports/evaluasi_replikasi.md
+	$(PY) -m src.eval.replikasi --out reports/evaluasi.md
+	$(PY) -m src.eval.evaluate --rules --out reports/evaluasi_per_run.md
 
 llm-single-pilot:
 	$(PY) -m src.eval.pilot
 	$(PY) -m src.baselines.llm_single --ids results/pilot/pilot_ids.json --out-dir results/pilot
-
-llm-single:
-	$(PY) -m src.baselines.llm_single
 
 agent-pilot:
 	$(PY) -m src.agent.run --ids results/pilot/pilot_ids.json --out-dir results/pilot
@@ -97,15 +94,16 @@ agent-val:
 		--single results/validasi/llm_single.jsonl --single-pilot '' \
 		--title "Validasi deep agent v2 vs LLM tunggal (srbh_val)" --out reports/validasi_agent_val.md
 
-agent:
-	$(PY) -m src.agent.run
+R ?= 1
 
-replikasi-c:
-	for r in 1 2 3; do $(PY) -m src.baselines.llm_single --out-dir results/replikasi --name llm_single_r$$r \
-		--calls results/replikasi/llm_single_r$${r}_calls.jsonl || exit 1; done
+run-c:
+	$(PY) -m src.baselines.llm_single --name llm_single_r$(R) --calls results/llm_single_r$(R)_calls.jsonl
 
-replikasi-e:
-	for r in 1 2 3; do $(PY) -m src.agent.run --out-dir results/replikasi --name agent_r$$r \
-		--calls results/replikasi/agent_r$${r}_calls.jsonl || exit 1; done
+run-e:
+	$(PY) -m src.agent.run --name agent_r$(R) --calls results/agent_r$(R)_calls.jsonl
 
-replikasi: replikasi-c replikasi-e
+runs-c:
+	for r in 1 2 3; do $(MAKE) run-c R=$$r || exit 1; done
+
+runs-e:
+	for r in 1 2 3; do $(MAKE) run-e R=$$r || exit 1; done
