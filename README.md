@@ -20,7 +20,9 @@ make llm-single       # C: LLM tunggal pada 500 baris -> results/llm_single.json
 make agent-pilot      # E: deep agent pada 30 baris pilot yang sama -> results/pilot/agent.jsonl
 make agent-val        # E: validasi deep agent v2 (K1-K3) + LLM tunggal pada 30 baris srbh_val -> results/validasi/
 make agent            # E: deep agent pada 500 baris -> results/agent.jsonl (+ agent_calls.jsonl)
-make eval             # D: Tabel 4.2-4.5, F1 per kelas, confusion matrix, CI bootstrap -> reports/evaluasi.md/.json
+make replikasi        # C dan E masing-masing 3 run lagi pada 500 baris yang sama -> results/replikasi/
+make eval             # D: Tabel 4.2-4.5 per run (reports/evaluasi.md) + rerata dan rentang min-maks atas
+                      #    run berkonfigurasi sama (reports/evaluasi_replikasi.md; tabel utama = rerata)
 ```
 
 Run LLM (C dan E) yang terhenti karena galat API dilanjutkan dengan `--resume`
@@ -82,7 +84,8 @@ src/agent/                   deep agent (langkah E): graph (orkestrator deepagen
                              prompts, context, run; tidak mengimpor src/data/gate/. Sejak keputusan K1-K3
                              (2026-10-08): orkestrator hanya task + write_todos (alat berkas deepagents dan execute
                              dimatikan), Verifikasi deterministik tanpa LLM, prompt Klasifikasi = prompt C + MASUKAN
-src/eval/                    evaluate (Tabel 4.2-4.5, bootstrap klaster), pilot (pemilihan 30 baris),
+src/eval/                    evaluate (Tabel 4.2-4.5, bootstrap klaster), replikasi (rerata/min-maks atas run),
+                             pilot (pemilihan 30 baris),
                              pilot_compare (perbandingan per baris E vs C)
 scripts/check_openrouter.py  langkah A
 scripts/make_modsec_golden.py vektor emas port ModSecurity dari harness C (tests/fixtures/modsec_v2915_golden.json)

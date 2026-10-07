@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 RAW := data/raw/srbh2020/data_capec_multilabel.csv
 
-.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot llm-single agent-pilot agent-val agent
+.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot llm-single agent-pilot agent-val agent replikasi-c replikasi-e replikasi
 
 help:
 	@echo "make setup     buat .venv (Python 3.11) dan pasang dependensi terkunci"
@@ -24,6 +24,7 @@ help:
 	@echo "make agent-pilot E: deep agent pada 30 baris pilot yang sama dengan C -> results/pilot/"
 	@echo "make agent-val    E: validasi deep agent v2 + LLM tunggal pada 30 baris srbh_val -> results/validasi/"
 	@echo "make agent        E: deep agent pada 500 baris -> results/agent.jsonl (panggilan: results/agent_calls.jsonl)"
+	@echo "make replikasi    C dan E masing-masing 3 run lagi pada 500 baris yang sama -> results/replikasi/"
 
 setup:
 	@if command -v uv >/dev/null 2>&1; then \
@@ -76,6 +77,7 @@ regex-full:
 
 eval:
 	$(PY) -m src.eval.evaluate --rules --out reports/evaluasi.md
+	$(PY) -m src.eval.replikasi --out reports/evaluasi_replikasi.md
 
 llm-single-pilot:
 	$(PY) -m src.eval.pilot
@@ -97,3 +99,13 @@ agent-val:
 
 agent:
 	$(PY) -m src.agent.run
+
+replikasi-c:
+	for r in 1 2 3; do $(PY) -m src.baselines.llm_single --out-dir results/replikasi --name llm_single_r$$r \
+		--calls results/replikasi/llm_single_r$${r}_calls.jsonl || exit 1; done
+
+replikasi-e:
+	for r in 1 2 3; do $(PY) -m src.agent.run --out-dir results/replikasi --name agent_r$$r \
+		--calls results/replikasi/agent_r$${r}_calls.jsonl || exit 1; done
+
+replikasi: replikasi-c replikasi-e

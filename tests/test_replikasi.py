@@ -1,0 +1,69 @@
+import json
+
+import numpy as np
+import pytest
+
+from src.eval import replikasi as rp
+from src.eval.evaluate import Method, Truth
+
+CLASSES = ["SQLI", "XSS", "PATH_TRAVERSAL", "CMD_INJECTION", "WEB_SCANNING", "NORMAL"]
+
+
+def _truth():
+    labels, keys, logs = {}, {}, {}
+    for k, c in enumerate(CLASSES):
+        for j in range(4):
+            i = f"{c}-{j}"
+            labels[i], keys[i], logs[i] = c, f"t{j % 2}", "GET /?q=%3Cscript%3E HTTP/1.1"
+    return Truth(labels, keys, "uji", logs)
+
+
+def _method(truth, wrong: set[str], name="llm_single", run=None, cost=0.0002):
+    preds = {i: ("NORMAL" if i in wrong and truth.labels[i] != "NORMAL" else
+                 "SQLI" if i in wrong else truth.labels[i]) for i in truth.labels}
+    rows = [{"id": i, "label": p, "evidence": ["<script>"], "prompt_tokens": 900, "completion_tokens": 90,
+             "latency_s": 1.5, "cost_usd": cost, "attempts": 1, "status": "ok"} for i, p in preds.items()]
+    return Method(name, rp.RESULTS_DIR / f"{name}.jsonl", preds, False, run or {"run_id": name, "model": "m"}, rows)
+
+
+def test_single_run_aggregate_equals_the_run_and_ranges_collapse():
+    truth = _truth()
+    g = rp.aggregate([_method(truth, {"SQLI-0"})], truth)
+    m = g["metrics"]["accuracy"]
+    assert m["mean"] == m["min"] == m["max"] == pytest.approx(23 / 24)
+    assert rp._cell(m) == "0,958" and g["baris_label_berubah_antar_run"] == 0
+
+
+def test_mean_min_max_and_label_changes_across_runs():
+    truth = _truth()
+    runs = [_method(truth, set()), _method(truth, {"SQLI-0"}), _method(truth, {"SQLI-0", "XSS-1"}, cost=0.0004)]
+    g = rp.aggregate(runs, truth)
+    acc = g["metrics"]["accuracy"]
+    assert acc["values"] == pytest.approx([1.0, 23 / 24, 22 / 24])
+    assert acc["mean"] == pytest.approx(np.mean([1.0, 23 / 24, 22 / 24])) and acc["min"] == pytest.approx(22 / 24)
+    assert g["baris_label_berubah_antar_run"] == 2
+    assert g["metrics"]["biaya_per_1000_baris_usd"]["max"] == pytest.approx(0.4)
+    assert rp._cell(acc) == "0,958 (0,917–1,000)"
+    cm = np.array(g["confusion_mean"])
+    assert cm[0, 0] == pytest.approx((4 + 3 + 3) / 3) and cm[0, 5] == pytest.approx(2 / 3)
+    ci = g["macro_f1_ci95"]
+    assert ci["runs"] == 3 and ci["low"] <= g["metrics"]["macro_f1"]["mean"] <= ci["high"]
+
+
+def test_runs_with_different_configuration_are_refused():
+    truth = _truth()
+    a = _method(truth, set(), run={"run_id": "a", "model": "m", "prompt_sha256": "x"})
+    b = _method(truth, set(), run={"run_id": "b", "model": "m", "prompt_sha256": "y"})
+    with pytest.raises(ValueError, match="prompt_sha256"):
+        rp.check_consistent([a, b])
+    assert rp.check_consistent([a, a])["prompt_sha256"] == "x"
+
+
+def test_group_files_finds_main_and_numbered_replications(tmp_path):
+    (tmp_path / "rep").mkdir()
+    for path in ("agent.jsonl", "rep/agent_r1.jsonl", "rep/agent_r2.jsonl", "rep/agent_r10.jsonl",
+                 "rep/agent_r1_calls.jsonl", "rep/llm_single_r1.jsonl"):
+        (tmp_path / path).write_text(json.dumps({"id": "x", "label": "NORMAL"}) + "\n")
+    files = rp.group_files("agent", tmp_path, tmp_path / "rep")
+    assert [p.name for p in files] == ["agent.jsonl", "agent_r1.jsonl", "agent_r2.jsonl", "agent_r10.jsonl"]
+    assert [p.name for p in rp.group_files("agent", tmp_path, tmp_path / "rep", include_main=False)][0] == "agent_r1.jsonl"
