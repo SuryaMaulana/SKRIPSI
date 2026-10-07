@@ -1,0 +1,66 @@
+{
+  "run_id": "regex-20261007T150817Z-497dc3d",
+  "method": "regex",
+  "date_utc": "2026-10-07T15:08:17+00:00",
+  "git_commit": "497dc3d5c80b44da1b8c232644ebc769dcfb23be",
+  "git_branch": "tahap-sistem",
+  "git_dirty": false,
+  "model": null,
+  "python": "3.11.13",
+  "rules": "OWASP CRS 4.30.0 (PL1) + Baş Seyyar dkk. 2018",
+  "input_file": "data/processed/test_sample_500.jsonl",
+  "input_sha256": "950a93e1cdf5941ff85388c9624010a0c9f69445bde2b01a0bd79821c8104232",
+  "config_sha256": "175fa8a5c939d6f6ada07381cf3b9078c3e149a0f59db043c6c990957be2e9ed",
+  "ruleset": {
+    "engine": {
+      "modsecurity": "2.9.15",
+      "httpd": "2.4.69",
+      "config": "modsecurity.conf-recommended + SecUnicodeMapFile unicode.mapping 20127; MergeSlashes On; AllowEncodedSlashes Off",
+      "request_rejection_emulated": false,
+      "unicode_mapping": {
+        "url": "https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v2.9.15/unicode.mapping",
+        "sha256": "5e4500ef82e45c49d8edd9513648939710d6c8cc2d5997513b32866dc5d9be23",
+        "codepage": 20127
+      }
+    },
+    "loaded": 153,
+    "by_category_pl": {
+      "913/PL1": 1,
+      "930/PL1": 5,
+      "930/PL2": 1,
+      "931/PL1": 3,
+      "931/PL2": 2,
+      "932/PL1": 19,
+      "932/PL2": 19,
+      "932/PL3": 10,
+      "941/PL1": 26,
+      "941/PL2": 7,
+      "942/PL1": 20,
+      "942/PL2": 31,
+      "942/PL3": 7,
+      "942/PL4": 2
+    },
+    "above_pl": 79,
+    "excluded_operator": [
+      941100,
+      942100
+    ],
+    "not_applicable": [
+      932180
+    ],
+    "used": 71,
+    "used_by_category": {
+      "913": 1,
+      "930": 5,
+      "931": 3,
+      "932": 18,
+      "941": 25,
+      "942": 19
+    },
+    "control_rules_applied": [
+      941010
+    ],
+    "rules_dir_sha256": "88f6690b0bbdfd3f2d61a288f238798cbd857c674e1d93cbfb754631687913aa"
+  },
+  "rows": 500
+}

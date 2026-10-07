@@ -1,0 +1,72 @@
+{
+  "run_id": "check_openrouter-20261007T150823Z-497dc3d",
+  "method": "check_openrouter",
+  "date_utc": "2026-10-07T15:08:23+00:00",
+  "git_commit": "497dc3d5c80b44da1b8c232644ebc769dcfb23be",
+  "git_branch": "tahap-sistem",
+  "git_dirty": false,
+  "model": "openai/gpt-4.1-nano",
+  "python": "3.11.13",
+  "summary": {
+    "http_status": 200,
+    "latency_s": 1.338,
+    "generation_id": "gen-1791385701-ZgRECASTREtT8pw6mVQ1",
+    "served_model": "openai/gpt-4.1-nano",
+    "upstream_provider": "OpenAI",
+    "system_fingerprint": null,
+    "prompt_tokens": 60,
+    "completion_tokens": 6,
+    "reasoning_tokens": 0,
+    "cached_tokens": 0,
+    "cost_usd": 8.4e-06,
+    "cost_usd_from_rates": 8.4e-06,
+    "finish_reason": "stop",
+    "content": "{\"status\":\"ok\"}",
+    "error": null
+  },
+  "request": {
+    "model": "openai/gpt-4.1-nano",
+    "messages": [
+      {
+        "role": "system",
+        "content": "Jawab hanya dengan JSON sesuai skema."
+      },
+      {
+        "role": "user",
+        "content": "Uji koneksi: kembalikan status ok."
+      }
+    ],
+    "temperature": 0,
+    "seed": 42,
+    "max_tokens": 20,
+    "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+        "name": "api_check",
+        "strict": true,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "ok"
+              ]
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "provider": {
+      "order": [
+        "openai"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": true
+    }
+  }
+}

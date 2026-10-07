@@ -15,15 +15,19 @@ model_version: openai/gpt-4.1-nano-2025-04-14
 pricing_usd_per_1m_tokens:
   input: 0.1
   output: 0.4
+  cache_read: 0.025
 pricing_source: GET https://openrouter.ai/api/v1/models
-pricing_retrieved_utc: '2026-10-07T12:09:07+00:00'
+pricing_retrieved_utc: '2026-10-07T15:08:23+00:00'
 api_check:
-  date_utc: '2026-10-07T12:09:07+00:00'
-  git_commit: 16978d82e7e8bb1fceeb118a832123dcf11f21e6
+  run_id: check_openrouter-20261007T150823Z-497dc3d
+  date_utc: '2026-10-07T15:08:23+00:00'
+  git_commit: 497dc3d5c80b44da1b8c232644ebc769dcfb23be
+  git_dirty: false
+  model_version: openai/gpt-4.1-nano-2025-04-14
   served_model: openai/gpt-4.1-nano
   upstream_provider: OpenAI
   prompt_tokens: 60
   completion_tokens: 6
-  latency_s: 1.928
+  latency_s: 1.338
   cost_usd: 8.4e-06
   structured_output: valid
