@@ -1,6 +1,6 @@
 # Skripsi — Deteksi dan Klasifikasi Serangan Aplikasi Web pada Log Akses (Deep Agent LLM)
 
-Tahap saat ini **hanya persiapan dataset**. Belum ada agen atau model.
+Tahap persiapan dataset selesai (langkah 1–10). Tahap sistem berjalan: A cek API, B pembanding regex, C LLM tunggal, D evaluasi. Deep agent belum dibangun.
 
 ## Menjalankan
 
@@ -8,8 +8,15 @@ Tahap saat ini **hanya persiapan dataset**. Belum ada agen atau model.
 make setup   # sekali: .venv Python 3.11 + dependensi terkunci (requirements.txt)
 make data    # dari awal: unduh SR-BH 2020 bila belum ada, lalu seluruh pipeline (Langkah 1–10)
 make test       # unit test (cepat)
-make test-slow  # uji paritas gerbang bukti pada data penuh (butuh data/evidence/)
+make test-slow  # uji paritas gerbang bukti (data penuh) + uji regresi resmi CRS
+make check-api  # A: satu prompt pendek ke model di configs/llm.yaml (OPENROUTER_API_KEY dari .env)
+make regex      # B: pembanding regex pada test_sample_500 -> results/regex.jsonl
+make verify-crs # B: cocokkan emulasi CRS dengan uji regresi resmi CRS -> results/crs_regression.json
 ```
+
+Aturan umum tahap sistem: semua metode membaca kolom masukan yang sama dari `test_sample_500.jsonl` lewat
+`src/common/inputs.py` (tanpa `label`/`template_key`); setiap run mencatat tanggal, commit git, dan nama model
+(`results/*.run.json`).
 
 Tanpa `make`: `python -m src.data.download && python -m src.data.prepare`.
 
@@ -31,14 +38,26 @@ Berkas di `data/raw/` tidak pernah diubah; pipeline memverifikasi MD5 sebelum me
 | `data/processed/srbh_excluded.parquet` | baris yang dikeluarkan beserta kode alasannya |
 | `data/processed/label_mapping.yaml` | pemetaan CAPEC → 6 kelas yang dipakai + hitungan |
 | `reports/data_report.md` | statistik per tahap dan daftar keputusan praproses |
+| `configs/llm.yaml` | model (openai/gpt-4.1-nano-2025-04-14), tarif per 1M token, hasil cek API |
+| `results/regex.jsonl`, `results/regex.run.json` | prediksi pembanding regex per baris + metadata run |
 
 ## Struktur
 
 ```
 configs/label_mapping.yaml   pemetaan CAPEC → 6 kelas (sumber kebenaran)
+configs/llm.yaml             model LLM dan tarif (langkah A)
+configs/regex_baseline.yaml  versi CRS, PL, poin skor, pemetaan hit -> kelas, aturan Baş Seyyar dkk. (langkah B)
 src/data/                    pipeline: download, load, inspect_srbh, labels, reconstruct, clf_parser,
                              normalize, session, split, sample, report, prepare
 src/data/gate/               aturan gerbang bukti per kelompok label
+src/common/                  masukan metode (tanpa kolom evaluasi) dan metadata run
+src/llm/                     klien OpenRouter
+src/baselines/               pembanding: crs (pemuat aturan CRS), modsec (emulasi ModSecurity 2.9.15 + Apache 2.4),
+                             bas_seyyar, regex_baseline, crs_regression (verifikasi terhadap uji resmi CRS)
+scripts/check_openrouter.py  langkah A
+scripts/make_modsec_golden.py vektor emas port ModSecurity dari harness C (tests/fixtures/modsec_v2915_golden.json)
+data/external/crs/           arsip OWASP CRS terpatok (diunduh otomatis, diverifikasi SHA-256)
+data/external/modsecurity/   unicode.mapping ModSecurity v2.9.15 terpatok (SecUnicodeMapFile 20127, diverifikasi SHA-256)
 tests/                       unit test (pytest)
 reports/                     laporan yang dihasilkan pipeline
 data/evidence/               cuplikan analisis bukti pemetaan label (sumber target paritas; tidak dihapus `make clean`)

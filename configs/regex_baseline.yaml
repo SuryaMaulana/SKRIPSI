@@ -1,0 +1,101 @@
+# Pembanding regex (§3.5 skripsi, langkah B): aturan OWASP CRS + aturan pemindaian Baş Seyyar dkk. (2018).
+# Aturan dibaca langsung dari sumber resmi; tidak ada yang diimpor atau disalin dari src/data/gate/.
+# Dipakai oleh src/baselines/regex_baseline.py (make regex).
+
+engine:
+  # Mesin acuan yang diemulasi src/baselines/modsec.py: ModSecurity 2.9.15 (tag v2.9.15, commit
+  # 151074aca78a416764b12ba1221e61a17a6c714d) pada Apache httpd 2.4 dengan semantik 2.4.x terbaru (2.4.69),
+  # dikonfigurasi seperti kontainer resmi CRS (owasp/modsecurity-crs:apache). Fase 1 = hook post_read_request (path
+  # mentah dari ap_parse_uri), fase 2 = hook fixups (path setelah ap_normalize_path + ap_unescape_url_ex).
+  # Penolakan permintaan oleh Apache (400/404 sebelum fase 1 atau 2) TIDAK diemulasi: setiap aturan dievaluasi pada
+  # setiap baris. Batas SecPcreMatchLimit juga tidak diemulasi.
+  modsecurity: "2.9.15"
+  httpd: "2.4.69"
+  config: >-
+    modsecurity.conf-recommended + SecUnicodeMapFile unicode.mapping 20127; MergeSlashes On; AllowEncodedSlashes Off
+  request_rejection_emulated: false
+  unicode_mapping:
+    # SecUnicodeMapFile untuk t:urlDecodeUni; diunduh ke data/external/modsecurity/ dan diverifikasi SHA-256.
+    url: https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v2.9.15/unicode.mapping
+    sha256: 5e4500ef82e45c49d8edd9513648939710d6c8cc2d5997513b32866dc5d9be23
+    codepage: 20127
+
+crs:
+  # Rilis stabil terbaru saat eksperimen (2026-10-02). Arsip sumber lengkap (aturan + uji regresi resmi) dari GitHub,
+  # diverifikasi SHA-256 lalu diekstrak ke data/external/crs/.
+  version: "4.30.0"
+  url: https://github.com/coreruleset/coreruleset/archive/refs/tags/v4.30.0.tar.gz
+  sha256: a4bb3688ef6205b64471a9ccbf0d7b024eb8edf39b97c6f6c0006e7a948f8550
+  categories: ["913", "930", "931", "932", "941", "942"]
+  paranoia_level: 1            # PL bawaan CRS; aturan PL2-4 tidak dipakai
+  excluded_operators:          # libinjection (@detectSQLi/@detectXSS) bukan regex: tidak dipakai
+    - detectSQLi
+    - detectXSS
+
+scoring:
+  # Poin per aturan yang cocok = nilai severity bawaan CRS (tx.critical_anomaly_score dst.), dihitung sekali per
+  # aturan (keputusan asisten). Ini bukan akumulasi skor anomali CRS: di ModSecurity v2 setvar skor anomali dijalankan
+  # setiap kali aturan cocok pada satu variabel, sehingga satu aturan bisa menambah skor berkali-kali. Skor kelas =
+  # jumlah poin aturan yang cocok di kelas itu. Kelas = skor tertinggi; NORMAL bila tidak ada aturan yang cocok; skor
+  # seri dipecah urutan berikut (sama dengan prioritas multi-label dataset).
+  severity_points: {CRITICAL: 5, ERROR: 4, WARNING: 3, NOTICE: 2}
+  tie_break: [CMD_INJECTION, SQLI, XSS, PATH_TRAVERSAL, WEB_SCANNING]
+
+class_map:                     # hit -> kelas menurut kategori CRS
+  "913": WEB_SCANNING          # scanner detection
+  "930": PATH_TRAVERSAL        # LFI / path traversal (lihat restricted_files)
+  "931": PATH_TRAVERSAL        # RFI: kelas Path Traversal/File Inclusion (Tabel 2.1)
+  "932": CMD_INJECTION         # RCE / command injection
+  "941": XSS
+  "942": SQLI
+  bas_seyyar: WEB_SCANNING     # aturan pemindaian Baş Seyyar dkk.
+
+restricted_files:
+  # Keputusan penulis (langkah B): hit kategori 930 pada berkas terlarang tanpa urutan traversal -> WEB_SCANNING.
+  # "Berkas terlarang" = aturan CRS bertajuk "Restricted File Access Attempt" (930130 restricted-files.data,
+  # 930140 ai-critical-artifacts.data). Urutan traversal = aturan 930100/930110 ikut cocok pada baris yang sama.
+  # 930120/930121 (OS File Access, berkas sistem di parameter/header) tetap PATH_TRAVERSAL.
+  rules: [930130, 930140]
+  traversal_rules: [930100, 930110]
+  class_without_traversal: WEB_SCANNING
+
+bas_seyyar:
+  # M. Baş Seyyar, F. Ö. Çatak, E. Gül, "Detection of attack-targeted scans from the Apache HTTP Server access logs",
+  # Applied Computing and Informatics 14(1):28-36, 2018, doi:10.1016/j.aci.2017.04.002, §3.3, Fig. 1, Algorithm 1.
+  # Algorithm 1 adalah rantai if/else per baris log; urutannya dipertahankan:
+  #   Set1 (XSS/SQLi, Fase 1) -> diwakili aturan CRS 941/942: bila ada yang cocok, aturan di bawah tidak dievaluasi;
+  #   Fase 2 (crawler)        -> BS-BOT (whitelist): bila cocok, evaluasi berhenti tanpa hit;
+  #   Set2                    -> BS-UA; bila cocok, Set3 tidak dievaluasi;
+  #   Set3                    -> BS-METHOD, hanya syarat metode (relaksasi per baris, keputusan asisten; lihat note).
+  # Poin = CRITICAL (5) setara aturan CRS sejenis (913100 UA pemindai, 911100 metode); makalah tidak memberi bobot.
+  # Bukti UA pemindai dihitung sekali: BS-UA bernilai 0 poin bila CRS 913100 juga cocok (daftar 913100 memuat
+  # acunetix, netsparker, w3af.org).
+  phase1_crs_categories: ["941", "942"]
+  dedup_with_crs: {BS-UA: 913100}
+  rules:
+    - id: BS-BOT
+      action: whitelist
+      paper: "Algorithm 1 Fase 2: CheckURI == /robots.txt and CheckUA in {bot, crawler, spider, robot, wanderer} and CheckReferer == '-' and CheckStatusCode in {400, 404} -> remove IP; §3.3 observasi 1-4"
+      all:
+        - {field: path, match: equals_any, values: [/robots.txt]}
+        - {field: user_agent, match: contains_any, values: [bot, crawler, spider, robot, wanderer]}
+        - {field: referer, match: is_empty}
+        - {field: status, match: equals_any, values: ["400", "404"]}
+    - id: BS-UA
+      paper: "Algorithm 1 Set2: CheckUA(log_line) in {wvs_UA_list}; §3.3 'we made a list of well-known automated web vulnerability scanners'"
+      note: "isi wvs_UA_list tidak diterbitkan di makalah maupun materi tambahannya; dipakai tiga pemindai yang diuji makalah (§3.2.3: Acunetix, Netsparker, W3AF)"
+      field: user_agent
+      match: contains_any
+      values: [acunetix, netsparker, w3af]
+      points: 5
+    - id: BS-METHOD
+      paper: "Algorithm 1 Set3: CheckHttpMethod(log_line) in {TRACK, TRACE, NETSPARKER, PRI, PROPFIND, QUIT}; §3.3, Tabel 1-2"
+      note: "Set3 di makalah = syarat metode AND >100 permintaan per IP AND porsi 404 >31% (§3.3, Fig. 1; Algorithm 1 menulisnya 'CheckReferer(log_line) > 31'). Dua syarat per IP butuh agregasi lintas baris, jadi hanya syarat metode yang dipakai: relaksasi per baris yang tidak diuji di makalah"
+      field: method
+      match: equals_any
+      values: [TRACK, TRACE, NETSPARKER, PRI, PROPFIND, QUIT]
+      points: 5
+  not_used:
+    - "Set3 bagian per IP: Check#ofRequests(IP) > 100 dan porsi 404 > 31% (butuh agregasi lintas baris; klasifikasi murni per baris)"
+    - "Fase 2 bagian pertama: CheckUA in {bot_list} dari Robots Database [18] (robotstxt.org); daftar itu tidak dipatok versinya di makalah"
+    - "Fase 1 CheckXSSorSQLI: pola tidak diterbitkan; perannya dalam urutan Algorithm 1 diwakili CRS 941/942"
