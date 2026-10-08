@@ -114,3 +114,19 @@ def test_degenerate_outcomes_include_verification_skipped():
     method.rows[0].update(truncated_calls=2, status="verification_skipped")
     out = rp.degenerate(method, truth)
     assert out["terdampak_verification_skipped"] == 1 and out["baris_terdampak"] == 1
+
+
+def test_calls_from_attempts_aborted_by_api_errors_are_excluded_from_call_latency(tmp_path):
+    truth = _truth()
+    calls = tmp_path / "calls.jsonl"
+    calls.write_text("".join(json.dumps(r) + "\n" for r in [
+        {"run_id": "r1", "jenis": "llm", "id": "a", "timestamp_utc": "2026-10-08T00:30:00.000+00:00", "latency_s": 50.0,
+         "cost_usd": 0.001},
+        {"run_id": "r1", "jenis": "galat_api", "id": "a", "timestamp_utc": "2026-10-08T00:32:41.000+00:00"},
+        {"run_id": "r1", "jenis": "llm", "id": "a", "timestamp_utc": "2026-10-08T00:35:20.000+00:00", "latency_s": 1.0},
+        {"run_id": "r1", "jenis": "llm", "id": "b", "timestamp_utc": "2026-10-08T00:31:00.000+00:00", "latency_s": 3.0}]))
+    method = _method(truth, set(), run={"run_id": "r1", "model": "m", "calls_file": str(calls)})
+    used, dropped = rp.call_records(method)
+    assert [r["latency_s"] for r in used] == [1.0, 3.0] and [r["latency_s"] for r in dropped] == [50.0]
+    metrics = rp.run_metrics(method, truth)
+    assert metrics["panggilan_dibatalkan_galat_api"] == 1 and metrics["biaya_panggilan_dibatalkan_usd"] == 0.001

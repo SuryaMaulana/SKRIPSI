@@ -92,30 +92,47 @@ def _pct(values: list[float], q: float) -> float | None:
     return float(np.percentile(values, q * 100))
 
 
-def call_latencies(method: Method) -> list[float]:
-    """Latensi setiap panggilan LLM run ini dari log panggilannya (C: semua rekaman; E: rekaman jenis llm)."""
+def _calls_path(method: Method) -> Path | None:
     calls_file = method.run.get("calls_file")
     if not calls_file:
-        return []
+        return None
     path = Path(calls_file) if Path(calls_file).is_absolute() else ROOT / calls_file
-    if not path.exists():
-        return []
-    out = []
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            record = json.loads(line)
-            if record.get("run_id") != method.run.get("run_id") or record.get("latency_s") is None:
-                continue
-            if record.get("jenis", "llm") == "llm":
-                out.append(record["latency_s"])
-    return out
+    return path if path.exists() else None
+
+
+def call_records(method: Method) -> tuple[list[dict], list[dict]]:
+    """Rekaman panggilan LLM run ini (C: semua rekaman; E: jenis llm), dipisah menjadi (dipakai, dibatalkan).
+
+    Dibatalkan = panggilan dari percobaan baris yang terhenti oleh galat API (rekaman galat_api) sebelum --resume; baris
+    itu diulang penuh setelah resume, dan token/biaya/latensi barisnya hanya memuat percobaan akhir. Agar basis Tabel 4.4
+    konsisten, panggilan yang dibatalkan tidak ikut latensi per panggilan dan dilaporkan terpisah."""
+    path = _calls_path(method)
+    if path is None:
+        return [], []
+    run_id = method.run.get("run_id")
+    records = [r for r in map(json.loads, path.read_text(encoding="utf-8").splitlines()) if r.get("run_id") == run_id]
+    aborted_at = {}
+    for r in records:
+        if r.get("jenis") == "galat_api":
+            aborted_at[r["id"]] = max(aborted_at.get(r["id"], ""), r.get("timestamp_utc", ""))
+    used, dropped = [], []
+    for r in records:
+        if r.get("jenis", "llm") != "llm" or r.get("latency_s") is None:
+            continue
+        cut = aborted_at.get(r.get("id"))
+        (dropped if cut and r.get("timestamp_utc", "") <= cut else used).append(r)
+    return used, dropped
+
+
+def call_latencies(method: Method) -> list[float]:
+    """Latensi setiap panggilan LLM yang dipakai (tanpa percobaan yang dibatalkan galat API)."""
+    return [r["latency_s"] for r in call_records(method)[0]]
 
 
 def truncated_in_log(method: Method) -> int | None:
     """Jumlah panggilan TRUNCATED menurut log panggilan run (C: outcome; E: status_panggilan), untuk cek silang."""
-    calls_file = method.run.get("calls_file")
-    path = None if not calls_file else (Path(calls_file) if Path(calls_file).is_absolute() else ROOT / calls_file)
-    if path is None or not path.exists():
+    path = _calls_path(method)
+    if path is None:
         return None
     count = 0
     with open(path, encoding="utf-8") as f:
@@ -170,9 +187,12 @@ def run_metrics(method: Method, truth) -> dict:
             "biaya_per_1000_baris_usd": 1000 * sum(r["cost_usd"] for r in rows) / len(rows),
             "panggilan_llm_rerata": statistics.mean(r.get("llm_calls", r.get("attempts", 1)) for r in rows),
         })
-    calls = call_latencies(method)
+    used, dropped = call_records(method)
+    calls = [r["latency_s"] for r in used]
     if calls:
-        out.update({"latensi_panggilan_median_s": _pct(calls, 0.5), "latensi_panggilan_p95_s": _pct(calls, 0.95)})
+        out.update({"latensi_panggilan_median_s": _pct(calls, 0.5), "latensi_panggilan_p95_s": _pct(calls, 0.95),
+                    "panggilan_dibatalkan_galat_api": len(dropped),
+                    "biaya_panggilan_dibatalkan_usd": sum(r.get("cost_usd") or 0.0 for r in dropped)})
     if rows and "truncated_calls" in rows[0]:
         out.update({f"degeneratif_{k}": v for k, v in degenerate(method, truth).items()})
     if rows and "tool_calls" in rows[0]:  # deep agent
@@ -245,8 +265,9 @@ def render(groups: dict[str, dict]) -> str:
     names = list(groups)
     label = {n: f"{n} (rerata {len(g['runs'])} run)" if len(g["runs"]) > 1 else n for n, g in groups.items()}
     out = ["Nilai sel: rerata atas run (min–maks bila run lebih dari satu dan nilainya berbeda). Tabel utama memakai rerata.",
-           "Run lama (C tanpa batas token, pilot E v1, validasi v2, E 500 tanpa batas parsial) ada di results/archive/ dan "
-           "tidak masuk tabel; lihat reports/catatan_rekayasa.md.", ""]
+           "Run lama, run yang dihentikan, dan run yang diganti (C tanpa batas token, pilot E v1, validasi v2, E 500 tanpa "
+           "batas parsial, run E bcb3445, set C 9890bd0, run C dengan run_id sama) ada di results/archive/ dan tidak masuk "
+           "tabel; lihat reports/catatan_rekayasa.md.", ""]
     out += ["Tabel 4.2 — deteksi biner (serangan vs NORMAL)", ""]
     out.append(_table(["metode", "accuracy", "precision", "recall", "F1", "FPR"],
                       [[label[n], *(_cell(groups[n]["metrics"][k]) for k in
@@ -279,8 +300,16 @@ def render(groups: dict[str, dict]) -> str:
                            "biaya per 1.000 baris ($)"],
                           [[label[n], *(_cell(groups[n]["metrics"].get(k, {"mean": None}), d) for k, d in zip(keys, digits))]
                            for n in with_cost]))
-        out.append("Latensi baris = waktu dinding satu baris (E: seluruh orkestrasi); latensi per panggilan = satu panggilan "
-                   "LLM dari log panggilan.")
+        out.append("Latensi baris = waktu dinding satu baris (E: seluruh orkestrasi, termasuk jeda ulang galat layanan); "
+                   "latensi per panggilan = satu panggilan LLM dari log panggilan.")
+        for n in with_cost:
+            m = groups[n]["metrics"]
+            if m.get("panggilan_dibatalkan_galat_api", {}).get("max"):
+                values = m["panggilan_dibatalkan_galat_api"]["values"]
+                cost = sum(v or 0.0 for v in m["biaya_panggilan_dibatalkan_usd"]["values"])
+                out.append(f"{n}: panggilan dari percobaan baris yang dibatalkan galat API sebelum --resume tidak dihitung "
+                           f"(per run {'/'.join(str(int(v or 0)) for v in values)} panggilan, total ${cost:.4f}); baris itu "
+                           f"diulang penuh setelah resume.")
     with_deg = [n for n in names if "degeneratif_kejadian" in groups[n]["metrics"]]
     if with_deg:
         out += ["", "Keluaran degeneratif — panggilan LLM terpotong di max_tokens (TRUNCATED), per run", ""]
