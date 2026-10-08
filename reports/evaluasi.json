@@ -1,9 +1,9 @@
 {
  "run": {
-  "run_id": "replikasi-20261008T020453Z-1953405",
+  "run_id": "replikasi-20261008T033139Z-ee70404",
   "method": "replikasi",
-  "date_utc": "2026-10-08T02:04:53+00:00",
-  "git_commit": "19534050ae724bd166eded7abe0faac9d6cbdc80",
+  "date_utc": "2026-10-08T03:31:39+00:00",
+  "git_commit": "ee70404f5dd33af86a503ab3dff8f81e33eb5b9b",
   "git_branch": "tahap-sistem",
   "git_dirty": false,
   "git_dirty_paths": [],
@@ -83,7 +83,7 @@
     {
      "file": "results/regex.jsonl",
      "run_id": "regex-20261007T150817Z-497dc3d",
-     "git_commit": "497dc3d5c80b44da1b8c232644ebc769dcfb23be",
+     "git_commit": "b4ee3afceab6d91e0ff81e21a4aa38e7d9ac4c4d",
      "git_dirty": false
     }
    ],
@@ -288,7 +288,7 @@
     {
      "file": "results/regex_full.jsonl",
      "run_id": "regex_full-20261007T161037Z-d7fd371",
-     "git_commit": "d7fd37166f0e70c5b2223bffee28321b995c0a5d",
+     "git_commit": "b3cff377ab7673452b9ce2e0dd6d5e3e7492d20b",
      "git_dirty": false
     }
    ],
@@ -493,19 +493,19 @@
     {
      "file": "results/llm_single_r1.jsonl",
      "run_id": "llm_single_r1-20261007T221846Z-ed0941b",
-     "git_commit": "ed0941b81341b19542196bc490c3b1c9e9817bc6",
+     "git_commit": "32f0ef0110658e46a5264bfcd71ad3356b379658",
      "git_dirty": false
     },
     {
      "file": "results/llm_single_r2.jsonl",
      "run_id": "llm_single_r2-20261007T221846Z-ed0941b",
-     "git_commit": "ed0941b81341b19542196bc490c3b1c9e9817bc6",
+     "git_commit": "32f0ef0110658e46a5264bfcd71ad3356b379658",
      "git_dirty": false
     },
     {
      "file": "results/llm_single_r3.jsonl",
      "run_id": "llm_single_r3-20261007T221846Z-ed0941b",
-     "git_commit": "ed0941b81341b19542196bc490c3b1c9e9817bc6",
+     "git_commit": "32f0ef0110658e46a5264bfcd71ad3356b379658",
      "git_dirty": false
     }
    ],
@@ -932,19 +932,19 @@
     {
      "file": "results/agent_r1.jsonl",
      "run_id": "agent_r1-20261007T223039Z-53ec4d2",
-     "git_commit": "53ec4d2b04718267a30a74bfd0d1cc79f09fa81e",
+     "git_commit": "9a5a77134ac1ab792d74b412df3a9190e9ced0fa",
      "git_dirty": false
     },
     {
      "file": "results/agent_r2.jsonl",
      "run_id": "agent_r2-20261007T223039Z-53ec4d2",
-     "git_commit": "53ec4d2b04718267a30a74bfd0d1cc79f09fa81e",
+     "git_commit": "9a5a77134ac1ab792d74b412df3a9190e9ced0fa",
      "git_dirty": false
     },
     {
      "file": "results/agent_r3.jsonl",
      "run_id": "agent_r3-20261007T223039Z-53ec4d2",
-     "git_commit": "53ec4d2b04718267a30a74bfd0d1cc79f09fa81e",
+     "git_commit": "9a5a77134ac1ab792d74b412df3a9190e9ced0fa",
      "git_dirty": false
     }
    ],

@@ -1,4 +1,4 @@
-Evaluasi evaluate-20261008T020453Z-1953405 (commit 1953405, dirty=False)
+Evaluasi evaluate-20261008T033140Z-ee70404 (commit ee70404, dirty=False)
 
 Sumber label: data/processed/test_sample_500.jsonl. Prediksi di luar 6 kelas dihitung salah.
 

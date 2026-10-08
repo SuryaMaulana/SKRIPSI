@@ -1,7 +1,7 @@
-Agregasi replikasi replikasi-20261008T020453Z-1953405 (commit 1953405, dirty=False)
+Agregasi replikasi replikasi-20261008T033139Z-ee70404 (commit ee70404, dirty=False)
 
 Nilai sel: rerata atas run (min–maks bila run lebih dari satu dan nilainya berbeda). Tabel utama memakai rerata.
-Run lama, run yang dihentikan, dan run yang diganti (C tanpa batas token, pilot E v1, validasi v2, E 500 tanpa batas parsial, run E bcb3445, set C 9890bd0, run C dengan run_id sama) ada di results/archive/ dan tidak masuk tabel; lihat reports/catatan_rekayasa.md.
+Run lama, run yang dihentikan, dan run yang diganti (C tanpa batas token, pilot E v1, validasi v2, E 500 tanpa batas parsial, run E 1693ae3, set C 56b9e2c, run C dengan run_id sama) ada di results/archive/ dan tidak masuk tabel; lihat reports/catatan_rekayasa.md.
 
 Tabel 4.2 — deteksi biner (serangan vs NORMAL)
 
@@ -109,11 +109,11 @@ Run yang dirata-rata
 
 | metode | berkas | run_id | commit | dirty |
 |---|---|---|---|---|
-| regex | results/regex.jsonl | regex-20261007T150817Z-497dc3d | 497dc3d | False |
-| regex_full (post hoc) | results/regex_full.jsonl | regex_full-20261007T161037Z-d7fd371 | d7fd371 | False |
-| llm_single | results/llm_single_r1.jsonl | llm_single_r1-20261007T221846Z-ed0941b | ed0941b | False |
-| llm_single | results/llm_single_r2.jsonl | llm_single_r2-20261007T221846Z-ed0941b | ed0941b | False |
-| llm_single | results/llm_single_r3.jsonl | llm_single_r3-20261007T221846Z-ed0941b | ed0941b | False |
-| agent | results/agent_r1.jsonl | agent_r1-20261007T223039Z-53ec4d2 | 53ec4d2 | False |
-| agent | results/agent_r2.jsonl | agent_r2-20261007T223039Z-53ec4d2 | 53ec4d2 | False |
-| agent | results/agent_r3.jsonl | agent_r3-20261007T223039Z-53ec4d2 | 53ec4d2 | False |
+| regex | results/regex.jsonl | regex-20261007T150817Z-497dc3d | b4ee3af | False |
+| regex_full (post hoc) | results/regex_full.jsonl | regex_full-20261007T161037Z-d7fd371 | b3cff37 | False |
+| llm_single | results/llm_single_r1.jsonl | llm_single_r1-20261007T221846Z-ed0941b | 32f0ef0 | False |
+| llm_single | results/llm_single_r2.jsonl | llm_single_r2-20261007T221846Z-ed0941b | 32f0ef0 | False |
+| llm_single | results/llm_single_r3.jsonl | llm_single_r3-20261007T221846Z-ed0941b | 32f0ef0 | False |
+| agent | results/agent_r1.jsonl | agent_r1-20261007T223039Z-53ec4d2 | 9a5a771 | False |
+| agent | results/agent_r2.jsonl | agent_r2-20261007T223039Z-53ec4d2 | 9a5a771 | False |
+| agent | results/agent_r3.jsonl | agent_r3-20261007T223039Z-53ec4d2 | 9a5a771 | False |
