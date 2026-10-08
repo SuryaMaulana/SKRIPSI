@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 RAW := data/raw/srbh2020/data_capec_multilabel.csv
 
-.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot agent-pilot agent-val run-c run-e runs-c runs-e
+.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot agent-pilot agent-val run-c run-e runs-c runs-e llm_single agent
 
 help:
 	@echo "make setup     buat .venv (Python 3.11) dan pasang dependensi terkunci"
@@ -25,6 +25,7 @@ help:
 	@echo "make agent-val    E: validasi deep agent v2 + LLM tunggal pada 30 baris srbh_val -> results/validasi/"
 	@echo "make run-e R=n   E: run resmi ke-n (1-3) pada 500 baris -> results/agent_rn.jsonl (+ _calls.jsonl)"
 	@echo "make runs-c / runs-e  ketiga run resmi C / E berurutan"
+	@echo "make llm_single / agent  alias runs-c / runs-e (urutan reproduksi di README)"
 
 setup:
 	@if command -v uv >/dev/null 2>&1; then \
@@ -107,3 +108,7 @@ runs-c:
 
 runs-e:
 	for r in 1 2 3; do $(MAKE) run-e R=$$r || exit 1; done
+
+llm_single: runs-c
+
+agent: runs-e

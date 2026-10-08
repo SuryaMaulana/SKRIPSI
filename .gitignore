@@ -17,3 +17,10 @@ __pycache__/
 .idea/
 .vscode/
 ~$*.docx
+
+# Log panggilan LLM/alat per run (besar; untuk audit, latensi per panggilan, dan cek silang TRUNCATED). Disimpan lokal,
+# tidak di-commit.
+results/**/*_calls*.jsonl
+
+# Draf naskah skripsi penulis (dikelola di luar repositori)
+Draft Skripsi*.docx
