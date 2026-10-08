@@ -1,7 +1,7 @@
-Agregasi replikasi replikasi-20261008T014940Z-0957f98 (commit 0957f98, dirty=False)
+Agregasi replikasi replikasi-20261008T020453Z-1953405 (commit 1953405, dirty=False)
 
 Nilai sel: rerata atas run (min–maks bila run lebih dari satu dan nilainya berbeda). Tabel utama memakai rerata.
-Run lama (C tanpa batas token, pilot E v1, validasi v2, E 500 tanpa batas parsial) ada di results/archive/ dan tidak masuk tabel; lihat reports/catatan_rekayasa.md.
+Run lama, run yang dihentikan, dan run yang diganti (C tanpa batas token, pilot E v1, validasi v2, E 500 tanpa batas parsial, run E bcb3445, set C 9890bd0, run C dengan run_id sama) ada di results/archive/ dan tidak masuk tabel; lihat reports/catatan_rekayasa.md.
 
 Tabel 4.2 — deteksi biner (serangan vs NORMAL)
 
@@ -42,8 +42,9 @@ Tabel 4.4 — token, latensi, dan biaya per baris (deskriptif)
 | metode | token masuk | token keluar | panggilan LLM | latensi baris median (s) | latensi baris p95 (s) | latensi per panggilan median (s) | latensi per panggilan p95 (s) | biaya per 1.000 baris ($) |
 |---|---|---|---|---|---|---|---|---|
 | llm_single (rerata 3 run) | 940 | 94 (93–94) | 1,0 | 1,27 (1,25–1,28) | 1,98 (1,94–2,06) | 1,27 (1,25–1,28) | 1,98 (1,94–2,06) | 0,1314 (0,1313–0,1316) |
-| agent (rerata 3 run) | 20807 (20576–21157) | 1322 (1276–1367) | 11,8 (11,7–11,9) | 18,39 (18,08–18,68) | 41,34 (38,11–43,87) | 1,49 (1,48–1,50) | 4,14 (4,05–4,29) | 1,6304 (1,6105–1,6552) |
-Latensi baris = waktu dinding satu baris (E: seluruh orkestrasi); latensi per panggilan = satu panggilan LLM dari log panggilan.
+| agent (rerata 3 run) | 20807 (20576–21157) | 1322 (1276–1367) | 11,8 (11,7–11,9) | 18,39 (18,08–18,68) | 41,34 (38,11–43,87) | 1,49 (1,48–1,50) | 4,13 (4,05–4,28) | 1,6304 (1,6105–1,6552) |
+Latensi baris = waktu dinding satu baris (E: seluruh orkestrasi, termasuk jeda ulang galat layanan); latensi per panggilan = satu panggilan LLM dari log panggilan.
+agent: panggilan dari percobaan baris yang dibatalkan galat API sebelum --resume tidak dihitung (per run 5/1/13 panggilan, total $0.0025); baris itu diulang penuh setelah resume.
 
 Keluaran degeneratif — panggilan LLM terpotong di max_tokens (TRUNCATED), per run
 
