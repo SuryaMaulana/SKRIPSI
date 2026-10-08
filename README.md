@@ -1,110 +1,128 @@
-# Skripsi — Deteksi dan Klasifikasi Serangan Aplikasi Web pada Log Akses (Deep Agent LLM)
+# Deteksi dan Klasifikasi Serangan Aplikasi Web pada Log Akses Web Server Menggunakan Deep Agent LLM
 
-Tahap persiapan dataset selesai (langkah 1–10). Tahap sistem: A cek API, B pembanding regex (utama + varian sekunder `regex_full`, post hoc), C LLM tunggal zero-shot, D evaluasi, E deep agent (pilot 30 baris; 500 baris menunggu persetujuan penulis).
+**Muhammad Surya Maulana** — Skripsi S1 Sains Data, Universitas Negeri Surabaya
 
-## Menjalankan
+## Ringkasan
+
+Penelitian ini mengklasifikasikan setiap baris log akses web server (Combined Log Format) dari dataset SR-BH 2020 ke enam
+kelas (SQLI, XSS, PATH_TRAVERSAL, CMD_INJECTION, WEB_SCANNING, NORMAL) dan membandingkan tiga pendekatan: pembanding
+berbasis aturan (emulasi OWASP CRS 4.30.0 PL1 dan aturan Baş Seyyar dkk.), satu LLM zero-shot, dan deep agent (orkestrator
+LangGraph/deepagents yang mendelegasikan ke sub-agen Parser, Analisis Payload, Klasifikasi, dan Verifikasi deterministik).
+Pada sampel uji 500 baris, LLM tunggal mencapai akurasi tertinggi (macro-F1 0,830, rerata 3 run), deep agent menghasilkan
+bukti yang paling sahih (evidence literal 0,897 vs 0,762) tetapi dengan akurasi lebih rendah (macro-F1 0,750) dan biaya
+sekitar 12 kali, sedangkan regex tidak menghasilkan positif palsu (FPR 0,000) namun melewatkan 35,9% baris serangan.
+Rincian angka dan sumbernya ada di `reports/evaluasi.md` dan `reports/ringkasan_sidang.md`.
+
+## Reproduksi dari nol
+
+Prasyarat: Python 3.11, `uv` (atau `pip`), `make`, dan `OPENROUTER_API_KEY` di berkas `.env` (dibaca hanya di dalam kode,
+tidak pernah dicatat).
 
 ```bash
-make setup   # sekali: .venv Python 3.11 + dependensi terkunci (requirements.txt)
-make data    # dari awal: unduh SR-BH 2020 bila belum ada, lalu seluruh pipeline (Langkah 1–10)
-make test       # unit test (cepat)
-make test-slow  # uji paritas gerbang bukti (data penuh) + uji regresi resmi CRS
-make check-api  # A: satu prompt pendek ke model di configs/llm.yaml (OPENROUTER_API_KEY dari .env)
-make regex      # B: pembanding regex pada test_sample_500 -> results/regex.jsonl
-make verify-crs # B: cocokkan emulasi CRS dengan uji regresi resmi CRS -> results/crs_regression.json
-make golden-check   # B: bandingkan port ModSecurity dengan vektor emas harness C (tools/modsec_harness/)
-make regex-full-val # B: varian sekunder regex_full (CRS PL1 semua kategori) pada srbh_val -> results/tuning/
-make regex-full     # B: regex_full sekali pada test_sample_500 -> results/regex_full.jsonl (post_hoc=true)
-make llm-single-pilot # C: LLM tunggal pada 30 baris pilot (5 per kelas) -> results/pilot/
-make run-c R=1        # C: run resmi ke-1 (1-3) pada 500 baris -> results/llm_single_r1.jsonl (+ _calls.jsonl)
-make agent-pilot      # E: deep agent pada 30 baris pilot yang sama -> results/pilot/agent.jsonl
-make agent-val        # E: validasi deep agent v2 (K1-K3) + LLM tunggal pada 30 baris srbh_val -> results/validasi/
-make run-e R=1        # E: run resmi ke-1 (1-3) pada 500 baris -> results/agent_r1.jsonl (+ _calls.jsonl)
-make runs-c / runs-e  # ketiga run resmi C / E berurutan (boleh dijalankan paralel antar run)
-make eval             # D: laporan utama reports/evaluasi.md = rerata (min-maks) atas 3 run C dan 3 run E untuk
-                      #    Tabel 4.2-4.5, F1 per kelas, confusion matrix rerata, frekuensi keluaran degeneratif;
-                      #    rincian per run di reports/evaluasi_per_run.md
+make setup        # .venv Python 3.11 + dependensi terkunci (requirements.txt)
+make data         # unduh SR-BH 2020, verifikasi MD5, pipeline Langkah 1-10 -> data/processed/, reports/data_report.md
+make regex        # pembanding regex utama -> results/regex.jsonl
+make regex-full   # varian sekunder regex_full (CRS PL1 semua kategori, post hoc) -> results/regex_full.jsonl
+make llm_single   # LLM tunggal, 3 run pada 500 baris yang sama -> results/llm_single_r{1,2,3}.jsonl
+make agent        # deep agent, 3 run pada 500 baris yang sama -> results/agent_r{1,2,3}.jsonl
+make eval         # reports/evaluasi.md (rerata dan rentang min-maks) dan reports/evaluasi_per_run.md
+make test         # unit test
 ```
 
-Run LLM (C dan E) yang terhenti karena galat API dilanjutkan dengan menjalankan ulang perintah yang sama persis ditambah
-`--resume` (mis. `python -m src.agent.run --split val --ids results/validasi/val_ids.json --out-dir results/validasi
---resume`); runner menolak bila masukan, daftar baris, log panggilan, atau nama keluaran berbeda dari run awal. Baris yang
-terkena galat API tidak dinilai salah. Kunci `OPENROUTER_API_KEY` hanya dibaca dari `.env` di dalam kode dan tidak pernah dicatat; tracing
-LangSmith dimatikan, semua catatan panggilan tetap lokal.
+- Ketiga run tiap metode boleh dijalankan paralel: `make run-c R=1|2|3` dan `make run-e R=1|2|3`. Run yang terhenti karena
+  galat API dilanjutkan dengan perintah yang sama ditambah `--resume`
+  (mis. `python -m src.agent.run --name agent_r1 --calls results/agent_r1_calls.jsonl --resume`).
+- Hasil LLM tidak identik bit demi bit antar run walaupun temperature 0 dan seed sama; karena itu tabel utama memakai
+  rerata 3 run.
+- **Model:** `openai/gpt-4.1-nano-2025-04-14` lewat OpenRouter, penyedia `openai` tanpa fallback, temperature 0, seed 42,
+  `max_tokens` 4.096 untuk semua panggilan (pengaman kegagalan; panggilan terpotong dicatat TRUNCATED, diulang sekali,
+  lalu PARSE_ERROR bila tetap tidak valid).
+- **Tarif** (OpenRouter, diambil 2026-10-07, `configs/llm.yaml`): $0,10 per 1 juta token masukan, $0,40 per 1 juta token
+  keluaran, $0,025 per 1 juta token cache.
+- **Versi:** Python 3.11.13; deepagents 0.7.22; langchain 1.4.3; langchain-core 1.6.7; langchain-openai 1.6.7;
+  langgraph 1.2.14; openai 3.26.0; httpx 0.28.1; pydantic 2.13.5; pandas 2.3.3; numpy 2.4.6; pyarrow 25.0.1;
+  scikit-learn 1.9.1; pyyaml 6.0.3; python-dotenv 1.2.4; pytest 9.1.1. Daftar lengkap terkunci di `requirements.txt`.
+  OWASP CRS 4.30.0 diunduh dari arsip terpatok dan diverifikasi SHA-256; emulasi mengikuti ModSecurity 2.9.15.
+- **Log panggilan** (`results/*_calls.jsonl`: setiap panggilan LLM dan alat) tidak disertakan di repositori karena
+  ukurannya. Tanpa log itu, `make eval` tetap menghasilkan semua tabel kecuali kolom latensi per panggilan di Tabel 4.4 dan
+  cek silang TRUNCATED.
 
-Protokol akhir (keputusan penulis 2026-10-08): semua panggilan LLM C dan E memakai max_tokens 4.096 (configs/llm.yaml;
-pengaman kegagalan, bukan biaya). Panggilan yang terpotong dicatat TRUNCATED, diulang sekali, lalu PARSE_ERROR bila tetap
-tidak valid. C dan E masing-masing dijalankan 3 kali pada 500 baris yang sama (seed sama); tabel utama memakai rerata.
-Run lama (C 500 tanpa batas, pilot E v1, validasi v2, E 500 tanpa batas parsial) ada di results/archive/ dan dibahas di
-reports/catatan_rekayasa.md; tidak masuk tabel.
+## Hasil akhir (ringkas)
 
-Aturan umum tahap sistem: semua metode membaca kolom masukan yang sama dari `test_sample_500.jsonl` lewat
-`src/common/inputs.py` (tanpa `label`/`template_key`); setiap run mencatat tanggal, commit git, dan nama model
-(`results/*.run.json`).
+Disalin dari `reports/evaluasi.md`; nilai LLM tunggal dan deep agent adalah rerata 3 run (min–maks).
 
-Tanpa `make`: `python -m src.data.download && python -m src.data.prepare`.
+**Tabel 4.2 — deteksi biner (serangan vs NORMAL)**
+
+| metode | accuracy | precision | recall | F1 | FPR |
+|---|---|---|---|---|---|
+| regex | 0,704 | 1,000 | 0,641 | 0,781 | 0,000 |
+| regex_full (post hoc) | 0,836 | 1,000 | 0,801 | 0,889 | 0,000 |
+| llm_single | 0,902 (0,898–0,906) | 0,993 (0,992–0,995) | 0,888 (0,883–0,891) | 0,937 (0,935–0,940) | 0,030 (0,023–0,034) |
+| agent | 0,837 (0,836–0,838) | 0,989 (0,985–0,991) | 0,811 (0,808–0,813) | 0,891 (0,890–0,892) | 0,042 (0,034–0,057) |
+
+**Tabel 4.3 — klasifikasi 6 kelas**
+
+| metode | accuracy | macro-P | macro-R | macro-F1 | IK 95% macro-F1 |
+|---|---|---|---|---|---|
+| regex | 0,698 | 0,889 | 0,717 | 0,717 | [0,622; 0,779] |
+| regex_full (post hoc) | 0,828 | 0,912 | 0,839 | 0,820 | [0,752; 0,859] |
+| llm_single | 0,831 (0,828–0,832) | 0,860 (0,859–0,862) | 0,841 (0,839–0,843) | 0,830 (0,828–0,832) | [0,752; 0,878] |
+| agent | 0,747 (0,740–0,752) | 0,853 (0,850–0,857) | 0,763 (0,756–0,768) | 0,750 (0,745–0,753) | [0,644; 0,814] |
+
+**Tabel 4.5 — evidence literal**
+
+| metode | proporsi literal |
+|---|---|
+| llm_single | 0,762 (0,750–0,768) |
+| agent | 0,897 (0,890–0,901) |
+
+## Berkas hasil dan laporan
+
+| berkas | isi |
+|---|---|
+| `results/regex.jsonl` (+ `.run.json`) | prediksi pembanding regex utama per baris dan metadata run |
+| `results/regex_full.jsonl` (+ `.run.json`) | prediksi varian sekunder regex_full (post hoc) |
+| `results/llm_single_r{1,2,3}.jsonl` (+ `.run.json`) | LLM tunggal, 3 run resmi: label, confidence, evidence, explanation, token, biaya, latensi |
+| `results/agent_r{1,2,3}.jsonl` (+ `.run.json`) | deep agent, 3 run resmi: label akhir, status verifikasi, delegasi, token, biaya, latensi |
+| `results/tuning/` | run regex_full di srbh_val untuk penyesuaian pemetaan |
+| `results/crs_regression.json`, `results/crs_regression_regex_full.json` | verifikasi emulasi CRS terhadap uji regresi resmi CRS |
+| `results/check_openrouter.json` | hasil cek API dan konfigurasi model |
+| `results/archive/` | run yang tidak masuk tabel (lihat Catatan rekayasa) |
+| `reports/evaluasi.md` (+ `.json`) | laporan evaluasi utama: Tabel 4.2–4.5, F1 per kelas, confusion matrix rerata, keluaran degeneratif |
+| `reports/evaluasi_per_run.md` (+ `.json`) | rincian evaluasi per run dan aturan pendorong salah kelas regex |
+| `reports/ringkasan_sidang.md` | ringkasan satu halaman: angka kunci, klaim utama, pertanyaan penguji |
+| `reports/catatan_rekayasa.md` | riwayat run yang tidak masuk tabel beserta alasannya |
+| `reports/data_report.md` | statistik dataset per tahap, sampel uji, dan daftar keputusan praproses |
+| `reports/srbh_inspection.md` | inspeksi awal SR-BH 2020 |
+| `reports/label_mapping_proposal.md` | usulan dan bukti pemetaan label CAPEC ke 6 kelas |
+| `reports/catatan_pembanding_regex.md` | catatan pembanding regex dan regex_full |
+| `reports/archive/` | laporan run lama (pilot, validasi, evaluasi tanpa batas token) |
 
 ## Data
 
-| Dataset | Lokasi | Keterangan |
+| dataset | lokasi | keterangan |
 |---|---|---|
 | SR-BH 2020 | `data/raw/srbh2020/data_capec_multilabel.csv` | Harvard Dataverse doi:10.7910/DVN/OGOIXX, v1.2, CC0 1.0, MD5 `173ec515308bdce5aec19cfd5b792596` |
-| Zenodo Org. X | `data/raw/zenodo_orgx/` | belum diproses (validasi eksternal opsional) |
 
-Berkas di `data/raw/` tidak pernah diubah; pipeline memverifikasi MD5 sebelum membaca. Folder `data/` tidak di-commit.
-
-## Keluaran
-
-| Berkas | Isi |
-|---|---|
-| `data/processed/srbh_{train,val,test}.parquet` | split stratified 70/15/15 (random_state=42) |
-| `data/processed/test_sample_500.jsonl` | sampel uji untuk eksperimen LLM |
-| `data/processed/srbh_excluded.parquet` | baris yang dikeluarkan beserta kode alasannya |
-| `data/processed/label_mapping.yaml` | pemetaan CAPEC → 6 kelas yang dipakai + hitungan |
-| `reports/data_report.md` | statistik per tahap dan daftar keputusan praproses |
-| `configs/llm.yaml` | model (openai/gpt-4.1-nano-2025-04-14), tarif per 1M token, hasil cek API |
-| `results/regex.jsonl`, `results/regex.run.json` | prediksi pembanding regex per baris + metadata run |
-| `results/regex_full.jsonl`, `results/regex_full.run.json` | varian sekunder regex_full (post hoc) |
-| `results/llm_single_r{1,2,3}.jsonl` + `.run.json` | LLM tunggal, 3 run resmi: label, confidence, evidence, explanation, token, biaya, latensi |
-| `results/llm_single_r{1,2,3}_calls.jsonl` | setiap panggilan API LLM tunggal per run: prompt, respons mentah, token, biaya, TRUNCATED |
-| `results/agent_r{1,2,3}.jsonl` + `.run.json` | deep agent, 3 run resmi: label akhir, status verifikasi, delegasi, token, biaya, latensi |
-| `results/agent_r{1,2,3}_calls.jsonl` | setiap panggilan LLM dan alat deep agent per run: sub-agen, token, biaya, latensi, putaran |
-| `results/archive/` | run lama (catatan rekayasa): C tanpa batas, pilot v1, validasi v2, E 500 tanpa batas parsial |
-| `reports/evaluasi.md/.json` | laporan evaluasi utama (rerata dan rentang atas 3 run) |
-| `reports/evaluasi_per_run.md/.json` | rincian evaluasi per run dan aturan pendorong salah kelas regex |
+Berkas di `data/raw/` tidak pernah diubah; pipeline memverifikasi MD5 sebelum membaca. Folder `data/` tidak di-commit dan
+dibangun ulang dengan `make data`. Semua metode hanya membaca kolom masukan `test_sample_500.jsonl` lewat
+`src/common/inputs.py` (tanpa `label`/`template_key`); setiap run mencatat tanggal, commit git, dan nama model di
+`results/*.run.json`.
 
 ## Struktur
 
 ```
-configs/label_mapping.yaml   pemetaan CAPEC → 6 kelas (sumber kebenaran)
-configs/llm.yaml             model LLM dan tarif (langkah A)
-configs/regex_baseline.yaml  versi CRS, PL, poin skor, pemetaan hit -> kelas, aturan Baş Seyyar dkk. (langkah B)
-configs/regex_full.yaml      varian sekunder: CRS PL1 semua kategori, pemetaan kategori -> kelas, penyesuaian tercatat
-configs/owasp_kb.yaml        basis pengetahuan statis per kelas untuk alat lookup_owasp (langkah E)
-src/data/                    pipeline: download, load, inspect_srbh, labels, reconstruct, clf_parser,
-                             normalize, session, split, sample, report, prepare
-src/data/gate/               aturan gerbang bukti per kelompok label
-src/common/                  masukan metode (tanpa kolom evaluasi), metadata run, pemeriksa evidence literal
-src/llm/                     klien OpenRouter; klasifikasi.py: Tabel 2.1, aturan, skema keluaran (dipakai C dan E)
-src/baselines/               pembanding: crs (pemuat aturan CRS), modsec (emulasi ModSecurity 2.9.15 + Apache 2.4),
-                             bas_seyyar, regex_baseline, crs_regression (verifikasi terhadap uji resmi CRS)
-                             llm_prompt + llm_single (LLM tunggal zero-shot, langkah C)
-src/agent/                   deep agent (langkah E): graph (orkestrator deepagents + 4 sub-agen), tools,
-                             prompts, context, run; tidak mengimpor src/data/gate/. Sejak keputusan K1-K3
-                             (2026-10-08): orkestrator hanya task + write_todos (alat berkas deepagents dan execute
-                             dimatikan), Verifikasi deterministik tanpa LLM, prompt Klasifikasi = prompt C + MASUKAN
-src/eval/                    evaluate (Tabel 4.2-4.5, bootstrap klaster), replikasi (rerata/min-maks atas run),
-                             pilot (pemilihan 30 baris),
-                             pilot_compare (perbandingan per baris E vs C)
-scripts/check_openrouter.py  langkah A
-scripts/make_modsec_golden.py vektor emas port ModSecurity dari harness C (tests/fixtures/modsec_v2915_golden.json)
-data/external/crs/           arsip OWASP CRS terpatok (diunduh otomatis, diverifikasi SHA-256)
-data/external/modsecurity/   unicode.mapping ModSecurity v2.9.15 terpatok (SecUnicodeMapFile 20127, diverifikasi SHA-256)
-tests/                       unit test (pytest)
-reports/                     laporan yang dihasilkan pipeline
-data/evidence/               cuplikan analisis bukti pemetaan label (sumber target paritas; tidak dihapus `make clean`)
+configs/      pemetaan label, model LLM dan tarif, konfigurasi regex/regex_full, basis pengetahuan OWASP untuk agen
+src/data/     pipeline dataset (unduh, label, rekonstruksi, parsing, normalisasi, split, sampel, laporan)
+src/baselines/ pembanding regex (emulasi CRS/ModSecurity, Baş Seyyar dkk.) dan LLM tunggal
+src/agent/    deep agent: orkestrator deepagents, sub-agen, alat, prompt, runner
+src/eval/     evaluasi per run, agregasi rerata 3 run, pemilihan pilot, perbandingan per baris
+src/common/   masukan metode, metadata run, pemeriksa evidence literal
+tests/        unit test (pytest)
 ```
 
-## Kelas target
+## Catatan rekayasa
 
-SQLI, XSS, PATH_TRAVERSAL, CMD_INJECTION, WEB_SCANNING, NORMAL.
+Run yang tidak masuk tabel utama, misalnya run sebelum batas `max_tokens`, pilot, validasi, dan run yang dihentikan,
+disimpan di `results/archive/`. Riwayat dan alasan setiap keputusannya dicatat di
+[`reports/catatan_rekayasa.md`](reports/catatan_rekayasa.md).
