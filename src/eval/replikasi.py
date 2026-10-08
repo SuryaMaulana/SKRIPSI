@@ -26,7 +26,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..common.runinfo import run_info
+from ..common.runinfo import commit_terkini, run_info
 from ..data.config import CLASSES, RANDOM_STATE, ROOT
 from .evaluate import (
     K,
@@ -240,7 +240,7 @@ def aggregate(methods: list[Method], truth) -> dict:
     t, _ = _indices([truth.labels[i] for i in ids], [truth.labels[i] for i in ids])
     preds = [_indices([truth.labels[i] for i in ids], [m.predictions[i] for i in ids])[1] for m in methods]
     confusion = np.mean([multiclass(t, p)["confusion"] for p in preds], axis=0)
-    result = {"runs": [{"file": m.relpath, "run_id": m.run.get("run_id"), "git_commit": m.run.get("git_commit"),
+    result = {"runs": [{"file": m.relpath, "run_id": m.run.get("run_id"), "git_commit": commit_terkini(m.run.get("git_commit")),
                         "git_dirty": m.run.get("git_dirty")} for m in methods],
               "metrics": {k: summarize([r.get(k) for r in per_run]) for k in keys},
               "confusion_mean": confusion.tolist(), "rows": len(ids)}
@@ -266,7 +266,7 @@ def render(groups: dict[str, dict]) -> str:
     label = {n: f"{n} (rerata {len(g['runs'])} run)" if len(g["runs"]) > 1 else n for n, g in groups.items()}
     out = ["Nilai sel: rerata atas run (min–maks bila run lebih dari satu dan nilainya berbeda). Tabel utama memakai rerata.",
            "Run lama, run yang dihentikan, dan run yang diganti (C tanpa batas token, pilot E v1, validasi v2, E 500 tanpa "
-           "batas parsial, run E bcb3445, set C 9890bd0, run C dengan run_id sama) ada di results/archive/ dan tidak masuk "
+           "batas parsial, run E 1693ae3, set C 56b9e2c, run C dengan run_id sama) ada di results/archive/ dan tidak masuk "
            "tabel; lihat reports/catatan_rekayasa.md.", ""]
     out += ["Tabel 4.2 — deteksi biner (serangan vs NORMAL)", ""]
     out.append(_table(["metode", "accuracy", "precision", "recall", "F1", "FPR"],

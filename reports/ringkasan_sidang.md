@@ -3,8 +3,9 @@
 **Deteksi dan Klasifikasi Serangan Aplikasi Web pada Log Akses Web Server Menggunakan Deep Agent LLM**
 Muhammad Surya Maulana — S1 Sains Data, Universitas Negeri Surabaya
 
-Sumber angka: **[E]** `reports/evaluasi.md` (LLM tunggal dan deep agent: rerata 3 run), **[P]**
-`reports/evaluasi_per_run.json`, **[D]** `reports/data_report.md`, **[R]** `reports/catatan_rekayasa.md`.
+Sumber angka: **[E]** `reports/evaluasi.md` (LLM tunggal dan deep agent: rerata 3 run), **[J]**
+`reports/evaluasi.json`, **[P]** `reports/evaluasi_per_run.json`, **[D]** `reports/data_report.md`, **[L]**
+`reports/label_mapping_proposal.md`, **[R]** `reports/catatan_rekayasa.md`.
 
 ## Angka kunci
 
@@ -29,7 +30,7 @@ Sumber: [E] Tabel 4.2–4.5.
 3. **Deep agent: bukti paling sahih, tetapi akurasi lebih rendah dan biaya 12×.** Evidence literal 0,897 vs 0,762,
    macro-F1 0,750 vs 0,830, biaya per 1.000 baris 1,6304/0,1314 = 12,4× [E Tabel 4.3–4.5].
 
-## Sepuluh pertanyaan penguji
+## Pertanyaan penguji
 
 1. **Mengapa deep agent lebih rendah?** Selisih F1 terbesar di WEB_SCANNING (0,382 vs 0,590) dan PATH_TRAVERSAL (0,699
    vs 0,850). Deep agent memberi NORMAL pada 54,0 dari 89 baris WEB_SCANNING (LLM tunggal 39,3) dan 17,7 baris
@@ -58,3 +59,34 @@ Sumber: [E] Tabel 4.2–4.5.
    18,0 baris; dari baris itu, 10,7 tetap ok dan 5,7 berakhir PARSE_ERROR. LLM tunggal: 0 [E].
 10. **Apakah orkestrator selalu mengikuti prosedur?** Tidak: delegasi ke keempat sub-agen terjadi pada 468,7 dari 500
     baris per run (465–475) [E].
+11. **Mengapa gpt-4.1-nano, dan apakah berlaku untuk model besar?** Model ditetapkan penulis dan dipakai identik oleh LLM
+    tunggal dan deep agent: `openai/gpt-4.1-nano` (versi 2025-04-14), temperature 0, seed 42 [J], pada 500 baris yang
+    sama. Karena itu selisih antarmetode sahih untuk model ini. Apakah kesimpulannya berlaku untuk model yang lebih besar
+    belum diuji; itu saran penelitian lanjutan.
+12. **Apa bedanya deep agent dengan pipeline biasa?** Pada pipeline, urutan Parser → Analisis Payload → Klasifikasi →
+    Verifikasi tetap di kode. Pada deep agent, orkestrator LLM sendiri yang memutuskan sub-agen mana yang dipanggil dan
+    kapan, sehingga prosedurnya tidak selalu lengkap: delegasi ke keempat sub-agen terjadi pada 468,7 dari 500 baris per
+    run, dan 31,3 baris (500 − 468,7) tidak [E].
+13. **Mengapa label CAPEC tidak dipetakan langsung, dan berapa yang dikeluarkan?** Pada pemetaan langsung per nama CAPEC,
+    hanya 1,3% baris "XSS" dan 41,3% baris CMD_INJECTION yang lolos gerbang bukti dengan kelas yang sama [L §3]. Karena
+    itu kelas akhir harus berasal dari label baris itu sendiri dan buktinya terlihat di field log [D §3]. Dikeluarkan
+    216.047 dari 907.815 baris [D §2], masing-masing dengan kode alasan: LABELER_BLIND 71.431, OUT_OF_SCOPE 38.022,
+    SCANNER_PROBE 29.984, LABEL_MISMATCH 27.097, INSPECTED_VISIBLE_PAYLOAD 17.378, HIDDEN_EVIDENCE 15.099,
+    RFI_SCHEMELESS 12.262, NO_EVIDENCE 4.772, EMPTY_ROW 2 [D §3].
+14. **Mengapa tidak ada XSS di label asli, dan dari mana 56 baris XSS?** SR-BH 2020 punya 1 label Normal dan 13 label
+    CAPEC, tanpa label XSS (CAPEC-63) [L, Ringkasan]. Payload XSS ada di bawah label 242 (Code Injection): dari 15.827
+    baris berlabel 242, 378 memuat payload XSS yang terlihat di log (aturan gerbang K1), sedangkan sebagian besar
+    sisanya injeksi kode di luar taksonomi (OUT_OF_SCOPE 13.742) [D §3]. Setelah dedup dan split, split uji memuat 56
+    baris XSS [D §5], dan sampel mengambil seluruhnya [D §6].
+15. **Bagaimana prompt injection lewat baris log ditangani?** Baris log dikirim di dalam `<log>...</log>` dengan aturan
+    bahwa isinya data, bukan instruksi, dan Verifikasi E hanya menerima evidence yang ada harfiah di log. Di log
+    panggilan run resmi tidak ada kejadian: 0 dari 500 baris sampel memuat teks berpola instruksi, dan 0 dari 1.500
+    respons C serta 17.739 respons E memuat penolakan atau frasa meta [R §8]. Sampel tidak memuat percobaan prompt
+    injection, jadi ketahanannya belum teruji (keterbatasan).
+16. **Mengapa validasi di log Indonesia tidak dilakukan?** Label YAML dataset log Indonesia belum diaudit, sehingga hasil
+    di sana belum dapat dinilai sahih. Validasi eksternal ini dicatat sebagai keterbatasan dan saran penelitian lanjutan.
+17. **Apa kontribusi penelitian ini?** (1) Gerbang bukti dan dataset 6 kelas yang dapat direproduksi: 907.815 baris
+    SR-BH 2020 menjadi 272.107 baris dalam split (190.474 / 40.816 / 40.817) dan sampel uji 500 baris, dengan setiap
+    eksklusi berkode alasan [D §2, §3]. (2) Perbandingan terkendali regex, LLM tunggal, dan deep agent pada model dan
+    baris yang sama [E; J]. (3) Metrik evidence literal untuk kesahihan bukti: 0,897 vs 0,762 [E Tabel 4.5]. (4) Temuan
+    bahwa arsitektur agen tidak menaikkan akurasi pada klasifikasi per baris: macro-F1 0,750 vs 0,830 [E Tabel 4.3].

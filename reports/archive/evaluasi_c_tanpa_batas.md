@@ -1,4 +1,4 @@
-Evaluasi evaluate-20261007T164624Z-2efbd87 (commit 2efbd87, dirty=False)
+Evaluasi evaluate-20261007T164624Z-2efbd87 (commit 8cb3644, dirty=False)
 
 Sumber label: data/processed/test_sample_500.jsonl. Prediksi di luar 6 kelas dihitung salah.
 

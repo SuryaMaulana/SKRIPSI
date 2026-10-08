@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import platform
 import subprocess
 from datetime import datetime, timezone
@@ -11,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_PREFIXES = ("results/", "reports/")  # keluaran run/evaluasi tidak membuat pohon kerja dianggap berubah
 DOCUMENT_SUFFIXES = (".docx",)  # draf skripsi penulis: bukan kode/konfigurasi yang memengaruhi hasil
+COMMIT_MAP = ROOT / "results" / "pemetaan_commit.json"
 
 
 def _git(*args: str) -> str | None:
@@ -59,6 +61,18 @@ def run_info(method: str, model: str | None, run_name: str | None = None, **extr
         "python": platform.python_version(),
         **extra,
     }
+
+
+def commit_terkini(commit: str | None) -> str | None:
+    """Hash di riwayat git sekarang untuk commit yang tercatat di *.run.json.
+
+    Riwayat git ditulis ulang setelah semua run selesai (reports/catatan_rekayasa.md §7): run.json dan run_id tetap
+    memuat hash lama, dan results/pemetaan_commit.json memetakannya ke hash baru. Hash yang tidak ada di pemetaan
+    dikembalikan apa adanya.
+    """
+    if not commit or not COMMIT_MAP.exists():
+        return commit
+    return json.loads(COMMIT_MAP.read_text(encoding="utf-8"))["lama_ke_baru"].get(commit, commit)
 
 
 def repo_path(path: Path | None) -> str | None:

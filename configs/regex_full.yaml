@@ -51,7 +51,7 @@ ignored_categories:                      # tidak punya padanan kelas: aturannya 
   "980": korelasi (bukan aturan deteksi)
   "999": pengecualian setelah CRS (bukan aturan deteksi)
 
-# Aturan Baş Seyyar dkk. dan pemetaan berkas terlarang diwarisi apa adanya dari pembanding utama (keputusan implementasi),
+# Aturan Baş Seyyar dkk. dan pemetaan berkas terlarang diwarisi apa adanya dari pembanding utama (keputusan asisten),
 # sehingga perbedaan kedua varian hanya pada cakupan kategori CRS.
 
 adjustments:                             # hasil pengujian di srbh_val (bukan di data uji)

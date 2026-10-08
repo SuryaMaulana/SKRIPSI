@@ -90,11 +90,12 @@ dihitung dengan bootstrap klaster per templat (1.000×) atas macro-F1 rerata run
 | `results/tuning/` | run regex_full di srbh_val untuk penyesuaian pemetaan |
 | `results/crs_regression.json`, `results/crs_regression_regex_full.json` | verifikasi emulasi CRS terhadap uji regresi resmi CRS |
 | `results/check_openrouter.json` | hasil cek API dan konfigurasi model |
+| `results/pemetaan_commit.json` | pemetaan commit lama (tercatat di `*.run.json` dan `run_id`) ke riwayat git sekarang |
 | `results/archive/` | run yang tidak masuk tabel (lihat Catatan rekayasa) |
 | `reports/evaluasi.md` (+ `.json`) | laporan evaluasi utama: Tabel 4.2–4.5, F1 per kelas, confusion matrix rerata, keluaran degeneratif |
 | `reports/evaluasi_per_run.md` (+ `.json`) | rincian evaluasi per run dan aturan pendorong salah kelas regex |
-| `reports/ringkasan_sidang.md` | ringkasan satu halaman: angka kunci, klaim utama, pertanyaan penguji |
-| `reports/catatan_rekayasa.md` | riwayat run yang tidak masuk tabel beserta alasannya |
+| `reports/ringkasan_sidang.md` | ringkasan sidang: angka kunci, tiga klaim utama, 17 pertanyaan penguji dengan jawaban berbasis angka |
+| `reports/catatan_rekayasa.md` | riwayat run yang tidak masuk tabel beserta alasannya, pemetaan hash commit, pemeriksaan prompt injection |
 | `reports/data_report.md` | statistik dataset per tahap, sampel uji, dan daftar keputusan praproses |
 | `reports/srbh_inspection.md` | inspeksi awal SR-BH 2020 |
 | `reports/label_mapping_proposal.md` | usulan dan bukti pemetaan label CAPEC ke 6 kelas |
@@ -110,7 +111,9 @@ dihitung dengan bootstrap klaster per templat (1.000×) atas macro-F1 rerata run
 Berkas di `data/raw/` tidak pernah diubah; pipeline memverifikasi MD5 sebelum membaca. Folder `data/` tidak di-commit dan
 dibangun ulang dengan `make data`. Semua metode hanya membaca kolom masukan `test_sample_500.jsonl` lewat
 `src/common/inputs.py` (tanpa `label`/`template_key`); setiap run mencatat tanggal, commit git, dan nama model di
-`results/*.run.json`.
+`results/*.run.json`. Riwayat git ditulis ulang setelah semua run selesai, sehingga commit di `*.run.json` dan di
+`run_id` adalah hash lama; pemetaannya ke riwayat sekarang ada di `results/pemetaan_commit.json` dan
+`reports/catatan_rekayasa.md` §7.
 
 ## Struktur
 
@@ -131,4 +134,5 @@ tests/        unit test (pytest)
 
 Run yang tidak masuk tabel utama, misalnya run sebelum batas `max_tokens`, pilot, validasi, dan run yang dihentikan,
 disimpan di `results/archive/`. Riwayat dan alasan setiap keputusannya dicatat di
-[`reports/catatan_rekayasa.md`](reports/catatan_rekayasa.md).
+[`reports/catatan_rekayasa.md`](reports/catatan_rekayasa.md), bersama pemetaan hash commit (§7) dan pemeriksaan prompt
+injection pada run resmi (§8).

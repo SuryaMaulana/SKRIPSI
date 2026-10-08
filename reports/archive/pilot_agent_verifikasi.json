@@ -291,7 +291,7 @@
    "rows": [
     {
      "id": "metode",
-     "finding": "Ada 44 respons jenis=llm subagen=klasifikasi untuk run_id agent-20261007T164716Z-725069c. Semuanya valid (finish_reason stop, tanpa ulangan parse) dan cocok 1:1 dengan keluaran alat task:klasifikasi serta masukan <klasifikasi> verifikator. Daftar evidence hilang dihitung ulang dengan evidence_exists dan cocok persis dengan 25 dari 25 alasan deterministik di agent.jsonl (0 selisih). graph.py dan evidence.py tidak berubah sejak commit 725069c. Skrip: <direktori_sementara>/verify/analyze.py"
+     "finding": "Ada 44 respons jenis=llm subagen=klasifikasi untuk run_id agent-20261007T164716Z-725069c. Semuanya valid (finish_reason stop, tanpa ulangan parse) dan cocok 1:1 dengan keluaran alat task:klasifikasi serta masukan <klasifikasi> verifikator. Daftar evidence hilang dihitung ulang dengan evidence_exists dan cocok persis dengan 25 dari 25 alasan deterministik di agent.jsonl (0 selisih). graph.py dan evidence.py tidak berubah sejak commit d1abba5. Skrip: <direktori_sementara>/verify/analyze.py"
     },
     {
      "id": "agregat-E",

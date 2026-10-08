@@ -17,12 +17,12 @@ Kronologi (commit di cabang `tahap-sistem`):
 
 | langkah | commit / run |
 |---|---|
-| Pemetaan ditulis dan di-commit sebelum varian dijalankan | `5046290` |
-| Kode pendukung (semua kategori, nilai bawaan 901, `--split`) | `da9dace` |
+| Pemetaan ditulis dan di-commit sebelum varian dijalankan | `258c385` |
+| Kode pendukung (semua kategori, nilai bawaan 901, `--split`) | `e5e17bd` |
 | Run val pertama: 920440 tidak pernah cocok karena aksi `setvar` belum diemulasi | (ditimpa run berikutnya) |
-| Perbaikan emulasi `setvar` (bukan perubahan pemetaan) | `dd93c9b` |
+| Perbaikan emulasi `setvar` (bukan perubahan pemetaan) | `339580f` |
 | Run val resmi | `regex_full-20261007T152855Z-dd93c9b` → `results/tuning/regex_full_val.jsonl` |
-| Keputusan val dicatat (tanpa penyesuaian pemetaan) | `675337d` |
+| Keputusan val dicatat (tanpa penyesuaian pemetaan) | `23089e0` |
 | Satu kali run pada test_sample_500 (`post_hoc: true`) | `regex_full-20261007T153015Z-675337d` → `results/regex_full.jsonl` |
 
 Bukti val untuk aturan kategori baru:
@@ -41,7 +41,7 @@ di val, tanpa satu pun hit pada kelas lain. Aturan itu semula tidak dipetakan ka
 
 Alasan taksonominya sama dengan 920440: berkas cadangan/VCS tanpa traversal termasuk WEB_SCANNING (aturan T3 di
 `configs/label_mapping.yaml`). Penulis memutuskan menambahkannya sebagai **penyesuaian setelah run uji**. Perubahan itu
-dicatat di `configs/regex_full.yaml` (`rule_class_map` dan `adjustments`, commit `d7fd371`).
+dicatat di `configs/regex_full.yaml` (`rule_class_map` dan `adjustments`, commit `b3cff37`).
 
 Dampaknya pada data uji nol: 920500 tidak cocok pada satu pun baris test_sample_500, dan prediksi run ulang
 `regex_full-20261007T161037Z-d7fd371` identik dengan run sebelumnya (diperiksa baris per baris, kecuali `run_id`). Di
@@ -64,9 +64,9 @@ tidak tercatat. Aturan yang dipakai tetapi tidak punya uji yang bisa dijalankan:
 Aturan-aturan ini tetap tercakup secara tidak langsung oleh vektor emas harness C ModSecurity 2.9.15, yang menguji
 transformasi dan pencocok frasa (`make golden-check`). Namun keputusan per aturannya tidak diuji terhadap uji resmi.
 
-Berkas uji `933200.yaml` di CRS 4.30.0 memuat `rule_id: 9331200` (salah ketik di sumber CRS). Sejak `4474989`
+Berkas uji `933200.yaml` di CRS 4.30.0 memuat `rule_id: 9331200` (salah ketik di sumber CRS). Sejak `c4968d4`
 verifikasi memakai nomor dari nama berkas, sehingga ke-10 uji 933200 ikut dihitung dan semuanya cocok.
 
-Koreksi atas klaim sebelumnya: teks `engine_fix` di `configs/regex_full.yaml` dan pesan commit `dd93c9b` menulis
+Koreksi atas klaim sebelumnya: teks `engine_fix` di `configs/regex_full.yaml` dan pesan commit `339580f` menulis
 "diverifikasi 1267/1267 uji regresi resmi CRS untuk semua aturan regex_full". Yang benar adalah angka di tabel di
 atas; tidak semua aturan punya uji yang bisa dijalankan.

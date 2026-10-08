@@ -3,7 +3,8 @@
 Semua run di bawah dipindah ke `results/archive/` atas keputusan penulis (2026-10-08) dan **tidak dipakai di tabel
 evaluasi utama** (`reports/evaluasi.md`, 3 run per metode dengan konfigurasi final ber-batas `max_tokens` 4.096). Catatan
 ini mendokumentasikan riwayat rekayasa agar setiap keputusan dapat ditelusuri. Laporan lama yang dirujuk ada di
-`reports/archive/`.
+`reports/archive/`. §7 memetakan hash commit yang tercatat di run ke riwayat git sekarang; §8 mencatat pemeriksaan
+prompt injection pada run resmi.
 
 ## 1. Daftar run arsip
 
@@ -19,8 +20,8 @@ ini mendokumentasikan riwayat rekayasa agar setiap keputusan dapat ditelusuri. L
 | `agent-20261007T185745Z-3988205` | E v2 final, tanpa batas token | 30 val | validasi K4 | selesai | konfigurasi final menambah `max_tokens` |
 | `llm_single-20261007T201505Z-3988205` | C, tanpa batas token | 30 val | pembanding validasi | selesai | validasi |
 | `agent-20261007T201758Z-e0daa05` | E v2, tanpa batas token | 82 uji | E 500 pertama | dihentikan (keputusan penulis) | konfigurasi final menambah `max_tokens`; disimpan untuk analisis keluaran degeneratif (`results/archive/agent_uncapped_partial.jsonl`) |
-| `llm_single-20261007T214045Z-dc055cd` (3 run) | C ber-batas | 30 / 30 / 27 uji (r1/r2/r3) | run resmi | dihentikan | ketiga run paralel mendapat run_id sama; run_id kini memuat nama run (koreksi: pesan commit 9890bd0 menyebut ±15 baris) |
-| `llm_single_r{1,2,3}-20261007T214206Z-9890bd0` | C ber-batas | 500 uji tiap run | run resmi | selesai, diganti | deteksi TRUNCATED diperluas (aturan bersama C/E: finish_reason length, alasan asli penyedia, atau token keluaran ≥ max_tokens); pada ketiga run ini aturan baru memberi hasil identik (4 panggilan TRUNCATED, semuanya finish_reason length), tetapi run diulang agar keenam run resmi memakai kode yang identik: C di `ed0941b`, E di `53ec4d2` (anak langsung `ed0941b` yang hanya menambah berkas hasil C) (`results/archive/c_9890bd0/`) |
+| `llm_single-20261007T214045Z-dc055cd` (3 run) | C ber-batas | 30 / 30 / 27 uji (r1/r2/r3) | run resmi | dihentikan | ketiga run paralel mendapat run_id sama; run_id kini memuat nama run (koreksi: pesan commit 56b9e2c menyebut ±15 baris) |
+| `llm_single_r{1,2,3}-20261007T214206Z-9890bd0` | C ber-batas | 500 uji tiap run | run resmi | selesai, diganti | deteksi TRUNCATED diperluas (aturan bersama C/E: finish_reason length, alasan asli penyedia, atau token keluaran ≥ max_tokens); pada ketiga run ini aturan baru memberi hasil identik (4 panggilan TRUNCATED, semuanya finish_reason length), tetapi run diulang agar keenam run resmi memakai kode yang identik: C di `32f0ef0`, E di `9a5a771` (anak langsung `32f0ef0` yang hanya menambah berkas hasil C) (`results/archive/c_9890bd0/`) |
 | `agent_r{1,2,3}-20261007T215441Z-bcb3445` | E ber-batas | 52 / 55 / 52 uji | run resmi | dihentikan | review: Klasifikasi memakai chat.completions.parse() yang melempar LengthFinishReasonError pada keluaran terpotong (run akan crash), dan pemanggilan alat orkestrator yang terpotong dilaporkan OpenRouter sebagai finish_reason tool_calls sehingga TRUNCATED tidak terdeteksi (6 kejadian di ±160 baris) (`results/archive/dihentikan_e_bcb3445/`) |
 
 ## 2. C 500 baris tanpa batas token (`llm_single-20261007T161203Z-6ce9f30`)
@@ -56,9 +57,9 @@ Laporan: `reports/archive/pilot_agent.md`, temuan terverifikasi: `reports/archiv
 
 Laporan: `reports/archive/validasi_agent_val.md`. Dua run validasi dihentikan sebelum selesai karena review adversarial
 kode menemukan masalah yang mengubah perilaku agen:
-- `9ad710b`: guard putaran tidak atomik bila klasifikasi dan verifikasi dipanggil dalam satu pesan; `--resume` tidak
+- `b8fecda`: guard putaran tidak atomik bila klasifikasi dan verifikasi dipanggil dalam satu pesan; `--resume` tidak
   memeriksa split/ids/log -> diperbaiki (pemanggilan klasifikasi/verifikasi berurutan, resume diperiksa);
-- `38b109b`: Klasifikasi menerima `<pattern_hits>[]` ("CRS dijalankan, tidak cocok") ketika alatnya tidak pernah
+- `bfe0f28`: Klasifikasi menerima `<pattern_hits>[]` ("CRS dijalankan, tidak cocok") ketika alatnya tidak pernah
   dijalankan (2/15 baris) -> masukan kini menulis "(alat tidak dijalankan)" dan klasifikasi yang dipanggil bersama
   parser/analisis_payload ditunda ke pesan berikutnya.
 
@@ -82,12 +83,12 @@ sampai batas (finish_reason length); pada E keluarannya pemanggilan alat orkestr
 
 | run | panggilan LLM | kejadian degeneratif | baris terdampak | porsi latensi | porsi biaya | outcome baris terdampak |
 |---|---|---|---|---|---|---|
-| C 500 (`6ce9f30`) | 501 | 2 | 1 dari 500 | 506 / 1.454 s | $0,0264 / $0,0917 | 1 PARSE_ERROR |
-| E pilot v1 (`725069c`) | 563 | 0 | 0 dari 30 | 0 | 0 | — |
-| E validasi (`9ad710b`, dihentikan) | 185 | 4 | 2 dari 16 | 1.442 / 1.828 s | $0,0579 / $0,0881 | — |
-| E validasi (`38b109b`, dihentikan) | 177 | 3 | 2 dari 16 | 1.243 / 1.570 s | $0,0428 / $0,0851 | — |
-| E validasi final (`3988205`) | 345 | 7 | 2 dari 30 | 3.596 / 4.301 s | $0,1111 / $0,1651 | 1 PARSE_ERROR (5 kejadian beruntun), 1 pulih |
-| E 500 parsial (`e0daa05`) | 961 | 6 | 2 dari 83 | 2.781 / 4.674 s | $0,0946 / $0,2257 | lihat `results/archive/agent_uncapped_partial.jsonl` |
+| C 500 (`2d01d57`) | 501 | 2 | 1 dari 500 | 506 / 1.454 s | $0,0264 / $0,0917 | 1 PARSE_ERROR |
+| E pilot v1 (`d1abba5`) | 563 | 0 | 0 dari 30 | 0 | 0 | — |
+| E validasi (`b8fecda`, dihentikan) | 185 | 4 | 2 dari 16 | 1.442 / 1.828 s | $0,0579 / $0,0881 | — |
+| E validasi (`bfe0f28`, dihentikan) | 177 | 3 | 2 dari 16 | 1.243 / 1.570 s | $0,0428 / $0,0851 | — |
+| E validasi final (`ed938d1`) | 345 | 7 | 2 dari 30 | 3.596 / 4.301 s | $0,1111 / $0,1651 | 1 PARSE_ERROR (5 kejadian beruntun), 1 pulih |
+| E 500 parsial (`6a89698`) | 961 | 6 | 2 dari 83 | 2.781 / 4.674 s | $0,0946 / $0,2257 | lihat `results/archive/agent_uncapped_partial.jsonl` |
 
 Pengamatan: keluaran degeneratif E muncul pada semua run v2 (setelah K1–K3) dan tidak muncul pada pilot v1 (563
 panggilan), tetapi baris dan konfigurasinya berbeda sehingga penyebabnya belum dapat dipastikan. Atas dasar ini penulis
@@ -104,7 +105,63 @@ dilaporkan di `reports/evaluasi.md`.
   laporan di `reports/` tidak membuat run tercatat dirty; run_id memuat nama run.
 - Review adversarial kode dijalankan sebelum setiap run panjang (pilot, validasi, run resmi); hasilnya ada di riwayat
   commit dan di `reports/archive/`.
-- Komentar (bukan nilai) di `configs/regex_baseline.yaml` dan `configs/regex_full.yaml` disunting setelah run regex
-  resmi; isi konfigurasi yang dibaca program identik. `config_sha256` di `results/regex.run.json`,
-  `results/regex_full.run.json`, dan `results/tuning/regex_full_val.run.json` cocok dengan berkas pada commit run
-  masing-masing (`497dc3d`, `d7fd371`).
+
+## 7. Pemetaan hash commit
+
+Riwayat git ditulis ulang pada 2026-10-08 setelah semua run selesai: identitas penulis diseragamkan, pesan commit
+dirapikan, serta log panggilan (`results/*_calls*.jsonl`) dan draf naskah dikeluarkan dari seluruh riwayat. Kode,
+konfigurasi, dan berkas hasil yang ter-commit tidak berubah (pohon berkas commit terakhir identik sebelum dan sesudah
+penulisan ulang), tetapi semua hash commit berubah. `run_id` dan `git_commit` di `results/**/*.run.json` serta
+`run_id` di setiap baris hasil tetap seperti tercatat saat run (hash lama); rujukan commit lain di `reports/` memakai
+hash baru. Pemetaan ke-39 commit ada di `results/pemetaan_commit.json`, dan `make eval` memakainya untuk kolom commit.
+
+| run (`run_id` seperti tercatat) | commit lama | commit baru |
+|---|---|---|
+| **Run resmi (tabel utama)** | | |
+| `regex-20261007T150817Z-497dc3d` | `497dc3d` | `b4ee3af` |
+| `regex_full-20261007T161037Z-d7fd371` | `d7fd371` | `b3cff37` |
+| `llm_single_r{1,2,3}-20261007T221846Z-ed0941b` | `ed0941b` | `32f0ef0` |
+| `agent_r{1,2,3}-20261007T223039Z-53ec4d2` | `53ec4d2` | `9a5a771` |
+| **Run arsip, tuning, dan cek API** | | |
+| `check_openrouter-20261007T150823Z-497dc3d` | `497dc3d` | `b4ee3af` |
+| `regex_full-20261007T152855Z-dd93c9b` | `dd93c9b` | `339580f` |
+| `regex_full-20261007T153015Z-675337d` | `675337d` | `23089e0` |
+| `regex_full-20261007T161009Z-d7fd371` (srbh_val) | `d7fd371` | `b3cff37` |
+| `llm_single-20261007T153351Z-47b7a8d` | `47b7a8d` | `c8eb41e` |
+| `llm_single-20261007T161103Z-d03363c` | `d03363c` | `ea756c5` |
+| `llm_single-20261007T161203Z-6ce9f30` | `6ce9f30` | `2d01d57` |
+| `agent-20261007T164625Z-2efbd87` | `2efbd87` | `8cb3644` |
+| `agent-20261007T164716Z-725069c` | `725069c` | `d1abba5` |
+| `agent-20261007T174549Z-9ad710b` | `9ad710b` | `b8fecda` |
+| `agent-20261007T182502Z-38b109b` | `38b109b` | `bfe0f28` |
+| `agent-20261007T185745Z-3988205`, `llm_single-20261007T201505Z-3988205` | `3988205` | `ed938d1` |
+| `agent-20261007T201758Z-e0daa05` | `e0daa05` | `6a89698` |
+| `llm_single-20261007T214045Z-dc055cd` (3 run) | `dc055cd` | `31f00b7` |
+| `llm_single_r{1,2,3}-20261007T214206Z-9890bd0` (`results/archive/c_9890bd0/`) | `9890bd0` | `56b9e2c` |
+| `agent_r{1,2,3}-20261007T215441Z-bcb3445` (`results/archive/dihentikan_e_bcb3445/`) | `bcb3445` | `1693ae3` |
+| **Run evaluasi (laporan)** | | |
+| `evaluate-20261007T161057Z-d7fd371` (`reports/archive/evaluasi_regex.md`) | `d7fd371` | `b3cff37` |
+| `evaluate-20261007T164624Z-2efbd87` (`reports/archive/evaluasi_c_tanpa_batas.md`) | `2efbd87` | `8cb3644` |
+| `replikasi-20261008T020453Z-1953405`, `evaluate-20261008T020453Z-1953405` (evaluasi akhir sebelum penulisan ulang) | `1953405` | `c273ca4` |
+
+Commit lain yang dirujuk di `reports/catatan_pembanding_regex.md`: `5046290` → `258c385`, `da9dace` → `e5e17bd`,
+`4474989` → `c4968d4`. Hash lama di komentar `configs/` dan di `api_check` pada `configs/llm.yaml` dibiarkan seperti
+tercatat, karena berkas konfigurasi yang dipakai run tidak diubah.
+
+## 8. Pemeriksaan prompt injection pada run resmi
+
+Pertahanan dalam desain: baris log selalu dikirim di dalam `<log>...</log>` dengan aturan prompt bahwa isinya data,
+bukan instruksi, dan teks yang menyerupai instruksi dicatat sebagai temuan mencurigakan. Aturan ini ada di prompt C,
+orkestrator, Parser, Analisis Payload, dan Klasifikasi E (prompt C + MASUKAN). Verifikasi E deterministik dan hanya
+menerima evidence yang ada harfiah di baris log.
+
+Pemeriksaan 2026-10-08 pada sampel uji dan log panggilan lokal keenam run resmi:
+- Sampel uji: 0 dari 500 baris memuat teks berpola instruksi untuk model, yaitu frasa perintah bahasa Inggris/Indonesia
+  (mis. "ignore previous instructions", "you are", "system prompt", "abaikan", "kamu adalah"), nama model atau vendor
+  LLM, dan kata "prompt". Pola dicari pada `raw_log_masked`, `path_norm`, `query_norm`, `ua_norm`, dan `referer` setelah
+  URL-decode hingga 3 lapis.
+- Respons LLM: 1.500 respons C dan 17.739 respons E; 0 memuat penolakan atau frasa meta (mis. "maaf", "I cannot",
+  "as an AI", "abaikan"). Kata "instruksi" muncul 18 kali, semuanya di E: 17 kali saat model menjelaskan payload
+  (instruksi konfigurasi PHP atau eksekusi perintah di parameter) dan 1 kali di teks delegasi orkestrator sendiri.
+- Kesimpulan: tidak ada kejadian prompt injection, tetapi sampel juga tidak memuat percobaannya, sehingga ketahanan
+  terhadap prompt injection belum teruji oleh data ini (keterbatasan).

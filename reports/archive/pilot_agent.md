@@ -1,6 +1,6 @@
 # Pilot deep agent vs LLM tunggal (30 baris, label benar dari test)
 
-Run E: `agent-20261007T164716Z-725069c` (commit 725069c, dirty=False, model openai/gpt-4.1-nano). C: `llm_single-20261007T161203Z-6ce9f30`.
+Run E: `agent-20261007T164716Z-725069c` (commit d1abba5, dirty=False, model openai/gpt-4.1-nano). C: `llm_single-20261007T161203Z-6ce9f30`.
 
 ## Hasil per baris
 

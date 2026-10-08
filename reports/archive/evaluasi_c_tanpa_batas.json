@@ -3,7 +3,7 @@
   "run_id": "evaluate-20261007T164624Z-2efbd87",
   "method": "evaluate",
   "date_utc": "2026-10-07T16:46:24+00:00",
-  "git_commit": "2efbd87fcadf8acb6e7d8dc7b867a7c5371efcdf",
+  "git_commit": "8cb3644e2aeb0c65b748f4730150c7af9a18be32",
   "git_branch": "tahap-sistem",
   "git_dirty": false,
   "model": null,
@@ -13,21 +13,21 @@
   "inputs": {
    "results/llm_single.jsonl": {
     "run_id": "llm_single-20261007T161203Z-6ce9f30",
-    "git_commit": "6ce9f303c019b67d55cd5a6eaa67cc770322f96c",
+    "git_commit": "2d01d575d8f6f60bee224bcbaf363cbc19273b18",
     "git_dirty": false,
     "model": "openai/gpt-4.1-nano",
     "model_version": "openai/gpt-4.1-nano-2025-04-14"
    },
    "results/regex.jsonl": {
     "run_id": "regex-20261007T150817Z-497dc3d",
-    "git_commit": "497dc3d5c80b44da1b8c232644ebc769dcfb23be",
+    "git_commit": "b4ee3afceab6d91e0ff81e21a4aa38e7d9ac4c4d",
     "git_dirty": false,
     "model": null,
     "model_version": null
    },
    "results/regex_full.jsonl": {
     "run_id": "regex_full-20261007T161037Z-d7fd371",
-    "git_commit": "d7fd37166f0e70c5b2223bffee28321b995c0a5d",
+    "git_commit": "b3cff377ab7673452b9ce2e0dd6d5e3e7492d20b",
     "git_dirty": false,
     "model": null,
     "model_version": null

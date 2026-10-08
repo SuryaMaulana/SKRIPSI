@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 
 from ..common.evidence import evidence_exists
-from ..common.runinfo import run_info
+from ..common.runinfo import commit_terkini, run_info
 from ..data.config import CLASSES, RANDOM_STATE, ROOT
 from ..common.inputs import SAMPLE_PATH, split_path
 
@@ -316,8 +316,8 @@ def main(argv: list[str] | None = None) -> int:
             m.tag = m.relpath
     results = [evaluate(m, truth, ci=args.truth == "sample") for m in methods]
     info = run_info("evaluate", None, truth=truth.source, skipped=[str(p) for p in skipped],
-                    inputs={m.relpath: {k: m.run.get(k) for k in ("run_id", "git_commit", "git_dirty", "model",
-                                                                  "model_version")}
+                    inputs={m.relpath: {k: commit_terkini(m.run.get(k)) if k == "git_commit" else m.run.get(k)
+                                        for k in ("run_id", "git_commit", "git_dirty", "model", "model_version")}
                             for m in methods})
     text = f"Evaluasi {info['run_id']} (commit {str(info['git_commit'])[:7]}, dirty={info['git_dirty']})\n\n"
     if skipped:

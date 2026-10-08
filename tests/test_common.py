@@ -85,3 +85,22 @@ def test_parallel_runs_started_in_the_same_second_get_distinct_run_ids(monkeypat
     ids = {runinfo.run_info("llm_single", "m", run_name=f"llm_single_r{r}")["run_id"].split("-")[0] for r in (1, 2, 3)}
     assert ids == {"llm_single_r1", "llm_single_r2", "llm_single_r3"}
     assert runinfo.run_info("evaluate", None)["run_id"].startswith("evaluate-")
+
+
+def test_commit_terkini_maps_recorded_commits_to_the_rewritten_history(monkeypatch, tmp_path):
+    path = tmp_path / "pemetaan_commit.json"
+    path.write_text(json.dumps({"lama_ke_baru": {"a" * 40: "b" * 40}}), encoding="utf-8")
+    monkeypatch.setattr(runinfo, "COMMIT_MAP", path)
+    assert runinfo.commit_terkini("a" * 40) == "b" * 40
+    assert runinfo.commit_terkini("c" * 40) == "c" * 40  # tidak dipetakan -> apa adanya
+    assert runinfo.commit_terkini(None) is None
+    monkeypatch.setattr(runinfo, "COMMIT_MAP", tmp_path / "tidak_ada.json")
+    assert runinfo.commit_terkini("a" * 40) == "a" * 40
+
+
+def test_every_recorded_run_commit_has_a_mapping():
+    mapping = json.loads(runinfo.COMMIT_MAP.read_text(encoding="utf-8"))["lama_ke_baru"]
+    runs = sorted((runinfo.ROOT / "results").rglob("*.run.json"))
+    assert runs
+    for path in runs:
+        assert json.loads(path.read_text(encoding="utf-8"))["git_commit"] in mapping, path

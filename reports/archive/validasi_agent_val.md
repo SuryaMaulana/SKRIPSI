@@ -1,6 +1,6 @@
 # Validasi deep agent v2 vs LLM tunggal (srbh_val) (30 baris, label benar dari val)
 
-Run E: `agent-20261007T185745Z-3988205` (commit 3988205, dirty=False, model openai/gpt-4.1-nano). C: `llm_single-20261007T201505Z-3988205`.
+Run E: `agent-20261007T185745Z-3988205` (commit ed938d1, dirty=False, model openai/gpt-4.1-nano). C: `llm_single-20261007T201505Z-3988205`.
 
 ## Hasil per baris
 
