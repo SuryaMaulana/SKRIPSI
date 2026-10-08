@@ -1,7 +1,7 @@
 """Gerbang bukti label 88 — OS Command Injection dan 248 — Command Injection.
 
 99,5% baris berlabel 88 berasal dari satu active scan OWASP ZAP; sisanya dropper botnet IoT, probe Nmap, dan satu
-probe ThinkPHP. Tiga pola di bawah adalah aturan R1–R3 analisis bukti (agents/cmd-88-248/rule88.py), diturunkan
+probe ThinkPHP. Tiga pola di bawah adalah aturan R1–R3 analisis bukti (skrip di luar repositori), diturunkan
 dari templat payload yang teramati pada label ini, bukan dari aturan CRS. Alternatif '$(' dan kutip sebagai
 pemisah di R1 dibuang karena tidak muncul di field mana pun di SR-BH 2020 (hasilnya identik). Pola dicari per
 field. Kecocokan di URI, UA, atau Referer ter-decode (terlihat di log akses) dinilai berurutan, yang pertama menang:

@@ -39,7 +39,7 @@ Laporan lengkap: `reports/archive/evaluasi_c_tanpa_batas.md`.
 ## 3. Pilot E v1 (`agent-20261007T164716Z-725069c`, 30 baris uji)
 
 Laporan: `reports/archive/pilot_agent.md`, temuan terverifikasi: `reports/archive/pilot_agent_temuan.md` dan
-`reports/archive/pilot_agent_verifikasi.json` (verifikasi adversarial 6 agen).
+`reports/archive/pilot_agent_verifikasi.json` (verifikasi adversarial independen).
 
 - Benar 19/30 (C 23/30); macro-F1 30 baris 0,624 (C 0,747); evidence literal 0,636 (C 0,761); 18,8 panggilan LLM dan
   55.618 token masukan per baris; latensi median 28,2 s; ok 14 / verification_failed 13 / PARSE_ERROR 3.
@@ -104,3 +104,7 @@ dilaporkan di `reports/evaluasi.md`.
   laporan di `reports/` tidak membuat run tercatat dirty; run_id memuat nama run.
 - Review adversarial kode dijalankan sebelum setiap run panjang (pilot, validasi, run resmi); hasilnya ada di riwayat
   commit dan di `reports/archive/`.
+- Komentar (bukan nilai) di `configs/regex_baseline.yaml` dan `configs/regex_full.yaml` disunting setelah run regex
+  resmi; isi konfigurasi yang dibaca program identik. `config_sha256` di `results/regex.run.json`,
+  `results/regex_full.run.json`, dan `results/tuning/regex_full_val.run.json` cocok dengan berkas pada commit run
+  masing-masing (`497dc3d`, `d7fd371`).

@@ -374,7 +374,7 @@ Alasannya adalah artefak dataset: median rasio status 4xx dalam jendela 60 detik
 | 15 | Evaluasi nanti: bootstrap klaster 1.000× per templat payload dengan kunci templat §6; kunci disimpan di kolom `template_key` test_sample_500 | §6 |
 | 16 | Few-shot: calon contoh dari train yang isinya (tanpa stempel waktu) muncul di srbh_test dikeluarkan dari pool (kolom `fewshot_eligible` di srbh_train) | §5 |
 
-### Keputusan yang diambil asisten (wajib tercatat)
+### Keputusan implementasi (wajib tercatat)
 
 | # | keputusan | alasan/konteks |
 |---|---|---|

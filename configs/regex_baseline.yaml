@@ -34,7 +34,7 @@ crs:
 
 scoring:
   # Poin per aturan yang cocok = nilai severity bawaan CRS (tx.critical_anomaly_score dst.), dihitung sekali per
-  # aturan (keputusan asisten). Ini bukan akumulasi skor anomali CRS: di ModSecurity v2 setvar skor anomali dijalankan
+  # aturan (keputusan implementasi). Ini bukan akumulasi skor anomali CRS: di ModSecurity v2 setvar skor anomali dijalankan
   # setiap kali aturan cocok pada satu variabel, sehingga satu aturan bisa menambah skor berkali-kali. Skor kelas =
   # jumlah poin aturan yang cocok di kelas itu. Kelas = skor tertinggi; NORMAL bila tidak ada aturan yang cocok; skor
   # seri dipecah urutan berikut (sama dengan prioritas multi-label dataset).
@@ -66,7 +66,7 @@ bas_seyyar:
   #   Set1 (XSS/SQLi, Fase 1) -> diwakili aturan CRS 941/942: bila ada yang cocok, aturan di bawah tidak dievaluasi;
   #   Fase 2 (crawler)        -> BS-BOT (whitelist): bila cocok, evaluasi berhenti tanpa hit;
   #   Set2                    -> BS-UA; bila cocok, Set3 tidak dievaluasi;
-  #   Set3                    -> BS-METHOD, hanya syarat metode (relaksasi per baris, keputusan asisten; lihat note).
+  #   Set3                    -> BS-METHOD, hanya syarat metode (relaksasi per baris, keputusan implementasi; lihat note).
   # Poin = CRITICAL (5) setara aturan CRS sejenis (913100 UA pemindai, 911100 metode); makalah tidak memberi bobot.
   # Bukti UA pemindai dihitung sekali: BS-UA bernilai 0 poin bila CRS 913100 juga cocok (daftar 913100 memuat
   # acunetix, netsparker, w3af.org).

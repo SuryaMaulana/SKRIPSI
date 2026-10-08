@@ -36,7 +36,7 @@ _VISIBLE = ("uri_dec", "ua_dec", "ref_dec")
 _HIDDEN = ("body_dec", "cookie_dec")
 
 # (aturan bila subtipe utama terlihat, aturan bila hanya di body/cookie, pola), urut prioritas. Subtipe dan urutannya
-# dari analisis bukti (agents/code-242/c242lib.py), diturunkan dari templat yang teramati pada label ini, bukan dari
+# dari analisis bukti (skrip c242lib di luar repositori), diturunkan dari templat yang teramati pada label ini, bukan dari
 # aturan CRS. Tiga subtipe XSS c242lib digabung; XSS_HTML_TAG (tag tanpa script/event handler) dan
 # WP_TEMPLATE_BRACES (teks templat WordPress, bukan payload) dibuang karena tidak pernah menjadi subtipe utama.
 # Alternatif c242lib yang tidak pernah muncul di SR-BH 2020 (direktif SSI selain exec, 'vbscript:') juga dibuang.

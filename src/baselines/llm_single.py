@@ -12,7 +12,7 @@ respons mentah, token masuk/keluar, latensi, dan biaya. Penanganan kegagalan:
 - kegagalan layanan (galat jaringan, HTTP 408/429/5xx, atau HTTP 200 yang berisi galat penyedia, badan bukan JSON, atau
   konten kosong) -> dicoba ulang dengan jeda 2, 4, ..., 64 detik; ini bukan kegagalan parse;
 - kegagalan layanan yang menetap, atau HTTP 4xx lain (401/402/403: kunci, saldo, moderasi) -> run DIHENTIKAN tanpa
-  menilai baris itu (keputusan asisten: galat API bukan kesalahan model). Prediksi yang sudah selesai disimpan di
+  menilai baris itu (galat API bukan kesalahan model). Prediksi yang sudah selesai disimpan di
   <out>/llm_single.partial.jsonl dan run dapat dilanjutkan dengan --resume.
 Token, biaya, dan latensi per baris = jumlah semua panggilan baris itu (jeda antarpercobaan tidak dihitung).
 Panggilan berurutan (satu per satu) agar latensi per baris tidak dipengaruhi antrean paralel.

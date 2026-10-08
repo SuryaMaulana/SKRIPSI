@@ -1,5 +1,5 @@
 {
- "keterangan": "Verifikasi adversarial temuan pilot deep agent (run agent-20261007T164716Z-725069c) oleh 6 agen independen yang membaca results/pilot/agent.jsonl dan results/agent_calls.jsonl (read-only), 2026-10-08.",
+ "keterangan": "Verifikasi adversarial independen atas temuan pilot deep agent (run agent-20261007T164716Z-725069c), langsung dari results/pilot/agent.jsonl dan results/agent_calls.jsonl (hanya baca), 2026-10-08.",
  "hasil": [
   {
    "key": "parse-error",
@@ -84,7 +84,7 @@
     },
     {
      "id": "metode",
-     "finding": "Rekaman difilter dengan run_id=agent-20261007T164716Z-725069c (1172 rekaman; tidak ada llm_galat atau galat_api). Run lain, agent-20261007T164625Z-2efbd87, tidak memuat ketiga id ini. agent.run.json mencatat orchestrator_recursion_limit=80, procedure_reminders=4, dan recursion_limit_rows=1. Skrip bantu (read-only): <direktori_sementara>/verify/parse_error/pe_fs_all.py, pe_detail.py, pe_seq_fs.py, pe_stats.py, pe_ua.py."
+     "finding": "Rekaman difilter dengan run_id=agent-20261007T164716Z-725069c (1172 rekaman; tidak ada llm_galat atau galat_api). Run lain, agent-20261007T164625Z-2efbd87, tidak memuat ketiga id ini. agent.run.json mencatat orchestrator_recursion_limit=80, procedure_reminders=4, dan recursion_limit_rows=1. Skrip bantu (hanya baca): <direktori_sementara>/verify/parse_error/pe_fs_all.py, pe_detail.py, pe_seq_fs.py, pe_stats.py, pe_ua.py."
     }
    ],
    "corrections": [

@@ -1,7 +1,7 @@
 """Gerbang bukti label 126 — Path Traversal.
 
 20.951 dari 20.992 baris berasal dari satu pemindai aktif (diduga OWASP ZAP), 41 dari Nmap NSE. Pola dan urutannya
-berasal dari aturan R1a–R5 analisis bukti (agents/traversal-126/mapping.py), diturunkan dari templat payload yang
+berasal dari aturan R1a–R5 analisis bukti (skrip di luar repositori), diturunkan dari templat payload yang
 teramati pada label ini, bukan dari aturan CRS. Alternatif pola analisis yang tidak cocok dengan satu baris pun
 berlabel 126 dibuang (akhiran '/..', overlong '%c0%ae', perintah selain 'cat /etc/passwd', pemisah '$(',
 etc/shadow|group|hosts, system.ini, .bzr, .bzrignore, .cvs, web-inf); hasilnya identik. Keputusan per baris, yang

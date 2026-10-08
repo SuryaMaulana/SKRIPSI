@@ -1,7 +1,7 @@
 # Temuan pilot deep agent (30 baris) — terverifikasi
 
 Run `agent-20261007T164716Z-725069c` (commit 725069c, bersih). Angka per baris: `reports/pilot_agent.md`. Setiap temuan
-di bawah diperiksa ulang secara adversarial oleh agen independen langsung pada `results/agent_calls.jsonl` dan
+di bawah diperiksa ulang secara adversarial dan independen langsung pada `results/agent_calls.jsonl` dan
 `results/pilot/agent.jsonl` (rincian lengkap: `reports/pilot_agent_verifikasi.json`). Baris pilot adalah bagian dari
 sampel uji: temuan ini dicatat untuk keputusan penulis, bukan untuk menyetel agen pada data uji.
 

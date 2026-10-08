@@ -8,7 +8,7 @@ menjadi S5 bila famili yang sama ada di body, cookie, atau header lain (redirect
 nilai parameter berupa metakarakter di body/cookie), S7 bila UA Nmap (label 66 netral, kelasnya dari label
 310), selain itu S6.
 
-Famili, urutan, dan hasilnya sama dengan analisis bukti 2026-10-07 (agents/verify-methodology-sqli-66: fam.py,
+Famili, urutan, dan hasilnya sama dengan analisis bukti 2026-10-07 (skrip di luar repositori: fam.py,
 m8_families2.py, m13_hidden.py, m25_mapping.py). Setiap alternatif regex adalah templat yang teramati pada baris
 label 66; alternatif analisis yang tidak pernah cocok di field mana pun (mis. pg_sleep, waitfor delay, phpinfo,
 famili format string) atau yang tercakup alternatif lain (mis. select..from, information_schema, tautologi

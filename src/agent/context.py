@@ -2,7 +2,7 @@
 
 Baris diproses satu per satu, jadi konteks disimpan sebagai variabel modul. Alat membaca baris log ASLI dari sini,
 bukan dari teks yang ditulis LLM, agar pengurai, pencocok pola, dan verifikasi evidence tidak bergantung pada salinan
-yang mungkin keliru (keputusan asisten). Keluaran alat juga disimpan di sini sebagai bahan masukan sub-agen Klasifikasi.
+yang mungkin keliru (keputusan implementasi). Keluaran alat juga disimpan di sini sebagai bahan masukan sub-agen Klasifikasi.
 """
 
 from __future__ import annotations

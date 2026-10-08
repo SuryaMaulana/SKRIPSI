@@ -158,9 +158,9 @@ jadi tidak perlu 70%. Penyimpangan dari 70/15/15 berlaku khusus untuk kelas XSS 
 
 ## 6. Cara analisis dilakukan
 
-- 12 analis paralel (satu per kelompok label, audit label Normal, pencarian sumber XSS, aturan multi-label), masing-masing
-  diuji 2 peninjau adversarial (lensa data dan lensa metodologi), lalu 1 kritikus yang menyelesaikan 17 konflik antar-analis.
-  Total 37 agen.
+- Analisis dibagi menjadi 12 bagian (satu per kelompok label, audit label Normal, pencarian sumber XSS, aturan
+  multi-label); setiap bagian ditinjau secara adversarial dengan dua lensa (data dan metodologi), lalu 17 konflik
+  antarbagian diselesaikan dalam satu tinjauan akhir.
 - Verifikasi independen dari CSV mentah dengan decoder sendiri: jumlah baris `%2F` dan statusnya, distribusi label di
   baris `%2F`, XSS terlihat per label, komposisi 242, templat RFI 194, serta offset/tanggal baris serangan. Semua cocok.
 - Invarian: setiap kelas akhir berasal dari label baris itu sendiri (0 pelanggaran dari 907.815 baris). Urutan prioritas

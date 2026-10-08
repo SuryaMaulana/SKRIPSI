@@ -6,7 +6,7 @@ dkk. ada di bas_seyyar.py. Tidak ada yang diimpor atau disalin dari src/data/gat
 test_sample_500.jsonl (tanpa label/template_key).
 
 Keluaran per baris (results/regex.jsonl): label, skor per kelas, dan aturan yang cocok. Skor kelas = jumlah poin
-severity aturan yang cocok, dihitung sekali per aturan (keputusan asisten); ini bukan akumulasi skor anomali CRS, yang
+severity aturan yang cocok, dihitung sekali per aturan (keputusan implementasi); ini bukan akumulasi skor anomali CRS, yang
 di ModSecurity v2 bertambah setiap kali aturan cocok pada satu variabel (setvar dijalankan per kecocokan). Kelas = skor
 tertinggi; seri dipecah urutan `tie_break`; NORMAL bila tidak ada aturan yang cocok. Metadata run (tanggal, commit,
 versi aturan, mesin acuan) di results/regex.run.json.

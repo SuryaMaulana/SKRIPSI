@@ -45,7 +45,7 @@ AUTHOR_DECISIONS = [
      "(kolom `fewshot_eligible` di srbh_train)", "§5"),
 ]
 
-# Keputusan yang diambil asisten tanpa instruksi eksplisit (wajib tercatat).
+# Keputusan implementasi tanpa instruksi eksplisit di rancangan (wajib tercatat).
 OWN_DECISIONS = [
     ("Dataset diunduh dari Harvard Dataverse (v1.2, berkas tunggal data_capec_multilabel.csv) karena data/raw/ belum ada; "
      "MD5 diverifikasi setiap kali pipeline berjalan; data/raw/ tidak pernah ditulis ulang", "kesahihan sumber"),
@@ -475,7 +475,7 @@ def render(stats: dict, final: pd.DataFrame, sample: pd.DataFrame) -> str:
         "",
         md_table(["#", "keputusan", "bagian"], [[i + 1, d, s] for i, (d, s) in enumerate(AUTHOR_DECISIONS)], limit=400),
         "",
-        "### Keputusan yang diambil asisten (wajib tercatat)",
+        "### Keputusan implementasi (wajib tercatat)",
         "",
         md_table(["#", "keputusan", "alasan/konteks"], [[i + 1, d, s] for i, (d, s) in enumerate(OWN_DECISIONS)], limit=700),
         "",

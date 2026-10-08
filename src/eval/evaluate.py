@@ -11,7 +11,7 @@ results/pilot/ bukan berkas prediksi utama. Aturan penilaian:
   raw_log_masked mentah atau hasil decode (definisi di src/common/evidence.py, sama dengan alat Verifikasi deep agent).
 - IK 95% Macro-F1: bootstrap klaster 1.000 kali (random_state=42) yang meresampel template_key (kunci templat payload,
   laporan data §6), bukan baris. Templat diresampel di dalam tiap kelas sebenarnya (strata = kelas), karena sampel uji
-  dibangun dengan kuota per kelas (keputusan asisten); interval = persentil 2,5 dan 97,5.
+  dibangun dengan kuota per kelas (keputusan implementasi); interval = persentil 2,5 dan 97,5.
 Jalankan: make eval   (atau python -m src.eval.evaluate results/regex.jsonl results/regex_full.jsonl)
 """
 

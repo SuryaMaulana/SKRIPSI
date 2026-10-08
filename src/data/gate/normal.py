@@ -23,7 +23,7 @@ set/dict Python (membandingkan string utuh), bukan operasi hash pandas.
 
 Kosakata benign (`benign_vocabulary`) diturunkan dari baris yang diberikan, sehingga `evaluate` harus menerima seluruh
 baris berlabel normal sekaligus, seperti pada pipeline. Pola diambil dari pengklasifikasi sub-tipe analisis bukti
-(agents/normal-audit/classify.py dan assign.py, templat ZAP hasil review manual baris normal), bukan dari aturan CRS.
+(skrip di luar repositori; templat ZAP hasil review manual baris normal), bukan dari aturan CRS.
 Cabang alternasi dan anggota himpunan yang tidak cocok dengan satu pun baris normal dibuang (antara lain 'union select',
 'whoami', 'javascript:', '.htaccess', dan nama pemindai selain Nmap/python-requests); hasil per baris tetap sama
 persis dengan analisis. Jumlah di komentar pola = baris normal yang cocok, sebelum prioritas.
