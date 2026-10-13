@@ -1,6 +1,6 @@
 # Revisi jurnal — angka Tabel 4–11 termasuk ablasi
 
-Laporan revisi-20261013T094502Z-71c9347 (commit 71c9347, dirty=False)
+Laporan revisi-20261013T104225Z-e9361d4 (commit e9361d4, dirty=False)
 
 Format angka mengikuti manuskrip (titik desimal; metode LLM: rerata tiga run dengan rentang min–maks; † = identik di ketiga run). Definisi setiap kolom: docstring src/eval/revisi.py.
 
