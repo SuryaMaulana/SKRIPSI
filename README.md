@@ -141,9 +141,10 @@ dibangun ulang dengan `make data`.
 dengan `id` dan kolom masukan metode (`raw_log_masked`, hasil parsing tanpa waktu dan protokol, serta `path_norm`,
 `query_norm`, `ua_norm`), yaitu persis yang dibaca semua metode. Label gerbang dan `template_key` tidak disertakan;
 keduanya dibangun ulang dengan `make data`. `id` adalah id opak `srbh-` + 16 digit heksadesimal pertama
-SHA-256(`srbh2020:<nomor baris di CSV SR-BH>`) (`src/data/prepare.py`), sehingga urutan berkas (= urutan waktu, yang
-mengelompokkan kelas) tidak terlihat; id yang sama dipakai di `results/*.jsonl`. Berkas ini dibuat ulang dari sampel
-olahan dengan `make sampel-publik`. Semua metode hanya membaca kolom masukan `test_sample_500.jsonl` lewat
+SHA-256(`srbh2020:<row_id>`), dengan `row_id` = indeks baris data berbasis 0 di CSV SR-BH (tanpa header;
+`opaque_id` di `src/data/prepare.py`), sehingga id tidak memuat nomor baris; id yang sama dipakai di `results/*.jsonl`.
+Urutan baris berkas adalah acakan berbenih tetap (random_state 42) dari sampel, sama dengan urutan `results/*.jsonl`.
+Berkas ini dibuat ulang dari sampel olahan dengan `make sampel-publik`. Semua metode hanya membaca kolom masukan `test_sample_500.jsonl` lewat
 `src/common/inputs.py` (tanpa `label`/`template_key`); setiap run mencatat tanggal, commit git, dan nama model di
 `results/*.run.json`. Riwayat git ditulis ulang setelah semua run selesai, sehingga commit di `*.run.json` dan di
 `run_id` adalah hash lama; pemetaannya ke riwayat sekarang ada di `results/pemetaan_commit.json` dan

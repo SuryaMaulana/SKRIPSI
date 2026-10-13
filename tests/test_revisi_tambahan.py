@@ -26,7 +26,8 @@ def _truth(labels, keys=None):
 
 def _two_per_class():
     labels = {f"{c[:2]}{j}": c for c in CLASSES for j in range(2)}
-    return _truth(labels), labels
+    keys = {i: ("V1:MOVE" if c == "WEB_SCANNING" else f"t{i}") for i, c in labels.items()}
+    return _truth(labels, keys), labels
 
 
 def test_without_pilot_drops_the_pilot_ids_and_recomputes_metrics_and_paired_tests(tmp_path):
@@ -73,10 +74,15 @@ def test_cascade_keeps_attack_labels_of_the_first_layer_and_sends_only_normal_li
     assert out["biaya_per_1000_baris_usd"]["values"] == [pytest.approx(1000 * 8 * c / 12) for c in (0.001, 0.003)]
     assert out["biaya_list_per_1000_baris_usd"]["mean"] == pytest.approx(1000 * 8 * (100 * 0.1 + 10 * 0.4) / 1e6 / 12)
     assert [x["b"] for x in out["uji_berpasangan"]] == ["llm_single", "regex"]
+    assert out["baris_ke_llm_dipulihkan_per_kelas"]["SQLI"]["values"] == [2, 2]  # LLM benar pada kedua SQLI
+    assert out["baris_ke_llm_dipulihkan_per_kelas"]["NORMAL"]["mean"] == 2
+    assert out["recall_sub_tipe_ws"] == {"V1": rt.summarize([1.0, 1.0])}
+    assert "regex_930" not in rt.cascade(truth, data, n_paired=20)["lapis_pertama"]  # tanpa matched_rules
 
 
 def test_ws_subtypes_report_recall_per_gate_rule_and_the_regex_rules_that_fired():
-    keys = {"v1": "V1:MKCOL", "v2": "V1:MOVE", "w1": "W1:Nmap", "p1": "P1:.bak", "t1": "T3:.git", "n1": "GET /"}
+    keys = {"v1": "V1:MKCOL", "v2": "V1:MOVE", "w1": "W1:Nmap", "p1": "P1:.bak", "t1": "T3:.git", "t2": "T3:lainnya",
+            "n1": "GET /"}
     labels = {i: ("NORMAL" if i == "n1" else "WEB_SCANNING") for i in keys}
     truth = _truth(labels, keys)
     full = {i: label for i, label in labels.items()}
@@ -84,14 +90,17 @@ def test_ws_subtypes_report_recall_per_gate_rule_and_the_regex_rules_that_fired(
     full_rows = [{"id": i, "label": full[i], "matched_rules": [{"rule": r, "class": "WEB_SCANNING"} for r in rules.get(i, [])]
                   + [{"rule": "941100", "class": "XSS"}]} for i in keys]
     r1 = {**labels, "v1": "NORMAL", "v2": "NORMAL", "p1": "NORMAL"}
-    r2 = {**labels, "v1": "NORMAL", "p1": "PATH_TRAVERSAL"}
+    r2 = {**labels, "v1": "NORMAL", "p1": "PARSE_ERROR"}
     data = {"regex_full": {"methods": [_method("regex_full", full, full_rows)]},
             "llm_single": {"methods": [_method("c1", r1), _method("c2", r2)]}}
-    out = rt.ws_subtypes(truth, data)
-    assert out["n"] == {"V1": 2, "W1": 1, "P1": 1, "T3": 1}
+    inputs = [{"id": "t2", "path": "/blog/%2Ehtaccess"}]
+    out = rt.ws_subtypes(truth, data, inputs)
+    assert out["n"] == {"V1": 2, "W1": 1, "P1": 1, "T3": 2}
     assert out["rincian"]["V1"] == {"V1:MKCOL": 1, "V1:MOVE": 1}
+    assert out["rincian"]["T3"] == {"T3:.git": 1, "T3:.htaccess": 1}  # T3:lainnya dirinci menurut nama berkas
     assert out["metode"]["llm_single"]["V1"]["recall"]["values"] == [0.0, 0.5]
-    assert out["metode"]["llm_single"]["P1"]["prediksi_rerata"] == {"NORMAL": 0.5, "PATH_TRAVERSAL": 0.5}
+    assert out["recall_per_rincian"]["llm_single"]["V1:MOVE"]["values"] == [0.0, 1.0]
+    assert out["metode"]["llm_single"]["P1"]["prediksi_rerata"] == {"NORMAL": 0.5, "invalid": 0.5}
     assert out["metode"]["regex_full"]["T3"]["recall"]["mean"] == 1.0
     assert out["aturan_regex"]["regex_full"]["V1"] == {"911100": 2, "BS-METHOD": 1}
     assert "941100" not in json.dumps(out["aturan_regex"])
@@ -113,6 +122,7 @@ def test_label_changes_count_lines_by_gate_class_and_label_sets_like_aggregate()
     assert x["per_kelas_gerbang"] == {"SQLI": 0, "XSS": 0, "PATH_TRAVERSAL": 0, "CMD_INJECTION": 1, "WEB_SCANNING": 1,
                                       "NORMAL": 1}
     assert x["memuat_label"]["NORMAL"] == 2 and x["memuat_label"]["invalid"] == 1
+    assert (x["melibatkan_invalid"], x["antar_kelas_valid"]) == (1, 2)
     assert x["himpunan_label"] == {"PATH_TRAVERSAL / CMD_INJECTION": 1, "WEB_SCANNING / NORMAL": 1, "NORMAL / invalid": 1}
 
 
@@ -137,11 +147,56 @@ def test_sqli_missed_separates_payload_in_path_from_lines_without_query_string()
         {"id": "d", "path": "/blog%27+AND+1234%3D1234--+-/x", "query": "", "user_agent": "", "referer": ""},
         {"id": "e", "path": "/", "query": "", "user_agent": "", "referer": ""},
     ]
-    regex = {"a": "NORMAL", "b": "NORMAL", "c": "NORMAL", "d": "SQLI", "e": "NORMAL"}
-    out = rt.sqli_missed(_truth(labels), {"regex": {"methods": [_method("regex", regex)]}}, inputs, {"memeriksa_path": []})
-    assert out["sqli"] == 4 and out["terlewat"] == 3 and out["prediksi_regex"] == {"NORMAL": 3, "SQLI": 1}
-    assert out["payload_di_path"] == 2 and out["tanpa_query_string"] == 1
-    assert out["payload_di_path_dengan_query_string"] == 1 and out["payload_di_query_string"] == 1
+    inputs.append({"id": "f", "path": "/blog+AND+1%3D1/x", "query": "id=1%27+OR+%271%27%3D%271", "user_agent": "",
+                   "referer": ""})
+    labels["f"] = "SQLI"
+    regex = {"a": "NORMAL", "b": "NORMAL", "c": "NORMAL", "d": "SQLI", "e": "NORMAL", "f": "NORMAL"}
+    rows = [{"id": i, "label": label, "matched_rules": [{"rule": "942160", "class": "SQLI"}] if i == "d" else []}
+            for i, label in regex.items()]
+    out = rt.sqli_missed(_truth(labels), {"regex": {"methods": [_method("regex", regex, rows)]}}, inputs,
+                         {"memeriksa_path": [942160, 942550]})
+    assert out["sqli"] == 5 and out["terlewat"] == 4 and out["prediksi_regex"] == {"NORMAL": 4, "SQLI": 1}
+    assert out["payload_di_path"] == 3 and out["tanpa_query_string"] == 1 and out["payload_hanya_di_path"] == 2
+    assert out["payload_di_path_query_string_tanpa_sql"] == 1  # f: payload juga di query string, tidak dihitung
+    assert out["payload_di_query_string"] == 2
+    assert out["aturan_pada_sqli_terdeteksi"] == {"942160": 1}
+    assert out["baris_dengan_aturan_path"] == {"942160": 1, "942550": 0}
+
+
+def test_regex_labels_rescore_matched_rules_and_remap_restricted_files_to_their_category():
+    config = {"restricted_files": {"rules": [930130]}, "class_map": {"930": "PATH_TRAVERSAL"},
+              "scoring": {"tie_break": ["CMD_INJECTION", "SQLI", "XSS", "PATH_TRAVERSAL", "WEB_SCANNING"]}}
+    hit = lambda rule, cls, points, source="CRS 4.30.0": {"rule": rule, "class": cls, "points": points, "source": source}
+    rows = [{"id": "a", "matched_rules": [hit("930130", "WEB_SCANNING", 5)]},
+            {"id": "b", "matched_rules": [hit("930130", "WEB_SCANNING", 5), hit("BS-METHOD", "WEB_SCANNING", 3, "BS")]},
+            {"id": "c", "matched_rules": [hit("942160", "SQLI", 5), hit("932130", "CMD_INJECTION", 5)]},
+            {"id": "d", "matched_rules": [hit("BS-METHOD", "WEB_SCANNING", 0, "BS")]}]
+    assert rt.regex_labels(rows, config) == {"a": "WEB_SCANNING", "b": "WEB_SCANNING", "c": "CMD_INJECTION", "d": "NORMAL"}
+    remapped = rt.regex_labels(rows, config, restricted_as_category=True)
+    assert remapped == {"a": "PATH_TRAVERSAL", "b": "PATH_TRAVERSAL", "c": "CMD_INJECTION", "d": "NORMAL"}
+
+
+def test_render_shows_only_aggregates_and_keeps_tables_separated(tmp_path):
+    truth, labels = _two_per_class()
+    (tmp_path / "pilot.json").write_text(json.dumps({"ids": [i for i in labels if i.endswith("0")]}))
+    llm = {i: c for i, c in labels.items()}
+    regex = {i: (c if c == "XSS" else "NORMAL") for i, c in labels.items()}
+    data = {"regex": _entry(truth, [_method("regex", regex)]),
+            "llm_single": _entry(truth, [_method("c1", llm, _llm_rows(llm)), _method("c2", llm, _llm_rows(llm))]),
+            "agent": _entry(truth, [_method("e1", llm, _llm_rows(llm)), _method("e2", regex, _llm_rows(regex))])}
+    inputs = [{"id": i, "path": "/x", "query": "", "user_agent": "", "referer": ""} for i in labels]
+    result = {"tanpa_pilot": rt.without_pilot(truth, data, 20, tmp_path / "pilot.json"),
+              "kaskade": rt.cascade(truth, data, 20), "sub_tipe_web_scanning": rt.ws_subtypes(truth, data, inputs),
+              "label_berubah_antar_run": rt.label_changes(truth, data),
+              "sqli_terlewat_regex": rt.sqli_missed(truth, data, inputs, None), "dedup_persis": {"dilewati": "uji"}}
+    text = rt.render(result)
+    assert "srbh-" not in text and "srbh-" not in json.dumps(result)
+    assert "† = identik di ketiga run" in text and "lebih dari satu label" in text
+    lines = text.splitlines()
+    starts = [k for k, line in enumerate(lines) if line.startswith("|") and (k == 0 or not lines[k - 1].startswith("|"))]
+    assert starts and all(lines[k - 1] == "" for k in starts)  # setiap tabel diawali baris kosong
+    ends = [k for k, line in enumerate(lines[:-1]) if line.startswith("|") and not lines[k + 1].startswith("|")]
+    assert all(lines[k + 1] == "" for k in ends)  # dan diakhiri baris kosong
 
 
 @pytest.fixture(scope="module")
@@ -181,6 +236,22 @@ def test_report_reproduces_the_numbers_in_the_manuscript_text(real):
     assert all(changed[m]["baris"] == data[m]["group"]["baris_label_berubah_antar_run"] for m in changed)
     s = result["sqli_terlewat_regex"]
     assert (s["terlewat"], s["payload_di_path"], s["tanpa_query_string"]) == (67, 65, 62)
+    assert s["payload_di_path_query_string_tanpa_sql"] == 3 and s["aturan_pada_sqli_terdeteksi"] == {"942160": 20}
+    assert s["aturan_942_memeriksa_path"]["memeriksa_path"] == [942160, 942550]
+    assert s["baris_dengan_aturan_path"] == {"942160": 20, "942550": 0}
+    # tambahan dari verifikasi independen
+    assert [n(x["metode"][m]["akurasi_pilot"]["mean"]) for m in ("llm_single", "agent")] == ["0.767", "0.733"]
+    (y,) = [y for y in x["uji_berpasangan"] if (y["a"], y["b"]) == ("agent", "regex_full")]
+    (z,) = [z for z in x["uji_berpasangan_500"] if (z["a"], z["b"]) == ("agent", "regex_full")]
+    assert (rt._p(y["p"]), rt._p(z["p"]), n(y["ik_atas"]), n(z["ik_atas"])) == ("0.071", "0.047", "0.005", "−0.001")
+    sens = c["regex_930"]
+    assert f(sens["metrik"]["macro_f1"]) == "0.865(0.863–0.867)"
+    (y,) = [y for y in sens["uji_berpasangan"] if y["b"] == "llm_single"]
+    assert (n(y["selisih"]), n(y["ik_bawah"]), n(y["ik_atas"])) == ("0.035", "0.002", "0.071")
+    recovered = c["regex"]["baris_ke_llm_dipulihkan_per_kelas"]
+    assert recovered["SQLI"]["values"] == [66, 66, 66] and recovered["WEB_SCANNING"]["mean"] == 13
+    assert w["rincian"]["T3"] == {"T3:.svn": 5, "T3:.htaccess": 5, "T3:.git": 4}
+    assert changed["agent"]["melibatkan_invalid"] == 14
     json.dumps(result)
 
 
@@ -191,9 +262,11 @@ def test_exact_dedup_counterfactual_reproduces_the_manuscript():
     if not SRBH_CSV.exists() or not rt.split_path("test").exists():
         pytest.skip("butuh data/raw (make download) dan data/processed (make data)")
     out = rt.exact_dedup()
-    assert out["paritas_split_uji_resmi"] and out["baris_6_kelas"] == 691_768
+    assert out["paritas"] and out["baris_6_kelas"] == 691_768
     assert out["dedup_isi"]["duplicates_dropped"] == 387_099 and out["dedup_isi"]["rows_out"] == 304_669
     assert out["dedup_persis"]["duplicates_dropped"] + out["dedup_persis"]["conflict_rows_dropped"] == 14_257
-    assert f"{out['kontrafaktual']['dengan_batas_rfi']['persen']:.1f}" == "61.6"
+    y = out["kontrafaktual"]["dengan_batas_rfi"]
+    assert f"{y['persen']:.1f}" == "61.6" and (y["uji_berkembaran"], y["uji"]) == (59_366, 96_404)
+    assert (f"{y['persen_normal']:.1f}", f"{y['persen_serangan']:.1f}") == ("91.7", "13.9")
     assert np.isclose(sum(a for a, _ in out["kontrafaktual"]["dengan_batas_rfi"]["per_kelas"].values()),
                       out["kontrafaktual"]["dengan_batas_rfi"]["uji_berkembaran"])

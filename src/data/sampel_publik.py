@@ -3,8 +3,9 @@
 Isinya 500 baris data/processed/test_sample_500.jsonl dalam urutan berkas yang sama, hanya dengan id opak dan kolom
 masukan metode (src/common/inputs.METHOD_COLUMNS), yaitu persis yang dibaca regex, LLM tunggal, deep agent, dan ablasi.
 Kolom evaluasi (label gerbang dan template_key) tidak disertakan (keputusan penulis). SR-BH 2020 berlisensi CC0 1.0.
-id = "srbh-" + 16 digit heksadesimal pertama SHA-256("srbh2020:<nomor baris di CSV SR-BH>") (src/data/prepare.py
-opaque_id); id yang sama dipakai di results/*.jsonl.
+id = "srbh-" + 16 digit heksadesimal pertama SHA-256("srbh2020:<row_id>"), row_id = indeks baris data berbasis 0 di CSV
+SR-BH tanpa header (src/data/prepare.py opaque_id); id yang sama dipakai di results/*.jsonl. Urutan baris = acakan
+berbenih tetap (random_state 42) dari sampel, sama dengan test_sample_500.jsonl dan results/*.jsonl.
 Jalankan: make sampel-publik  (atau python -m src.data.sampel_publik)
 """
 
