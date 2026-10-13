@@ -1,10 +1,10 @@
 {
  "run": {
-  "run_id": "replikasi-20261008T033139Z-ee70404",
+  "run_id": "replikasi-20261013T075008Z-a75bda8",
   "method": "replikasi",
-  "date_utc": "2026-10-08T03:31:39+00:00",
-  "git_commit": "ee70404f5dd33af86a503ab3dff8f81e33eb5b9b",
-  "git_branch": "tahap-sistem",
+  "date_utc": "2026-10-13T07:50:08+00:00",
+  "git_commit": "a75bda804bd5c02de9687945a11d867153dd817a",
+  "git_branch": "revisi-jurnal",
   "git_dirty": false,
   "git_dirty_paths": [],
   "model": null,
@@ -25,6 +25,11 @@
     "results/agent_r1.jsonl",
     "results/agent_r2.jsonl",
     "results/agent_r3.jsonl"
+   ],
+   "llm_single_verified": [
+    "results/llm_single_verified_r1.jsonl",
+    "results/llm_single_verified_r2.jsonl",
+    "results/llm_single_verified_r3.jsonl"
    ]
   },
   "configs": {
@@ -47,7 +52,9 @@
     "input_sha256": "950a93e1cdf5941ff85388c9624010a0c9f69445bde2b01a0bd79821c8104232",
     "input_file": "data/processed/test_sample_500.jsonl",
     "ids_file": null,
-    "row_ids_sha256": "10000d6bd5e13c2ed003adeda1a2813015f4ead2c5e127ba1c2133cc8bc101ae"
+    "row_ids_sha256": "10000d6bd5e13c2ed003adeda1a2813015f4ead2c5e127ba1c2133cc8bc101ae",
+    "retry_prompt_sha256": null,
+    "max_verification_rounds": null
    },
    "agent": {
     "model": "openai/gpt-4.1-nano",
@@ -73,7 +80,32 @@
     "input_sha256": "950a93e1cdf5941ff85388c9624010a0c9f69445bde2b01a0bd79821c8104232",
     "input_file": "data/processed/test_sample_500.jsonl",
     "ids_file": null,
-    "row_ids_sha256": "10000d6bd5e13c2ed003adeda1a2813015f4ead2c5e127ba1c2133cc8bc101ae"
+    "row_ids_sha256": "10000d6bd5e13c2ed003adeda1a2813015f4ead2c5e127ba1c2133cc8bc101ae",
+    "retry_prompt_sha256": null,
+    "max_verification_rounds": null
+   },
+   "llm_single_verified": {
+    "model": "openai/gpt-4.1-nano",
+    "model_version": "openai/gpt-4.1-nano-2025-04-14",
+    "generation": {
+     "temperature": 0,
+     "seed": 42,
+     "max_tokens": 4096
+    },
+    "provider_routing": {
+     "order": [
+      "openai"
+     ],
+     "allow_fallbacks": false,
+     "require_parameters": true
+    },
+    "prompt_sha256": "3afd24b1e993b086c7ad45f46eabe830ff5f67a291789760d0ac45b973b0819b",
+    "input_sha256": "950a93e1cdf5941ff85388c9624010a0c9f69445bde2b01a0bd79821c8104232",
+    "input_file": "data/processed/test_sample_500.jsonl",
+    "ids_file": null,
+    "row_ids_sha256": "10000d6bd5e13c2ed003adeda1a2813015f4ead2c5e127ba1c2133cc8bc101ae",
+    "retry_prompt_sha256": "5b770681747c607b8bc71f5974b6d9a67c21b837e3bb6acc18643cd212c9bbc2",
+    "max_verification_rounds": 2
    }
   }
  },
@@ -1299,16 +1331,6 @@
       6
      ]
     },
-    "pemanggilan_alat_rerata": {
-     "mean": 15.441333333333333,
-     "min": 15.366,
-     "max": 15.504,
-     "values": [
-      15.366,
-      15.454,
-      15.504
-     ]
-    },
     "verification_failed": {
      "mean": 68.66666666666667,
      "min": 65.0,
@@ -1317,6 +1339,16 @@
       65,
       65,
       76
+     ]
+    },
+    "pemanggilan_alat_rerata": {
+     "mean": 15.441333333333333,
+     "min": 15.366,
+     "max": 15.504,
+     "values": [
+      15.366,
+      15.454,
+      15.504
      ]
     },
     "delegasi_keempat_subagen": {
@@ -1395,6 +1427,455 @@
     "runs": 3
    },
    "baris_label_berubah_antar_run": 26
+  },
+  "llm_single_verified": {
+   "runs": [
+    {
+     "file": "results/llm_single_verified_r1.jsonl",
+     "run_id": "llm_single_verified_r1-20261013T072431Z-22841cb",
+     "git_commit": "22841cbe010acfb9bcde5ed7275974cb1cbf0f74",
+     "git_dirty": false
+    },
+    {
+     "file": "results/llm_single_verified_r2.jsonl",
+     "run_id": "llm_single_verified_r2-20261013T072431Z-22841cb",
+     "git_commit": "22841cbe010acfb9bcde5ed7275974cb1cbf0f74",
+     "git_dirty": false
+    },
+    {
+     "file": "results/llm_single_verified_r3.jsonl",
+     "run_id": "llm_single_verified_r3-20261013T072431Z-22841cb",
+     "git_commit": "22841cbe010acfb9bcde5ed7275974cb1cbf0f74",
+     "git_dirty": false
+    }
+   ],
+   "metrics": {
+    "biner_accuracy": {
+     "mean": 0.8713333333333333,
+     "min": 0.864,
+     "max": 0.876,
+     "values": [
+      0.864,
+      0.874,
+      0.876
+     ]
+    },
+    "biner_precision": {
+     "mean": 0.9933710438449479,
+     "min": 0.9914285714285714,
+     "max": 0.9943502824858758,
+     "values": [
+      0.9914285714285714,
+      0.9943342776203966,
+      0.9943502824858758
+     ]
+    },
+    "biner_recall": {
+     "mean": 0.8495145631067961,
+     "min": 0.8422330097087378,
+     "max": 0.8543689320388349,
+     "values": [
+      0.8422330097087378,
+      0.8519417475728155,
+      0.8543689320388349
+     ]
+    },
+    "biner_f1": {
+     "mean": 0.915822755299498,
+     "min": 0.910761154855643,
+     "max": 0.9190600522193211,
+     "values": [
+      0.910761154855643,
+      0.9176470588235295,
+      0.9190600522193211
+     ]
+    },
+    "biner_fpr": {
+     "mean": 0.026515151515151516,
+     "min": 0.022727272727272728,
+     "max": 0.03409090909090909,
+     "values": [
+      0.03409090909090909,
+      0.022727272727272728,
+      0.022727272727272728
+     ]
+    },
+    "accuracy": {
+     "mean": 0.8039999999999999,
+     "min": 0.794,
+     "max": 0.81,
+     "values": [
+      0.794,
+      0.81,
+      0.808
+     ]
+    },
+    "macro_precision": {
+     "mean": 0.8502353696298618,
+     "min": 0.8440085014167237,
+     "max": 0.8541945895754176,
+     "values": [
+      0.8440085014167237,
+      0.8541945895754176,
+      0.852503017897444
+     ]
+    },
+    "macro_recall": {
+     "mean": 0.8109120904064725,
+     "min": 0.801534607714383,
+     "max": 0.8165371613405322,
+     "values": [
+      0.801534607714383,
+      0.8165371613405322,
+      0.8146645021645021
+     ]
+    },
+    "macro_f1": {
+     "mean": 0.8038914779415536,
+     "min": 0.7957691502046341,
+     "max": 0.809739303659944,
+     "values": [
+      0.7957691502046341,
+      0.809739303659944,
+      0.8061659799600828
+     ]
+    },
+    "f1_SQLI": {
+     "mean": 0.9702669149596522,
+     "min": 0.9666666666666667,
+     "max": 0.9720670391061451,
+     "values": [
+      0.9666666666666667,
+      0.9720670391061451,
+      0.9720670391061451
+     ]
+    },
+    "f1_XSS": {
+     "mean": 0.8974692165195598,
+     "min": 0.8869565217391304,
+     "max": 0.9107142857142857,
+     "values": [
+      0.9107142857142857,
+      0.8869565217391304,
+      0.8947368421052632
+     ]
+    },
+    "f1_PATH_TRAVERSAL": {
+     "mean": 0.8142584981294659,
+     "min": 0.7849462365591398,
+     "max": 0.8324324324324325,
+     "values": [
+      0.7849462365591398,
+      0.8324324324324325,
+      0.8253968253968254
+     ]
+    },
+    "f1_CMD_INJECTION": {
+     "mean": 0.8466415305124984,
+     "min": 0.8441558441558442,
+     "max": 0.8516129032258065,
+     "values": [
+      0.8441558441558442,
+      0.8441558441558442,
+      0.8516129032258065
+     ]
+    },
+    "f1_WEB_SCANNING": {
+     "mean": 0.5676315932129886,
+     "min": 0.5538461538461539,
+     "max": 0.5909090909090909,
+     "values": [
+      0.5538461538461539,
+      0.5909090909090909,
+      0.5581395348837209
+     ]
+    },
+    "f1_NORMAL": {
+     "mean": 0.7270811143151569,
+     "min": 0.7142857142857142,
+     "max": 0.7350427350427352,
+     "values": [
+      0.7142857142857142,
+      0.7319148936170213,
+      0.7350427350427352
+     ]
+    },
+    "prediksi_tidak_valid": {
+     "mean": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "values": [
+      0,
+      0,
+      0
+     ]
+    },
+    "evidence_literal": {
+     "mean": 0.8917034342195708,
+     "min": 0.887624466571835,
+     "max": 0.8954802259887006,
+     "values": [
+      0.8954802259887006,
+      0.887624466571835,
+      0.8920056100981767
+     ]
+    },
+    "token_masukan_rerata": {
+     "mean": 1278.572,
+     "min": 1276.26,
+     "max": 1280.974,
+     "values": [
+      1276.26,
+      1280.974,
+      1278.482
+     ]
+    },
+    "token_keluaran_rerata": {
+     "mean": 131.214,
+     "min": 124.078,
+     "max": 138.862,
+     "values": [
+      130.702,
+      124.078,
+      138.862
+     ]
+    },
+    "latensi_median_s": {
+     "mean": 1.4308333333333334,
+     "min": 1.391,
+     "max": 1.4625,
+     "values": [
+      1.439,
+      1.391,
+      1.4625
+     ]
+    },
+    "latensi_p95_s": {
+     "mean": 3.1319166666666653,
+     "min": 3.0342,
+     "max": 3.238849999999997,
+     "values": [
+      3.1226999999999983,
+      3.0342,
+      3.238849999999997
+     ]
+    },
+    "biaya_total_usd": {
+     "mean": 0.09006899999999995,
+     "min": 0.08886430000000005,
+     "max": 0.09154289999999989,
+     "values": [
+      0.08979979999999996,
+      0.08886430000000005,
+      0.09154289999999989
+     ]
+    },
+    "biaya_per_1000_baris_usd": {
+     "mean": 0.1801379999999999,
+     "min": 0.1777286000000001,
+     "max": 0.18308579999999977,
+     "values": [
+      0.17959959999999991,
+      0.1777286000000001,
+      0.18308579999999977
+     ]
+    },
+    "panggilan_llm_rerata": {
+     "mean": 1.324,
+     "min": 1.322,
+     "max": 1.326,
+     "values": [
+      1.322,
+      1.326,
+      1.324
+     ]
+    },
+    "latensi_panggilan_median_s": {
+     "mean": 1.264,
+     "min": 1.233,
+     "max": 1.286,
+     "values": [
+      1.273,
+      1.233,
+      1.286
+     ]
+    },
+    "latensi_panggilan_p95_s": {
+     "mean": 1.9401333333333326,
+     "min": 1.8481999999999994,
+     "max": 2.0681999999999987,
+     "values": [
+      1.904,
+      1.8481999999999994,
+      2.0681999999999987
+     ]
+    },
+    "panggilan_dibatalkan_galat_api": {
+     "mean": 1.0,
+     "min": 1.0,
+     "max": 1.0,
+     "values": [
+      1,
+      1,
+      1
+     ]
+    },
+    "biaya_panggilan_dibatalkan_usd": {
+     "mean": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "degeneratif_kejadian": {
+     "mean": 1.0,
+     "min": 0.0,
+     "max": 2.0,
+     "values": [
+      1,
+      0,
+      2
+     ]
+    },
+    "degeneratif_baris_terdampak": {
+     "mean": 0.6666666666666666,
+     "min": 0.0,
+     "max": 1.0,
+     "values": [
+      1,
+      0,
+      1
+     ]
+    },
+    "degeneratif_terdampak_ok": {
+     "mean": 0.6666666666666666,
+     "min": 0.0,
+     "max": 1.0,
+     "values": [
+      1,
+      0,
+      1
+     ]
+    },
+    "degeneratif_terdampak_verification_failed": {
+     "mean": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "values": [
+      0,
+      0,
+      0
+     ]
+    },
+    "degeneratif_terdampak_verification_skipped": {
+     "mean": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "values": [
+      0,
+      0,
+      0
+     ]
+    },
+    "degeneratif_terdampak_parse_error": {
+     "mean": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "values": [
+      0,
+      0,
+      0
+     ]
+    },
+    "degeneratif_terdampak_label_benar": {
+     "mean": 0.6666666666666666,
+     "min": 0.0,
+     "max": 1.0,
+     "values": [
+      1,
+      0,
+      1
+     ]
+    },
+    "verification_failed": {
+     "mean": 74.0,
+     "min": 72.0,
+     "max": 75.0,
+     "values": [
+      72,
+      75,
+      75
+     ]
+    }
+   },
+   "confusion_mean": [
+    [
+     87.0,
+     1.0,
+     0.0,
+     0.0,
+     0.0,
+     1.0,
+     0.0
+    ],
+    [
+     0.0,
+     51.0,
+     0.0,
+     0.0,
+     0.0,
+     5.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     76.0,
+     0.0,
+     1.3333333333333333,
+     11.666666666666666,
+     0.0
+    ],
+    [
+     3.3333333333333335,
+     2.3333333333333335,
+     12.666666666666666,
+     65.33333333333333,
+     3.0,
+     2.3333333333333335,
+     0.0
+    ],
+    [
+     0.0,
+     1.3333333333333333,
+     8.666666666666666,
+     0.0,
+     37.0,
+     42.0,
+     0.0
+    ],
+    [
+     0.0,
+     2.0,
+     0.3333333333333333,
+     0.0,
+     0.0,
+     85.66666666666667,
+     0.0
+    ]
+   ],
+   "rows": 500,
+   "macro_f1_ci95": {
+    "low": 0.721623032185113,
+    "high": 0.8547827725829639,
+    "mean": 0.7941666768188042,
+    "n_bootstrap": 1000,
+    "runs": 3
+   },
+   "baris_label_berubah_antar_run": 37
   }
  }
 }

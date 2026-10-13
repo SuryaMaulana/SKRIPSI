@@ -1,4 +1,4 @@
-Evaluasi evaluate-20261008T033140Z-ee70404 (commit ee70404, dirty=False)
+Evaluasi evaluate-20261013T075009Z-a75bda8 (commit a75bda8, dirty=False)
 
 Sumber label: data/processed/test_sample_500.jsonl. Prediksi di luar 6 kelas dihitung salah.
 
@@ -12,6 +12,9 @@ Tabel 4.2 — deteksi biner (serangan vs NORMAL)
 | llm_single_r1 | 500/500 | 0,902 | 0,992 | 0,888 | 0,937 | 0,034 |
 | llm_single_r2 | 500/500 | 0,898 | 0,992 | 0,883 | 0,935 | 0,034 |
 | llm_single_r3 | 500/500 | 0,906 | 0,995 | 0,891 | 0,940 | 0,023 |
+| llm_single_verified_r1 | 500/500 | 0,864 | 0,991 | 0,842 | 0,911 | 0,034 |
+| llm_single_verified_r2 | 500/500 | 0,874 | 0,994 | 0,852 | 0,918 | 0,023 |
+| llm_single_verified_r3 | 500/500 | 0,876 | 0,994 | 0,854 | 0,919 | 0,023 |
 | regex | 500/500 | 0,704 | 1,000 | 0,641 | 0,781 | 0,000 |
 | regex_full (post hoc) | 500/500 | 0,836 | 1,000 | 0,801 | 0,889 | 0,000 |
 
@@ -25,6 +28,9 @@ Tabel 4.3 — klasifikasi 6 kelas
 | llm_single_r1 | 500/500 | 0,832 | 0,859 | 0,843 | 0,832 | [0,754; 0,881] |
 | llm_single_r2 | 500/500 | 0,828 | 0,862 | 0,839 | 0,828 | [0,748; 0,878] |
 | llm_single_r3 | 500/500 | 0,832 | 0,859 | 0,843 | 0,830 | [0,750; 0,878] |
+| llm_single_verified_r1 | 500/500 | 0,794 | 0,844 | 0,802 | 0,796 | [0,715; 0,848] |
+| llm_single_verified_r2 | 500/500 | 0,810 | 0,854 | 0,817 | 0,810 | [0,729; 0,862] |
+| llm_single_verified_r3 | 500/500 | 0,808 | 0,853 | 0,815 | 0,806 | [0,724; 0,858] |
 | regex | 500/500 | 0,698 | 0,889 | 0,717 | 0,717 | [0,622; 0,779] |
 | regex_full (post hoc) | 500/500 | 0,828 | 0,912 | 0,839 | 0,820 | [0,752; 0,859] |
 
@@ -38,6 +44,9 @@ F1 per kelas
 | llm_single_r1 | 0,972 | 0,949 | 0,854 | 0,844 | 0,594 | 0,776 |
 | llm_single_r2 | 0,967 | 0,957 | 0,835 | 0,844 | 0,597 | 0,769 |
 | llm_single_r3 | 0,961 | 0,949 | 0,860 | 0,844 | 0,578 | 0,785 |
+| llm_single_verified_r1 | 0,967 | 0,911 | 0,785 | 0,844 | 0,554 | 0,714 |
+| llm_single_verified_r2 | 0,972 | 0,887 | 0,832 | 0,844 | 0,591 | 0,732 |
+| llm_single_verified_r3 | 0,972 | 0,895 | 0,825 | 0,852 | 0,558 | 0,735 |
 | regex | 0,367 | 1,000 | 0,894 | 0,898 | 0,598 | 0,543 |
 | regex_full (post hoc) | 0,367 | 1,000 | 0,894 | 0,983 | 0,994 | 0,682 |
 
@@ -51,6 +60,9 @@ Tabel 4.5 — evidence literal (item evidence yang ada harfiah di raw_log_masked
 | llm_single_r1 | 500 | 500 | 801 | 601 | 0,750 | 331 |
 | llm_single_r2 | 500 | 500 | 799 | 614 | 0,768 | 339 |
 | llm_single_r3 | 500 | 500 | 801 | 615 | 0,768 | 345 |
+| llm_single_verified_r1 | 500 | 500 | 708 | 634 | 0,895 | 428 |
+| llm_single_verified_r2 | 500 | 500 | 703 | 624 | 0,888 | 425 |
+| llm_single_verified_r3 | 500 | 500 | 713 | 636 | 0,892 | 425 |
 Metode tanpa field evidence (mis. regex) tidak dimasukkan.
 
 Confusion matrix — agent_r1
@@ -117,6 +129,39 @@ Confusion matrix — llm_single_r3
 | PATH_TRAVERSAL | 0 | 1 | 83 | 0 | 2 | 3 |
 | CMD_INJECTION | 5 | 0 | 13 | 65 | 5 | 1 |
 | WEB_SCANNING | 0 | 2 | 8 | 0 | 39 | 40 |
+| NORMAL | 0 | 2 | 0 | 0 | 0 | 86 |
+
+Confusion matrix — llm_single_verified_r1
+
+| benar \ prediksi | SQLI | XSS | PATH_TRAVERSAL | CMD_INJECTION | WEB_SCANNING | NORMAL |
+|---|---|---|---|---|---|---|
+| SQLI | 87 | 1 | 0 | 0 | 0 | 1 |
+| XSS | 0 | 51 | 0 | 0 | 0 | 5 |
+| PATH_TRAVERSAL | 0 | 0 | 73 | 0 | 1 | 15 |
+| CMD_INJECTION | 4 | 1 | 13 | 65 | 4 | 2 |
+| WEB_SCANNING | 0 | 1 | 10 | 0 | 36 | 42 |
+| NORMAL | 0 | 2 | 1 | 0 | 0 | 85 |
+
+Confusion matrix — llm_single_verified_r2
+
+| benar \ prediksi | SQLI | XSS | PATH_TRAVERSAL | CMD_INJECTION | WEB_SCANNING | NORMAL |
+|---|---|---|---|---|---|---|
+| SQLI | 87 | 1 | 0 | 0 | 0 | 1 |
+| XSS | 0 | 51 | 0 | 0 | 0 | 5 |
+| PATH_TRAVERSAL | 0 | 0 | 77 | 0 | 1 | 11 |
+| CMD_INJECTION | 3 | 3 | 12 | 65 | 3 | 3 |
+| WEB_SCANNING | 0 | 2 | 7 | 0 | 39 | 41 |
+| NORMAL | 0 | 2 | 0 | 0 | 0 | 86 |
+
+Confusion matrix — llm_single_verified_r3
+
+| benar \ prediksi | SQLI | XSS | PATH_TRAVERSAL | CMD_INJECTION | WEB_SCANNING | NORMAL |
+|---|---|---|---|---|---|---|
+| SQLI | 87 | 1 | 0 | 0 | 0 | 1 |
+| XSS | 0 | 51 | 0 | 0 | 0 | 5 |
+| PATH_TRAVERSAL | 0 | 0 | 78 | 0 | 2 | 9 |
+| CMD_INJECTION | 3 | 3 | 13 | 66 | 2 | 2 |
+| WEB_SCANNING | 0 | 1 | 9 | 0 | 36 | 43 |
 | NORMAL | 0 | 2 | 0 | 0 | 0 | 86 |
 
 Confusion matrix — regex
