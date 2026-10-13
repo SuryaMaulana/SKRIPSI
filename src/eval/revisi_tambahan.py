@@ -10,9 +10,10 @@ Definisi:
 - Kaskade §3.6 (post hoc pada keluaran per baris yang ada): baris yang diberi kelas serangan oleh regex utama (CRS PL1 +
   aturan Baş Seyyar dkk.) memakai label regex; baris yang diberi NORMAL memakai label LLM tunggal run yang sama (r1-r3).
   Varian: regex_full sebagai lapis pertama. Sensitivitas: regex utama dengan hit berkas terlarang (930130/930140, yang
-  oleh configs/regex_baseline.yaml restricted_files dipetakan ke WEB_SCANNING bila tanpa traversal) memakai kelas bawaan
-  kategori 930 (PATH_TRAVERSAL); label dihitung ulang dari matched_rules dengan skor dan tie_break regex_baseline
-  (rekonstruksi tanpa perubahan harus sama persis dengan results/regex.jsonl). Biaya = cost_usd (billed) dan harga list
+  oleh configs/regex_baseline.yaml restricted_files dipetakan ke WEB_SCANNING bila tanpa traversal) memakai kelas
+  pemetaan biasanya (rule_class_map, lalu class_map kategori 930 = PATH_TRAVERSAL); label dihitung ulang dari
+  matched_rules dengan skor dan tie_break regex_baseline (rekonstruksi tanpa perubahan harus sama persis dengan
+  results/regex.jsonl). Biaya = cost_usd (billed) dan harga list
   (token x tarif configs/llm.yaml) LLM tunggal hanya pada baris yang diteruskan, dibagi jumlah seluruh baris sampel, per
   1.000 baris. Baris diteruskan yang dipulihkan = baris yang diberi kelas gerbangnya oleh LLM.
 - Sub-tipe WEB_SCANNING: aturan gerbang di awalan template_key: V1 metode non-standar (label 274), W1 UA pemindai
@@ -27,13 +28,13 @@ Definisi:
   pada path, query string, User-Agent, dan Referer setelah multi_decode. Aturan 942 regex utama yang memeriksa path =
   aturan terpakai (PL1, tanpa operator yang dikecualikan, dapat dievaluasi dari log) yang target link pertamanya memuat
   REQUEST_FILENAME, REQUEST_BASENAME, REQUEST_URI, REQUEST_URI_RAW, atau REQUEST_LINE; dibaca dari berkas aturan CRS
-  yang sudah diekstrak oleh make regex (tanpa unduhan), dicocokkan dengan rules_dir_sha256 dan jumlah aturan 942 di
-  results/regex.run.json.
+  yang sudah diekstrak di data/external/crs (tanpa unduhan), dicocokkan dengan rules_dir_sha256 (.DS_Store diabaikan)
+  dan jumlah aturan 942 di results/regex.run.json.
 - Dedup persis: bingkai 6 kelas dibangun ulang dari data/raw (hanya dibaca; MD5 diverifikasi) dengan fungsi pipeline
   src/data seperti src/data/prepare.py. Paritas: dedup isi resmi -> batas templat RFI -> split harus menghasilkan id
   srbh_train/val/test.parquet dan baris RFI_TEMPLATE_CAP srbh_excluded.parquet persis. Kontrafaktual: dedup pada raw_log
-  utuh (dengan stempel waktu) -> batas templat RFI -> split stratified baru dengan seed yang sama; kembaran isi = baris
-  uji yang audit.content_key-nya (baris log tanpa stempel waktu) ada di train.
+  utuh (dengan stempel waktu) -> batas templat RFI -> split stratified baru dengan seed yang sama, serta varian tanpa
+  batas templat RFI; kembaran isi = baris uji yang audit.content_key-nya (baris log tanpa stempel waktu) ada di train.
 Laporan hanya memuat jumlah agregat, tanpa id per baris. † = nilai identik di ketiga run pada presisi yang ditampilkan.
 Jalankan: make eval  (atau python -m src.eval.revisi_tambahan --out reports/revisi_tambahan.md)
 """
@@ -67,7 +68,7 @@ CARRIERS = ("path", "query", "user_agent", "referer")
 PATH_VARIABLES = ("REQUEST_FILENAME", "REQUEST_BASENAME", "REQUEST_URI", "REQUEST_URI_RAW", "REQUEST_LINE")
 LABEL_NAMES = (*CLASSES, "invalid")  # indeks OTHER = keluaran di luar 6 kelas
 LAYERS = {"regex": "Cascade: regex → single LLM", "regex_full": "Cascade: full regex (post hoc) → single LLM",
-          "regex_930": "Sensitivity: regex with restricted files → PATH_TRAVERSAL (CRS 930 default) → single LLM"}
+          "regex_930": "Sensitivity: regex with restricted files → PATH_TRAVERSAL (class_map 930) → single LLM"}
 CASCADE_SHORT = {"regex": "Cascade (regex → single LLM)", "regex_full": "Cascade (full regex → single LLM)",
                  "regex_930": "Sensitivity cascade (restricted files → PATH_TRAVERSAL)"}
 SECOND = {**SHORT, "regex_930": "regex with restricted files → PATH_TRAVERSAL"}
@@ -158,13 +159,15 @@ def regex_labels(rows: list[dict], config: dict, restricted_as_category: bool = 
     from ..baselines.regex_baseline import ATTACK_CLASSES
 
     special = {str(r) for r in config["restricted_files"]["rules"]}
+    by_rule = {str(k): v for k, v in (config.get("rule_class_map") or {}).items()}
     order = config["scoring"]["tie_break"]
     out = {}
     for row in rows:
         score = dict.fromkeys(ATTACK_CLASSES, 0)
         for hit in row["matched_rules"]:
-            crs = str(hit.get("source", "")).startswith("CRS")
-            label = config["class_map"][hit["rule"][:3]] if restricted_as_category and crs and hit["rule"] in special else hit["class"]
+            label = hit["class"]
+            if restricted_as_category and str(hit.get("source", "")).startswith("CRS") and hit["rule"] in special:
+                label = by_rule.get(hit["rule"]) or config["class_map"][hit["rule"][:3]]  # seperti mapped_class
             score[label] += hit["points"]
         out[row["id"]] = (max(ATTACK_CLASSES, key=lambda c: (score[c], -order.index(c))) if any(score.values())
                           else "NORMAL")
@@ -194,7 +197,8 @@ def ws_groups(truth: Truth) -> dict[str, list[str]]:
 
 
 def cascade(truth: Truth, data: dict, n_paired: int = N_PAIRED) -> dict:
-    if "llm_single" not in data:
+    layers = _first_layers(data)
+    if "llm_single" not in data or not layers:
         return {}
     ids, t, clusters, preds = arrays(truth, data)
     gold = [truth.labels[i] for i in ids]
@@ -202,7 +206,7 @@ def cascade(truth: Truth, data: dict, n_paired: int = N_PAIRED) -> dict:
     rate_in, rate_out = _list_rates()
     out = {"llm_single_biaya_per_1000_baris_usd": data["llm_single"]["group"]["metrics"]["biaya_per_1000_baris_usd"],
            "lapis_pertama": {}}
-    for first, layer in _first_layers(data).items():
+    for first, layer in layers.items():
         sent = {i for i in ids if layer[i] == "NORMAL"}
         runs, billed, listed = [], [], []
         for m in data["llm_single"]["methods"]:
@@ -291,10 +295,20 @@ def sql_carriers(row: dict) -> set[str]:
     return {c for c in CARRIERS if any(f.search(multi_decode(row.get(c) or "")) for f in SQL_FAMILIES)}
 
 
+def _rules_digest(directory: Path) -> str:
+    """crs.tree_digest tanpa berkas .DS_Store (metadata Finder macOS yang bisa muncul setelah ekstraksi)."""
+    import hashlib
+
+    digest = hashlib.sha256()
+    for path in sorted(p for p in directory.rglob("*") if p.is_file() and p.name != ".DS_Store"):
+        digest.update(path.relative_to(directory).as_posix().encode() + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
 def sqli_rules_on_path(run_path: Path = REGEX_RUN) -> dict | None:
     """Aturan 942 terpakai di konfigurasi regex utama yang target link pertamanya memuat variabel path; dibaca dari
     berkas aturan CRS yang sudah diekstrak (tanpa unduhan). None bila folder aturan belum ada (make regex)."""
-    from ..baselines.crs import EXTERNAL_DIR, load_rules, tree_digest
+    from ..baselines.crs import EXTERNAL_DIR, load_rules
     from ..baselines.modsec import is_applicable
     from ..baselines.regex_baseline import load_config, mapped_class
 
@@ -304,7 +318,7 @@ def sqli_rules_on_path(run_path: Path = REGEX_RUN) -> dict | None:
     if not rules_dir.is_dir():
         return None
     summary = json.loads(run_path.read_text(encoding="utf-8"))["ruleset"]
-    if tree_digest(rules_dir) != summary["rules_dir_sha256"]:
+    if _rules_digest(rules_dir) != summary["rules_dir_sha256"]:
         raise RuntimeError(f"{rules_dir} berbeda dari aturan yang dipakai {run_path.name} (rules_dir_sha256)")
     excluded = set(crs["excluded_operators"])
     rules = [r for r in load_rules(rules_dir, ["942"])[0]
@@ -330,7 +344,8 @@ def sqli_missed(truth: Truth, data: dict, inputs: list[dict], rules_on_path: dic
     hits = {r["id"]: {h["rule"] for h in r.get("matched_rules") or []} for r in regex.rows}
     caught = [i for i in sqli if regex.predictions[i] == "SQLI"]
     return {
-        "sqli": len(sqli), "prediksi_regex": dict(Counter(regex.predictions[i] for i in sqli).most_common()),
+        "sqli": len(sqli), "baris_regex": len(regex.rows),
+        "prediksi_regex": dict(Counter(regex.predictions[i] for i in sqli).most_common()),
         "terlewat": len(missed),
         "tanpa_query_string": count(lambda i: not query[i]),
         "payload_di_path": count(lambda i: "path" in where[i]),
@@ -431,6 +446,11 @@ def _counts(values: dict, keys) -> str:
     return ", ".join(f"{k} {values[k]}" for k in keys if values.get(k))
 
 
+def _safe(text: str) -> str:
+    """Teks dari data untuk sel tabel Markdown."""
+    return text.replace("|", "\\|").replace("\n", " ").replace("\r", " ")
+
+
 def _cell(stat: dict | None, digits: int = 3) -> str:
     runs = len(stat["values"]) if stat and stat.get("values") else 1
     return cell(stat, digits, runs=runs, dagger=True)
@@ -469,7 +489,7 @@ def _section_pilot(x: dict) -> list[str]:
                             f"{_p(z['p'])} / {_p(z['p_permutasi'])}"]
                            for y in tests for z in [full[(y["a"], y["b"])]]]))
     if x["mcnemar"]:
-        out += ["", f"McNemar eksak pada {x['n']} baris per pasangan run berindeks sama:", ""]
+        out += ["", f"McNemar eksak pada {x['n']} baris per pasangan run berindeks sama (mengabaikan klaster templat):", ""]
         out.append(_table(["A − B", "run", "A benar, B salah", "B benar, A salah", "p eksak"],
                           [[f"{SHORT[y['a']]} − {SHORT[y['b']]}", f"r{q['run']}–r{q['run']}", str(q["a_benar_b_salah"]),
                             str(q["b_benar_a_salah"]), f"{q['p']:.2e}"] for y in x["mcnemar"] for q in y["pasangan"]]))
@@ -522,7 +542,7 @@ def _section_ws(x: dict) -> list[str]:
                        for r in present]))
     out += ["", "Recall per template_key (T3:lainnya dirinci menurut nama berkas):", ""]
     out.append(_table(["Template", "Lines", *(NAMES[n] for n in names)],
-                      [[d, str(k), *(_cell(x["recall_per_rincian"][n][d], 2) for n in names)]
+                      [[_safe(d), str(k), *(_cell(x["recall_per_rincian"][n][d], 2) for n in names)]
                        for r in present for d, k in x["rincian"][r].items()]))
     out += ["", "Prediksi pada baris sub-tipe (rerata per run):", ""]
     out += [f"- {NAMES[n]}: " + "; ".join(
@@ -565,9 +585,10 @@ def _section_sqli(x: dict) -> list[str]:
         fired = ", ".join(f"{k} {v}" for k, v in x["baris_dengan_aturan_path"].items())
         out.append(f"- Aturan 942 terpakai (PL1, regex) di konfigurasi utama: {rules['aturan_942_dipakai']}; yang "
                    f"memeriksa path ({', '.join(rules['variabel_path'])}): {', '.join(map(str, rules['memeriksa_path']))}"
-                   f" (jumlah baris dari 500 yang memicunya: {fired}).")
+                   f" (jumlah baris dari {x['baris_regex']} yang memicunya: {fired}).")
     else:
-        out.append("- Aturan 942 yang memeriksa path: dilewati (aturan CRS belum diekstrak; jalankan make regex).")
+        out.append("- Aturan 942 yang memeriksa path: dilewati (arsip CRS terpatok belum diekstrak ke data/external/crs; "
+                   "ekstrak dengan src/baselines/crs.ensure_crs, tanpa menjalankan ulang make regex).")
     out.append("- Aturan 942 pada baris SQLI yang diprediksi SQLI (jumlah baris): "
                + (", ".join(f"{k} {v}" for k, v in x["aturan_pada_sqli_terdeteksi"].items()) or "tidak ada") + ".")
     return out
@@ -584,7 +605,7 @@ def _section_dedup(x: dict) -> list[str]:
             f"{c['duplicates_dropped'] + c['conflict_rows_dropped']:,} (konflik label {c['conflict_rows_dropped']:,}), "
             f"sisa {c['rows_out']:,}.",
             f"- Dedup persis (raw_log utuh dengan stempel waktu): dibuang **{d['duplicates_dropped'] + d['conflict_rows_dropped']:,}** "
-            f"(konflik label {d['conflict_rows_dropped']:,}), sisa {d['rows_out']:,}; per kelas: "
+            f"(konflik label {d['conflict_rows_dropped']:,}), sisa {d['rows_out']:,}; duplikat per kelas (tanpa baris konflik): "
             + ", ".join(f"{k} {v:,}" for k, v in d["duplicates_dropped_by_class"].items()) + "."]
     for name, title in (("dengan_batas_rfi", f"dedup persis -> batas templat RFI ({x['batas_templat_rfi']}) -> split"),
                         ("tanpa_batas_rfi", "dedup persis -> split (tanpa batas templat RFI)")):

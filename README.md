@@ -142,7 +142,8 @@ dengan `id` dan kolom masukan metode (`raw_log_masked`, hasil parsing tanpa wakt
 `query_norm`, `ua_norm`), yaitu persis yang dibaca semua metode. Label gerbang dan `template_key` tidak disertakan;
 keduanya dibangun ulang dengan `make data`. `id` adalah id opak `srbh-` + 16 digit heksadesimal pertama
 SHA-256(`srbh2020:<row_id>`), dengan `row_id` = indeks baris data berbasis 0 di CSV SR-BH (tanpa header;
-`opaque_id` di `src/data/prepare.py`), sehingga id tidak memuat nomor baris; id yang sama dipakai di `results/*.jsonl`.
+`opaque_id` di `src/data/prepare.py`). id tidak memuat nomor baris secara langsung, tetapi dapat dicocokkan ulang ke CSV
+dengan rumus ini; id yang sama dipakai di `results/*.jsonl`.
 Urutan baris berkas adalah acakan berbenih tetap (random_state 42) dari sampel, sama dengan urutan `results/*.jsonl`.
 Berkas ini dibuat ulang dari sampel olahan dengan `make sampel-publik`. Semua metode hanya membaca kolom masukan `test_sample_500.jsonl` lewat
 `src/common/inputs.py` (tanpa `label`/`template_key`); setiap run mencatat tanggal, commit git, dan nama model di

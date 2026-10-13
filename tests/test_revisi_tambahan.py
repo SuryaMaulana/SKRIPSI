@@ -24,8 +24,8 @@ def _truth(labels, keys=None):
     return Truth(dict(labels), keys, "uji", {i: "GET / HTTP/1.1" for i in labels})
 
 
-def _two_per_class():
-    labels = {f"{c[:2]}{j}": c for c in CLASSES for j in range(2)}
+def _two_per_class(prefix=""):
+    labels = {f"{prefix}{c[:2]}{j}": c for c in CLASSES for j in range(2)}
     keys = {i: ("V1:MOVE" if c == "WEB_SCANNING" else f"t{i}") for i, c in labels.items()}
     return _truth(labels, keys), labels
 
@@ -46,6 +46,10 @@ def test_without_pilot_drops_the_pilot_ids_and_recomputes_metrics_and_paired_tes
     assert out["metode"]["agent"]["macro_f1"]["mean"] == pytest.approx(macro_f1(t, p))
     (test,) = out["uji_berpasangan"]
     assert (test["a"], test["b"]) == ("llm_single", "agent") and test["selisih"] == pytest.approx(1 - macro_f1(t, p))
+    _, t_all, clusters, preds = rt.arrays(truth, data)
+    (full,) = out["uji_berpasangan_500"]
+    assert full == {"a": "llm_single", "b": "agent", **rt.paired(t_all, preds["llm_single"], preds["agent"], clusters, 20)}
+    assert out["metode"]["agent"]["akurasi_pilot"]["mean"] == 1.0  # baris pilot (akhiran 0) semuanya benar
     (tmp_path / "pilot.json").write_text(json.dumps({"ids": ["tidak-ada"]}))
     with pytest.raises(ValueError, match="tidak ada di sampel"):
         rt.without_pilot(truth, data, n_paired=20, pilot_path=tmp_path / "pilot.json")
@@ -177,7 +181,7 @@ def test_regex_labels_rescore_matched_rules_and_remap_restricted_files_to_their_
 
 
 def test_render_shows_only_aggregates_and_keeps_tables_separated(tmp_path):
-    truth, labels = _two_per_class()
+    truth, labels = _two_per_class("srbh-")
     (tmp_path / "pilot.json").write_text(json.dumps({"ids": [i for i in labels if i.endswith("0")]}))
     llm = {i: c for i, c in labels.items()}
     regex = {i: (c if c == "XSS" else "NORMAL") for i, c in labels.items()}
@@ -188,9 +192,19 @@ def test_render_shows_only_aggregates_and_keeps_tables_separated(tmp_path):
     result = {"tanpa_pilot": rt.without_pilot(truth, data, 20, tmp_path / "pilot.json"),
               "kaskade": rt.cascade(truth, data, 20), "sub_tipe_web_scanning": rt.ws_subtypes(truth, data, inputs),
               "label_berubah_antar_run": rt.label_changes(truth, data),
-              "sqli_terlewat_regex": rt.sqli_missed(truth, data, inputs, None), "dedup_persis": {"dilewati": "uji"}}
+              "sqli_terlewat_regex": rt.sqli_missed(truth, data, inputs, {"aturan_942_dipakai": 2, "memeriksa_path": [942160],
+                                                                        "variabel_path": ["REQUEST_FILENAME"]}),
+              "dedup_persis": {"md5": "x", "baris_mentah": 10, "baris_6_kelas": 9, "paritas": "cocok", "batas_templat_rfi": 2,
+                               "dedup_isi": {"duplicates_dropped": 3, "conflict_rows_dropped": 0, "rows_out": 6},
+                               "dedup_persis": {"duplicates_dropped": 1, "conflict_rows_dropped": 0, "rows_out": 8,
+                                                "duplicates_dropped_by_class": {"NORMAL": 1}},
+                               "kontrafaktual": {k: {"train": 5, "uji": 2, "uji_berkembaran": 1, "persen": 50.0,
+                                                     "persen_normal": 100.0, "persen_serangan": 0.0,
+                                                     "per_kelas": {"NORMAL": [1, 1], "SQLI": [0, 1]}}
+                                                 for k in ("dengan_batas_rfi", "tanpa_batas_rfi")}}}
     text = rt.render(result)
-    assert "srbh-" not in text and "srbh-" not in json.dumps(result)
+    assert "srbh-" not in text and "srbh-" not in json.dumps(result)  # id fixture berawalan srbh-: tidak boleh muncul
+    assert "942160" in text and "jumlah baris dari 12 yang memicunya" in text and "1 dari 2 (50.00%)" in text
     assert "† = identik di ketiga run" in text and "lebih dari satu label" in text
     lines = text.splitlines()
     starts = [k for k, line in enumerate(lines) if line.startswith("|") and (k == 0 or not lines[k - 1].startswith("|"))]
@@ -205,12 +219,14 @@ def real():
         pytest.skip("butuh results/ resmi dan data/processed/test_sample_500.jsonl")
     truth = rt.load_truth("sample")
     data = rt.collect(truth)
-    return rt.build(truth, data, rt.load_inputs(rt.SAMPLE_PATH), dedup=False), data
+    return rt.build(truth, data, rt.load_inputs(rt.SAMPLE_PATH), dedup=False), data, truth
 
 
 @pytest.mark.slow
 def test_report_reproduces_the_numbers_in_the_manuscript_text(real):
-    result, data = real
+    result, data, truth = real
+    dumped = json.dumps(result) + rt.render({**result, "dedup_persis": {"dilewati": "uji"}})
+    assert not any(i in dumped for i in truth.labels)  # tidak ada id per baris di laporan
     n, f = rt._n, lambda stat, d=3: rt.cell(stat, d, runs=len(stat["values"]))
     x = result["tanpa_pilot"]
     assert x["n"] == 470 and set(x["pilot_per_kelas"].values()) == {5}
@@ -252,6 +268,8 @@ def test_report_reproduces_the_numbers_in_the_manuscript_text(real):
     assert recovered["SQLI"]["values"] == [66, 66, 66] and recovered["WEB_SCANNING"]["mean"] == 13
     assert w["rincian"]["T3"] == {"T3:.svn": 5, "T3:.htaccess": 5, "T3:.git": 4}
     assert changed["agent"]["melibatkan_invalid"] == 14
+    (mc,) = [y for y in x["mcnemar"] if (y["a"], y["b"]) == ("llm_single", "agent")]
+    assert [(q["a_benar_b_salah"], q["b_benar_a_salah"]) for q in mc["pasangan"]] == [(49, 9), (52, 9), (49, 10)]
     json.dumps(result)
 
 
@@ -270,3 +288,38 @@ def test_exact_dedup_counterfactual_reproduces_the_manuscript():
     assert (f"{y['persen_normal']:.1f}", f"{y['persen_serangan']:.1f}") == ("91.7", "13.9")
     assert np.isclose(sum(a for a, _ in out["kontrafaktual"]["dengan_batas_rfi"]["per_kelas"].values()),
                       out["kontrafaktual"]["dengan_batas_rfi"]["uji_berkembaran"])
+
+
+def test_regex_930_layer_refuses_a_reconstruction_that_differs_from_the_regex_results():
+    truth, labels = _two_per_class()
+    hit = {"rule": "942160", "class": "SQLI", "points": 5, "source": "CRS 4.30.0"}
+    rows = [{"id": i, "label": "NORMAL", "matched_rules": [hit] if c == "SQLI" else []} for i, c in labels.items()]
+    regex = {r["id"]: r["label"] for r in rows}  # SQLI berhit tetapi berlabel NORMAL: tidak konsisten
+    with pytest.raises(RuntimeError, match="rekonstruksi"):
+        rt._first_layers({"regex": {"methods": [_method("regex", regex, rows)]}})
+
+
+def test_rules_digest_matches_tree_digest_and_ignores_finder_metadata(tmp_path):
+    from src.baselines.crs import tree_digest
+
+    (tmp_path / "a.conf").write_text("SecRule ARGS")
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "b.data").write_text("x")
+    before = rt._rules_digest(tmp_path)
+    assert before == tree_digest(tmp_path)
+    (tmp_path / ".DS_Store").write_bytes(b"finder")
+    assert rt._rules_digest(tmp_path) == before != tree_digest(tmp_path)
+
+
+def test_sqli_rules_on_path_reads_the_extracted_rules_and_checks_the_run_digest(tmp_path):
+    from src.baselines.crs import EXTERNAL_DIR
+
+    if not (EXTERNAL_DIR / "coreruleset-4.30.0" / "rules").is_dir() or not rt.REGEX_RUN.exists():
+        pytest.skip("butuh aturan CRS terekstrak (data/external/crs) dan results/regex.run.json")
+    out = rt.sqli_rules_on_path()
+    assert out["aturan_942_dipakai"] == 19 and out["memeriksa_path"] == [942160, 942550]
+    run = json.loads(rt.REGEX_RUN.read_text())
+    run["ruleset"]["rules_dir_sha256"] = "0" * 64
+    (tmp_path / "regex.run.json").write_text(json.dumps(run))
+    with pytest.raises(RuntimeError, match="rules_dir_sha256"):
+        rt.sqli_rules_on_path(tmp_path / "regex.run.json")
