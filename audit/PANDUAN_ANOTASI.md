@@ -88,15 +88,18 @@ metode, path, query string, User-Agent, atau Referer, tidak hanya di parameter.
 | `XSS` | skrip sisi klien disisipkan agar dijalankan di peramban korban | `<script>`, `onerror=`, `javascript:`, varian ter-encode (`%3Cscript%3E`); bisa muncul di Referer |
 | `PATH_TRAVERSAL` | akses berkas di luar web root, atau penyertaan berkas lokal/jarak jauh | `../`, `..%2f`, `/etc/passwd`, `win.ini`; URL eksternal ber-skema (`http://...`) di path atau parameter (RFI) |
 | `CMD_INJECTION` | perintah sistem operasi disisipkan lewat permintaan | pemisah perintah shell (`;`, `&`, `&&`, `\|`, `\|\|`, baris baru) diikuti perintah seperti `id`, `cat /etc/passwd`, `sleep 15`; backtick atau `$(...)`; varian ter-encode (`%7C`, `%26%26`, `%60`); Shellshock `() {`; argumen PHP-CGI `-d allow_url_include` |
-| `WEB_SCANNING` | pemindaian otomatis untuk menemukan berkas, direktori, atau kemampuan server | User-Agent pemindai (Nmap, zgrab, sqlmap); metode HTTP non-standar (lihat di bawah); permintaan berkas sensitif tanpa payload: cadangan/salinan (`.bak`, `.backup`, `.old`, `.swp`, `~`), log (`.log`), konfigurasi (`.htaccess`, `/.env`), folder VCS (`.git/`, `.svn/`); probe `/wp-login.php` |
+| `WEB_SCANNING` | pemindaian otomatis untuk menemukan berkas, direktori, atau kemampuan server | User-Agent pemindai (Nmap, zgrab, sqlmap); metode non-standar (definisi D1); permintaan tanpa payload ke berkas sensitif (definisi D2); probe `/wp-login.php` |
 | `NORMAL` | permintaan sah pengguna atau crawler mesin pencari | URI wajar, parameter alfanumerik, status 200/301/304, User-Agent peramban atau bot mesin pencari yang dikenal dari namanya (mis. Googlebot, bingbot) |
 
 Batasan:
 
 - **URL eksternal** adalah URL ke host selain situs uji `test-site.com`. URL ke `test-site.com` (misalnya di Referer
   atau di parameter `url=`) bukan indikator. URL di Referer atau User-Agent juga bukan indikator RFI.
-- **Metode HTTP non-standar** adalah metode selain `GET`, `POST`, `HEAD`, `OPTIONS`, dan `TRACE`, misalnya `PUT`,
-  `PATCH`, `DELETE`, `PROPFIND`, `MKCOL`, `COPY`, `MOVE`, `LOCK`, `TRACK`.
+
+Definisi eksplisit (keputusan penulis):
+
+- **D1.** metode selain GET, HEAD, POST, OPTIONS dihitung indikator WEB_SCANNING (mis. PROPFIND, MKCOL, TRACK, PUT, PATCH)
+- **D2.** permintaan tanpa payload ke berkas sensitif dihitung WEB_SCANNING: cadangan (.bak, .backup, .old, .swp, ~), log (.log), konfigurasi (.htaccess, /.env), VCS (.git/, .svn/)
 
 ### Cara memutuskan
 
@@ -188,8 +191,7 @@ Nilai setiap butir dalam dua langkah.
    - Item ada bila isinya muncul utuh dan berurutan di baris log, apa adanya atau setelah decode (bagian 2).
    - Item juga boleh di-decode dengan cara yang sama sebelum dicocokkan.
    - Spasi dan tanda kutip di awal/akhir item, serta perbedaan huruf besar/kecil, diabaikan.
-   - Bila item berupa nama bagian diikuti nilai (mis. `request: ...`, `user agent ...`, `<nama>: <nilai>`), nama
-     bagiannya diabaikan dan hanya nilainya yang dicocokkan.
+   - **D3.** untuk butir berpola `<nama>: <nilai>`, hanya nilainya yang dicocokkan ke log; nama bagian diabaikan
    - Item **tidak ada** bila berupa uraian, parafrase, gabungan potongan yang tidak bersambung, atau teks yang tidak
      muncul di baris. Contohnya, `UNION SELECT` tidak ada di baris yang berisi `UNION ALL SELECT`.
    - Untuk item panjang, cek dengan Ctrl+F. Jumlah pengulangan (mis. `..%2F`) harus cocok: item boleh lebih pendek dari
@@ -304,9 +306,8 @@ Bila ada masalah, **tidak ada sel yang dilewati: perhitungan ditolak seluruhnya*
   `[item kosong]`.
 - **Urutan fase.** Lembar Panduan menulis "sampai kedua berkas selesai". Panduan ini memperjelas: Fase A diselesaikan
   dulu sebelum Fase B dibuka, dan larangan di bagian 2 berlaku untuk kedua fase.
-- **Tambahan.** Panduan ini menambahkan batasan definisi kelas (contoh tidak lengkap, URL eksternal, metode
-  non-standar, berkas sensitif), definisi "ada" (decode, tanda kutip, huruf besar/kecil, nama bagian), ketentuan untuk
-  prediksi `NORMAL`, `[item kosong]`, dan ragu, serta contoh dari data nyata. Lembar Panduan Fase B hanya berisi contoh
-  rekaan.
+- **Tambahan.** Panduan ini menambahkan definisi eksplisit D1–D3 (keputusan penulis), batasan definisi kelas (contoh
+  tidak lengkap, URL eksternal), definisi "ada" (decode, tanda kutip, huruf besar/kecil), ketentuan untuk prediksi
+  `NORMAL`, `[item kosong]`, dan ragu, serta contoh dari data nyata. Lembar Panduan Fase B hanya berisi contoh rekaan.
 - Tabel definisi di lembar Panduan adalah Tabel 1 naskah dalam bahasa Inggris. Isinya sama dengan ringkasan di bagian 3,
   di luar batasan yang ditambahkan panduan ini.
