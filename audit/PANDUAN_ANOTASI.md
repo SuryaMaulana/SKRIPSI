@@ -87,7 +87,7 @@ metode, path, query string, User-Agent, atau Referer, tidak hanya di parameter.
 | `SQLI` | sintaks SQL disisipkan untuk memanipulasi kueri basis data | `' OR 1=1`, `' AND '1'='2`, `UNION SELECT`, `SLEEP(`, komentar `--` atau `#`; sering ter-encode (`%27`, `%20`) |
 | `XSS` | skrip sisi klien disisipkan agar dijalankan di peramban korban | `<script>`, `onerror=`, `javascript:`, varian ter-encode (`%3Cscript%3E`); bisa muncul di Referer |
 | `PATH_TRAVERSAL` | akses berkas di luar web root, atau penyertaan berkas lokal/jarak jauh | `../`, `..%2f`, `/etc/passwd`, `win.ini`; URL eksternal ber-skema (`http://...`) di path atau parameter (RFI) |
-| `CMD_INJECTION` | perintah sistem operasi disisipkan lewat permintaan | pemisah perintah shell (`;`, `&`, `&&`, `\|`, `\|\|`, baris baru) diikuti perintah seperti `id`, `cat /etc/passwd`, `sleep 15`; backtick atau `$(...)`; varian ter-encode (`%7C`, `%26%26`, `%60`); Shellshock `() {`; argumen PHP-CGI `-d allow_url_include` |
+| `CMD_INJECTION` | perintah sistem operasi disisipkan lewat permintaan | pemisah perintah shell (`;`, `&`, `&&`, `\|`, `\|\|`, baris baru) diikuti perintah seperti `id`, `cat /etc/passwd`, `sleep 15`; backtick atau `$(...)`; varian ter-encode (`%7C`, `%26%26`, `%60`); Shellshock `() {`; argumen PHP-CGI `-d allow_url_include`. & yang memisahkan parameter (nama=nilai&nama=nilai) bukan pemisah perintah; & tunggal dihitung hanya bila diikuti perintah shell |
 | `WEB_SCANNING` | pemindaian otomatis untuk menemukan berkas, direktori, atau kemampuan server | User-Agent pemindai (Nmap, zgrab, sqlmap); metode non-standar (definisi D1); permintaan tanpa payload ke berkas sensitif (definisi D2); probe `/wp-login.php` |
 | `NORMAL` | permintaan sah pengguna atau crawler mesin pencari | URI wajar, parameter alfanumerik, status 200/301/304, User-Agent peramban atau bot mesin pencari yang dikenal dari namanya (mis. Googlebot, bingbot) |
 
@@ -98,8 +98,8 @@ Batasan:
 
 Definisi eksplisit (keputusan penulis):
 
-- **D1.** metode selain GET, HEAD, POST, OPTIONS dihitung indikator WEB_SCANNING (mis. PROPFIND, MKCOL, TRACK, PUT, PATCH)
-- **D2.** permintaan tanpa payload ke berkas sensitif dihitung WEB_SCANNING: cadangan (.bak, .backup, .old, .swp, ~), log (.log), konfigurasi (.htaccess, /.env), VCS (.git/, .svn/)
+- **D1.** metode selain GET, HEAD, POST, OPTIONS, TRACE dihitung indikator WEB_SCANNING (mis. PROPFIND, MKCOL, TRACK, PUT, PATCH)
+- **D2.** permintaan tanpa payload ke berkas sensitif dihitung WEB_SCANNING: cadangan (.bak, .backup, .old, .swp, ~), log (.log), konfigurasi (.htaccess, .htpasswd, wp-config, .ini, /.env), basis data (.sql, .db, .mdb), VCS (.git/, .svn/, .hg/, .gitignore)
 
 ### Cara memutuskan
 
