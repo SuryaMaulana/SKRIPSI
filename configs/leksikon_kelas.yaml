@@ -5,7 +5,8 @@
 #
 # utama: kolom indikator Tabel 1 manuskrip (= TABLE_2_1 di src/llm/klasifikasi.py). Bila Tabel 1 menyebut kategori dengan
 #   contoh ("perintah shell", "metode non-standar", "berkas cadangan/VCS"), kategori itu diperluas ke anggota umumnya;
-#   contoh lain dipakai apa adanya.
+#   contoh lain dipakai apa adanya. Indikator "kode 404 beruntun" (TABLE_2_1, WEB_SCANNING) tidak dibawa: butuh
+#   beberapa baris log, sehingga tidak dapat diperiksa pada satu item evidence dari satu baris.
 # tambahan_kb: bagian "catatan" configs/owasp_kb.yaml (basis pengetahuan agen). Hanya untuk analisis sensitivitas
 #   (utama + tambahan_kb), bukan angka utama.
 

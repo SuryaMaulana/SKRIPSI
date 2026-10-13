@@ -2,7 +2,7 @@
 PY ?= .venv/bin/python
 RAW := data/raw/srbh2020/data_capec_multilabel.csv
 
-.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot agent-pilot agent-val run-c run-e runs-c runs-e llm_single agent run-cv runs-cv llm_single_verified
+.PHONY: help setup download inspect data test test-slow clean check-api regex verify-crs golden-check regex-full-val regex-full eval llm-single-pilot agent-pilot agent-val run-c run-e runs-c runs-e llm_single agent run-cv runs-cv llm_single_verified sampel-publik
 
 help:
 	@echo "make setup     buat .venv (Python 3.11) dan pasang dependensi terkunci"
@@ -20,6 +20,7 @@ help:
 	@echo "make regex-full varian regex_full pada test_sample_500 -> results/regex_full.jsonl (post_hoc)"
 	@echo "make eval      D: Tabel 4.2/4.3, F1 per kelas, confusion matrix, IK 95% untuk semua results/*.jsonl"
 	@echo "               + reports/revisi_ablasi.md: Tabel 4-11 manuskrip revisi (termasuk ablasi), uji berpasangan"
+	@echo "               + reports/revisi_tambahan.md: angka teks naskah (tanpa pilot, kaskade, sub-tipe WS, dedup persis, ...)"
 	@echo "make llm-single-pilot C: LLM tunggal pada 30 baris pilot (5 per kelas) -> results/pilot/"
 	@echo "make run-c R=n   C: run resmi ke-n (1-3) pada 500 baris -> results/llm_single_rn.jsonl (+ _calls.jsonl)"
 	@echo "make agent-pilot E: deep agent pada 30 baris pilot yang sama dengan C -> results/pilot/"
@@ -29,6 +30,7 @@ help:
 	@echo "make llm_single / agent  alias runs-c / runs-e (urutan reproduksi di README)"
 	@echo "make run-cv R=n  ablasi revisi: LLM tunggal + loop verifikasi, run ke-n (1-3) -> results/llm_single_verified_rn.jsonl"
 	@echo "make llm_single_verified  ketiga run ablasi berurutan (alias runs-cv)"
+	@echo "make sampel-publik  sampel/test_sample_500_masukan.jsonl: 500 baris uji, id opak + kolom masukan metode saja"
 
 setup:
 	@if command -v uv >/dev/null 2>&1; then \
@@ -83,6 +85,7 @@ eval:
 	$(PY) -m src.eval.replikasi --out reports/evaluasi.md
 	$(PY) -m src.eval.evaluate --rules --out reports/evaluasi_per_run.md
 	$(PY) -m src.eval.revisi --out reports/revisi_ablasi.md
+	$(PY) -m src.eval.revisi_tambahan --out reports/revisi_tambahan.md
 
 llm-single-pilot:
 	$(PY) -m src.eval.pilot
@@ -124,3 +127,6 @@ runs-cv:
 	for r in 1 2 3; do $(MAKE) run-cv R=$$r || exit 1; done
 
 llm_single_verified: runs-cv
+
+sampel-publik:
+	$(PY) -m src.data.sampel_publik

@@ -16,7 +16,7 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
-~$*.docx
+~$*
 
 # Log panggilan LLM/alat per run (besar; untuk audit, latensi per panggilan, dan cek silang TRUNCATED). Disimpan lokal,
 # tidak di-commit.
