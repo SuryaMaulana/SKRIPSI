@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from ..common.runinfo import run_info
+from ..common.runinfo import repo_path, run_info
 from ..data.config import ROOT
 from .crs import available_categories, ensure_crs, load_data_file, load_rules, tree_digest, tx_defaults
 from .modsec import Evaluator, Request, collections, compile_pcre, is_applicable, to_bytes_str
@@ -116,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
     categories = available_categories(root / "rules") if crs["categories"] == "all" else [str(c) for c in crs["categories"]]
     result = verify(root, categories, set(crs["excluded_operators"]), unicode_map=engine_unicode_map(config),
                     keep=lambda rule: mapped_class(rule, config) is not None)
-    info = run_info("crs_regression", None, config_file=str(args.config), engine=config["engine"],
+    info = run_info("crs_regression", None, config_file=repo_path(args.config), engine=config["engine"],
                     crs_version=crs["version"], crs_sha256=crs["sha256"], rules_dir_sha256=tree_digest(root / "rules"),
                     **result)
     out = ROOT / "results" / ("crs_regression.json" if name == "regex" else f"crs_regression_{name}.json")

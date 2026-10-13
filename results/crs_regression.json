@@ -7,7 +7,7 @@
   "git_dirty": false,
   "model": null,
   "python": "3.11.13",
-  "config_file": "/Users/lockbit/Documents/Project/SKRIPSI/configs/regex_baseline.yaml",
+  "config_file": "configs/regex_baseline.yaml",
   "engine": {
     "modsecurity": "2.9.15",
     "httpd": "2.4.69",
