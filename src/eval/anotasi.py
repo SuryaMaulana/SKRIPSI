@@ -1,5 +1,5 @@
-"""Paket audit manusia untuk revisi jurnal (keputusan penulis 2026-10-13). Pelabelan dan penilaian dikerjakan penulis dan
-satu anotator lain; skrip ini hanya menyiapkan berkas dan menghitung hasilnya.
+"""Paket audit manusia untuk revisi jurnal (keputusan penulis 2026-10-13). Pelabelan dan penilaian dikerjakan dua anotator;
+skrip ini hanya menyiapkan berkas dan menghitung hasilnya.
 
 siapkan:
 - 100 baris test_sample_500 dipilih stratified per kelas (SQLI 17, XSS 17, PATH_TRAVERSAL 17, CMD_INJECTION 17,
@@ -15,12 +15,15 @@ siapkan:
   evidence_item, skor (dropdown 0/1/2), catatan. Pemetaan butir -> metode disimpan terpisah di
   data/processed/audit_B_key.json, yang tidak dibagikan ke anotator.
 hitung: membaca keempat berkas terisi -> reports/revisi_anotasi.md (+ .json) dan results/revisi_anotasi_per_baris.json:
-- Fase A: kappa Cohen tak berbobot antar anotator dan persen setuju; kappa tiap anotator vs label gerbang bukti; daftar
-  baris "perlu diskusi" (id dan label kedua anotator); jumlah baris yang konsensusnya berbeda dari label gerbang per
-  pasangan kelas. Label konsensus per id dan label gerbang per id pada baris yang berbeda hanya ditulis ke
-  results/revisi_anotasi_per_baris.json (keputusan penulis: label gerbang sampel uji tidak ditulis di luar results/).
+- Fase A: kappa Cohen tak berbobot antar anotator dan kesepakatan mentah (persen setuju); kappa dan kesepakatan mentah
+  tiap anotator vs label gerbang bukti; daftar baris "perlu diskusi" (id dan label kedua anotator); jumlah baris yang
+  konsensusnya berbeda dari label gerbang per pasangan kelas; matriks konfusi konsensus vs label gerbang per kelas
+  (agregat); jumlah baris dengan catatan berawalan RAGU per anotator. Label konsensus per id dan label gerbang per id
+  pada baris yang berbeda hanya ditulis ke results/revisi_anotasi_per_baris.json (keputusan penulis: label gerbang
+  sampel uji tidak ditulis di luar results/).
 - Fase B: rerata skor relevansi per metode setelah kunci dibuka, kappa berbobot kuadratik antar anotator, distribusi skor
-  0/1/2 per metode, dan rerata skor pada baris yang labelnya benar vs salah.
+  0/1/2 per metode, rerata skor pada baris yang labelnya benar vs salah, dan rerata serta distribusi per metode dan
+  label prediksi.
 Jalankan: python -m src.eval.anotasi siapkan | python -m src.eval.anotasi hitung --a1 ... --a2 ... --b1 ... --b2 ...
 """
 
@@ -60,6 +63,8 @@ COLUMNS_B = ("no", "id", "raw_log_masked", "label_prediksi", "evidence_item", "s
 SCORES = (0, 1, 2)
 DISCUSS = "perlu diskusi"
 EMPTY_ITEM = "[item kosong]"  # item evidence berupa string kosong/spasi; sel kosong di xlsx terbaca sebagai None
+METHOD_NAMES = {"llm_single": "LLM tunggal", "agent": "deep agent"}
+RAGU = re.compile(r"\s*RAGU\b", re.IGNORECASE)  # audit/PANDUAN_ANOTASI.md: catatan baris yang ragu diawali "RAGU:"
 
 # Tabel 1 manuskrip revisi (revisi_v2.docx), disalin apa adanya.
 TABLE_1 = (
@@ -360,43 +365,77 @@ def scores_b(path: Path, key: dict, who: str) -> dict[str, int]:
     return out
 
 
-def phase_a_report(first: dict[str, str], second: dict[str, str], gate: dict[str, str], ids: list[str]) -> dict:
+def ragu_rows(path: Path) -> list[str]:
+    """id baris Fase A yang catatannya diawali RAGU (spasi di depan dan huruf besar/kecil diabaikan)."""
+    return [str(r["id"]) for r in read_sheet(path, COLUMNS_A) if RAGU.match(str(r["catatan"] or ""))]
+
+
+def _agreement(x: list[str], y: list[str]) -> float:
+    return 100 * float(np.mean([a == b for a, b in zip(x, y)]))
+
+
+def confusion(consensus: dict[str, str], gate: dict[str, str], ids: list[str]) -> dict[str, dict[str, int]]:
+    """Baris = label gerbang, kolom = konsensus (6 kelas + "perlu diskusi"); hanya jumlah, tanpa id."""
+    matrix = {g: dict.fromkeys([*CLASSES, DISCUSS], 0) for g in CLASSES}
+    for i in ids:
+        matrix[gate[i]][consensus[i]] += 1
+    return matrix
+
+
+def phase_a_report(first: dict[str, str], second: dict[str, str], gate: dict[str, str], ids: list[str],
+                   ragu: dict[str, list[str]] | None = None) -> dict:
     l1, l2, g = ([d[i] for i in ids] for d in (first, second, gate))
     consensus = {i: (a if a == b else DISCUSS) for i, a, b in zip(ids, l1, l2)}
     return {
         "n": len(ids),
         "kappa_antar_anotator": float(cohen_kappa_score(l1, l2)),
-        "persen_setuju": 100 * float(np.mean([a == b for a, b in zip(l1, l2)])),
+        "persen_setuju": _agreement(l1, l2),
         "kappa_anotator1_vs_gerbang": float(cohen_kappa_score(l1, g)),
         "kappa_anotator2_vs_gerbang": float(cohen_kappa_score(l2, g)),
+        "persen_setuju_anotator1_vs_gerbang": _agreement(l1, g),
+        "persen_setuju_anotator2_vs_gerbang": _agreement(l2, g),
         "perlu_diskusi": [{"id": i, "anotator1": first[i], "anotator2": second[i]} for i in ids
                           if consensus[i] == DISCUSS],
         "konsensus_beda_gerbang": [{"id": i, "konsensus": consensus[i], "gerbang": gate[i]} for i in ids
                                    if consensus[i] not in (DISCUSS, gate[i])],
+        "matriks_konfusi_konsensus_vs_gerbang": confusion(consensus, gate, ids),
+        "ragu": {who: len(rows) for who, rows in (ragu or {}).items()},
         "konsensus": consensus,
+    }
+
+
+def _relevance(inst: list[tuple[dict, dict]], s1: dict[str, int], s2: dict[str, int], gate: dict[str, str]) -> dict:
+    """Statistik skor atas instans (butir, asal); butir milik kedua metode ikut di instans kedua metode."""
+    def both(x: dict) -> float:
+        return (s1[x["butir"]] + s2[x["butir"]]) / 2
+
+    correct = [both(x) for x, _ in inst if x["label_prediksi"] == gate[x["id"]]]
+    wrong = [both(x) for x, _ in inst if x["label_prediksi"] != gate[x["id"]]]
+    return {
+        "item": len(inst), "baris": len({x["id"] for x, _ in inst}),
+        "rerata_anotator1": statistics.mean(s1[x["butir"]] for x, _ in inst),
+        "rerata_anotator2": statistics.mean(s2[x["butir"]] for x, _ in inst),
+        "rerata": statistics.mean([both(x) for x, _ in inst]),
+        "distribusi_anotator1": {s: sum(s1[x["butir"]] == s for x, _ in inst) for s in SCORES},
+        "distribusi_anotator2": {s: sum(s2[x["butir"]] == s for x, _ in inst) for s in SCORES},
+        "rerata_label_benar": statistics.mean(correct) if correct else None, "item_label_benar": len(correct),
+        "rerata_label_salah": statistics.mean(wrong) if wrong else None, "item_label_salah": len(wrong),
     }
 
 
 def phase_b_report(key: dict, s1: dict[str, int], s2: dict[str, int], gate: dict[str, str]) -> dict:
     butir = list(s1)
     out = {"butir": len(butir), "kappa_berbobot_kuadratik": float(cohen_kappa_score(
-        [s1[b] for b in butir], [s2[b] for b in butir], weights="quadratic", labels=list(SCORES))), "metode": {}}
-    methods = sorted({a["metode"] for x in key["butir"] for a in x["asal"]})
-    for method in methods:
+        [s1[b] for b in butir], [s2[b] for b in butir], weights="quadratic", labels=list(SCORES))),
+        "run": key.get("run", {}), "metode": {}, "metode_per_label": {}}
+    found = {a["metode"] for x in key["butir"] for a in x["asal"]}
+    for method in [m for m in METHOD_RUNS if m in found] + sorted(found - set(METHOD_RUNS)):
         inst = [(x, a) for x in key["butir"] for a in x["asal"] if a["metode"] == method]
-        mean_both = [(s1[x["butir"]] + s2[x["butir"]]) / 2 for x, _ in inst]
-        correct = [(s1[x["butir"]] + s2[x["butir"]]) / 2 for x, _ in inst if x["label_prediksi"] == gate[x["id"]]]
-        wrong = [(s1[x["butir"]] + s2[x["butir"]]) / 2 for x, _ in inst if x["label_prediksi"] != gate[x["id"]]]
-        out["metode"][method] = {
-            "item": len(inst), "baris": len({x["id"] for x, _ in inst}),
-            "rerata_anotator1": statistics.mean(s1[x["butir"]] for x, _ in inst),
-            "rerata_anotator2": statistics.mean(s2[x["butir"]] for x, _ in inst),
-            "rerata": statistics.mean(mean_both),
-            "distribusi_anotator1": {s: sum(s1[x["butir"]] == s for x, _ in inst) for s in SCORES},
-            "distribusi_anotator2": {s: sum(s2[x["butir"]] == s for x, _ in inst) for s in SCORES},
-            "rerata_label_benar": statistics.mean(correct) if correct else None, "item_label_benar": len(correct),
-            "rerata_label_salah": statistics.mean(wrong) if wrong else None, "item_label_salah": len(wrong),
-        }
+        out["metode"][method] = _relevance(inst, s1, s2, gate)
+        labels = {x["label_prediksi"] for x, _ in inst}
+        out["metode_per_label"][method] = {
+            label: _relevance([(x, a) for x, a in inst if x["label_prediksi"] == label], s1, s2, gate)
+            for label in [c for c in CLASSES if c in labels] + sorted(labels - set(CLASSES))}
     return out
 
 
@@ -404,15 +443,28 @@ def _f(x, digits: int = 3) -> str:
     return "–" if x is None else f"{x:.{digits}f}"
 
 
+def _dist(d: dict) -> str:
+    return "/".join(str(d[s]) for s in SCORES)
+
+
+def _scores(x: dict) -> str:
+    return (f"{x['item']} | {x['baris']} | {_f(x['rerata'], 2)} | {_f(x['rerata_anotator1'], 2)} | "
+            f"{_f(x['rerata_anotator2'], 2)} | {_dist(x['distribusi_anotator1'])} | {_dist(x['distribusi_anotator2'])}")
+
+
 def render(a: dict, b: dict, files: dict[str, Path]) -> str:
     out = ["# Audit manusia — hasil anotasi", "", "Berkas: " + ", ".join(f"{k} = {v.name}" for k, v in files.items()), "",
            "## Fase A — label kelas (100 baris)", ""]
-    out += [f"- Cohen's κ antar anotator (tak berbobot): {_f(a['kappa_antar_anotator'])}; persen setuju "
-            f"{_f(a['persen_setuju'], 1)}%.",
-            f"- κ anotator 1 vs label gerbang bukti: {_f(a['kappa_anotator1_vs_gerbang'])}; κ anotator 2 vs label gerbang: "
-            f"{_f(a['kappa_anotator2_vs_gerbang'])}.",
+    ragu = a.get("ragu", {})
+    out += [f"- Kesepakatan mentah antar anotator: {_f(a['persen_setuju'], 1)}% ({a['n'] - len(a['perlu_diskusi'])} dari "
+            f"{a['n']} baris); Cohen's κ antar anotator (tak berbobot): {_f(a['kappa_antar_anotator'])}.",
+            f"- Anotator 1 vs label gerbang bukti: κ {_f(a['kappa_anotator1_vs_gerbang'])}, kesepakatan mentah "
+            f"{_f(a['persen_setuju_anotator1_vs_gerbang'], 1)}%. Anotator 2 vs label gerbang: κ "
+            f"{_f(a['kappa_anotator2_vs_gerbang'])}, kesepakatan mentah {_f(a['persen_setuju_anotator2_vs_gerbang'], 1)}%.",
             f"- Perlu diskusi (anotator tidak setuju): {len(a['perlu_diskusi'])} baris.",
-            f"- Konsensus berbeda dari label gerbang: {len(a['konsensus_beda_gerbang'])} baris.", ""]
+            f"- Konsensus berbeda dari label gerbang: {len(a['konsensus_beda_gerbang'])} baris.",
+            f"- Baris dengan catatan RAGU (kolom catatan berawalan RAGU): anotator 1 {ragu.get('anotator1', '–')}, "
+            f"anotator 2 {ragu.get('anotator2', '–')}.", ""]
     if a["perlu_diskusi"]:
         out += ["Baris yang perlu diskusi (label gerbang sengaja tidak ditampilkan):", "",
                 "| id | anotator 1 | anotator 2 |", "|---|---|---|",
@@ -421,19 +473,34 @@ def render(a: dict, b: dict, files: dict[str, Path]) -> str:
         out += ["Ringkasan per kelas (gerbang -> konsensus): " + "; ".join(
             f"{pair}: {n}" for pair, n in differing_by_class(a).items()) + ". Rincian per id di "
             "results/revisi_anotasi_per_baris.json.", ""]
+    matrix = a["matriks_konfusi_konsensus_vs_gerbang"]
+    columns = [*CLASSES, DISCUSS]
+    out += ["Matriks konfusi konsensus vs label gerbang (baris = label gerbang, kolom = konsensus kedua anotator; "
+            f"\"{DISCUSS}\" = kedua anotator berbeda):", "",
+            "| gerbang / konsensus | " + " | ".join(columns) + " | total |", "|---" * (len(columns) + 2) + "|",
+            *[f"| {g} | " + " | ".join(str(row[c]) for c in columns) + f" | {sum(row.values())} |"
+              for g, row in matrix.items()],
+            "| total | " + " | ".join(str(sum(row[c] for row in matrix.values())) for c in columns)
+            + f" | {sum(sum(row.values()) for row in matrix.values())} |", ""]
     out += ["## Fase B — relevansi bukti (skala 0–2)", "",
-            f"- Butir unik: {b['butir']}; κ berbobot kuadratik antar anotator: {_f(b['kappa_berbobot_kuadratik'])}.", "",
+            f"- Butir unik: {b['butir']}; κ berbobot kuadratik antar anotator: {_f(b['kappa_berbobot_kuadratik'])}.",
+            "- Run: " + "; ".join(f"{METHOD_NAMES.get(m, m)} = {run}" for m, run in b.get("run", {}).items()) + ".", "",
+            "Per metode:", "",
             "| metode | item | baris | rerata (2 anotator) | rerata anotator 1 | rerata anotator 2 | skor 0/1/2 anotator 1 "
             "| skor 0/1/2 anotator 2 | rerata, label benar (item) | rerata, label salah (item) |",
             "|---|---|---|---|---|---|---|---|---|---|"]
     for method, x in b["metode"].items():
-        d1, d2 = x["distribusi_anotator1"], x["distribusi_anotator2"]
-        out.append(f"| {method} | {x['item']} | {x['baris']} | {_f(x['rerata'], 2)} | {_f(x['rerata_anotator1'], 2)} | "
-                   f"{_f(x['rerata_anotator2'], 2)} | {d1[0]}/{d1[1]}/{d1[2]} | {d2[0]}/{d2[1]}/{d2[2]} | "
-                   f"{_f(x['rerata_label_benar'], 2)} ({x['item_label_benar']}) | {_f(x['rerata_label_salah'], 2)} "
-                   f"({x['item_label_salah']}) |")
-    out += ["", "Rerata (2 anotator) = rerata atas item dari skor rata-rata kedua anotator. Item yang identik di kedua "
-            "metode dinilai sekali dan dihitung untuk keduanya. Label benar/salah menurut label gerbang bukti."]
+        out.append(f"| {METHOD_NAMES.get(method, method)} | {_scores(x)} | {_f(x['rerata_label_benar'], 2)} "
+                   f"({x['item_label_benar']}) | {_f(x['rerata_label_salah'], 2)} ({x['item_label_salah']}) |")
+    out += ["", "Per metode dan label prediksi:", "",
+            "| metode | label_prediksi | item | baris | rerata (2 anotator) | rerata anotator 1 | rerata anotator 2 "
+            "| skor 0/1/2 anotator 1 | skor 0/1/2 anotator 2 |", "|---|---|---|---|---|---|---|---|---|"]
+    for method, by_label in b.get("metode_per_label", {}).items():
+        out += [f"| {METHOD_NAMES.get(method, method)} | {label} | {_scores(x)} |" for label, x in by_label.items()]
+    out += ["", "Item = kemunculan item evidence pada keluaran metode; item yang identik di kedua metode dinilai sekali dan "
+            "dihitung untuk keduanya, dan item yang muncul dua kali pada keluaran yang sama dihitung dua kali. Rerata "
+            "(2 anotator) = rerata atas item dari skor rata-rata kedua anotator. Skor 0/1/2 = jumlah item per skor. Label "
+            "benar/salah menurut label gerbang bukti."]
     return "\n".join(out) + "\n"
 
 
@@ -470,7 +537,8 @@ def compute(files: dict[str, Path], ids_path: Path = IDS_PATH, key_path: Path = 
     key = json.loads(key_path.read_text(encoding="utf-8"))
     sample = load_sample(sample_path)
     gate = dict(zip(sample["id"], sample["label"]))
-    a = phase_a_report(labels_a(files["A1"], ids), labels_a(files["A2"], ids), gate, ids)
+    a = phase_a_report(labels_a(files["A1"], ids), labels_a(files["A2"], ids), gate, ids,
+                       {"anotator1": ragu_rows(files["A1"]), "anotator2": ragu_rows(files["A2"])})
     b = phase_b_report(key, scores_b(files["B1"], key, "anotator1"), scores_b(files["B2"], key, "anotator2"), gate)
     return a, b, render(a, b, files)
 

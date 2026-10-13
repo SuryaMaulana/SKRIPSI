@@ -111,24 +111,45 @@ def test_compute_reports_kappa_consensus_and_relevance_from_filled_files(package
           lambda r: "NORMAL" if r["id"] == both_wrong else gate[r["id"]])
     _fill(done["fase_a"]["anotator2"], "label_anotator",
           lambda r: "NORMAL" if r["id"] in (both_wrong, disagree) else gate[r["id"]].lower())
+    _fill(done["fase_a"]["anotator1"], "catatan",
+          lambda r: {disagree: "RAGU: SQLI atau NORMAL", both_wrong: "  ragu-ragu"}.get(r["id"]))
+    _fill(done["fase_a"]["anotator2"], "catatan", lambda r: "tidak ragu" if r["id"] == disagree else None)
     _fill(done["fase_b"]["anotator1"], "skor", lambda r: 2)
     _fill(done["fase_b"]["anotator2"], "skor", lambda r: "1" if r["evidence_item"] == "GET" else 2)
     files = {"A1": done["fase_a"]["anotator1"], "A2": done["fase_a"]["anotator2"],
              "B1": done["fase_b"]["anotator1"], "B2": done["fase_b"]["anotator2"]}
     a, b, text = an.compute(files, tmp / "ids.json", tmp / "key.json", package["sample"])
     assert a["n"] == 6 and a["persen_setuju"] == pytest.approx(100 * 5 / 6)
+    assert a["persen_setuju_anotator1_vs_gerbang"] == pytest.approx(100 * 5 / 6)
+    assert a["persen_setuju_anotator2_vs_gerbang"] == pytest.approx(100 * 4 / 6)
     assert [x["id"] for x in a["perlu_diskusi"]] == [disagree]
     assert a["konsensus_beda_gerbang"] == [{"id": both_wrong, "konsensus": "NORMAL", "gerbang": gate[both_wrong]}]
     assert a["kappa_anotator1_vs_gerbang"] == pytest.approx(an.cohen_kappa_score(
         [gate[i] if i != both_wrong else "NORMAL" for i in ids], [gate[i] for i in ids]))
+    matrix = a["matriks_konfusi_konsensus_vs_gerbang"]
+    assert list(matrix) == list(CLASSES) and list(matrix["SQLI"]) == [*CLASSES, an.DISCUSS]
+    assert matrix[gate[disagree]][an.DISCUSS] == 1 and matrix[gate[both_wrong]]["NORMAL"] == 1
+    assert sum(matrix[c][c] for c in CLASSES) == 4 and sum(sum(r.values()) for r in matrix.values()) == 6
+    assert a["ragu"] == {"anotator1": 2, "anotator2": 0}  # awalan RAGU saja; "tidak ragu" tidak dihitung
     single, agent = b["metode"]["llm_single"], b["metode"]["agent"]
+    assert list(b["metode"]) == ["llm_single", "agent"] and b["run"] == {"llm_single": "llm_single_r1",
+                                                                         "agent": "agent_r1"}
     assert single["item"] == 18 and agent["item"] == 6  # 6 baris x (path + GET + item kosong) / 6 baris x path
     shown = [r["evidence_item"] for r in _data(done["fase_b"]["anotator1"])[2]]
     assert shown.count(an.EMPTY_ITEM) == 6 and None not in shown
     assert single["rerata_anotator1"] == 2 and single["rerata_anotator2"] == pytest.approx((6 * 1 + 12 * 2) / 18)
     assert single["distribusi_anotator2"] == {0: 0, 1: 6, 2: 12} and agent["rerata"] == 2
     assert agent["item_label_salah"] == 1 and single["item_label_salah"] == 0  # agent memberi NORMAL pada XSS
-    assert "Cohen's κ antar anotator" in text and "κ berbobot kuadratik" in text
+    per_label = b["metode_per_label"]
+    assert list(per_label["llm_single"]) == list(CLASSES) and "XSS" not in per_label["agent"]
+    assert per_label["llm_single"]["SQLI"]["distribusi_anotator2"] == {0: 0, 1: 1, 2: 2}
+    assert per_label["llm_single"]["SQLI"]["rerata_anotator2"] == pytest.approx(5 / 3)
+    assert per_label["agent"]["NORMAL"]["item"] == 2 and per_label["agent"]["NORMAL"]["item_label_salah"] == 1
+    assert sum(x["item"] for x in per_label["llm_single"].values()) == single["item"]
+    assert "Cohen's κ antar anotator" in text and "κ berbobot kuadratik" in text and "Kesepakatan mentah" in text
+    assert "Matriks konfusi" in text and "catatan RAGU" in text and "anotator 1 2, anotator 2 0" in text
+    assert "| LLM tunggal | SQLI | 3 | 1 | 1.83 | 2.00 | 1.67 | 0/0/3 | 0/1/2 |" in text
+    assert "LLM tunggal = llm_single_r1; deep agent = agent_r1" in text
     # label gerbang per id hanya di results/: laporan reports/ memuat agregat dan daftar "perlu diskusi" saja
     assert both_wrong not in text and disagree in text and "results/revisi_anotasi_per_baris.json" in text
     an.write_outputs(a, b, text, tmp / "reports" / "anotasi.md", tmp / "results" / "per_baris.json")
