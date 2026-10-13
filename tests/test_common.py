@@ -98,9 +98,14 @@ def test_commit_terkini_maps_recorded_commits_to_the_rewritten_history(monkeypat
     assert runinfo.commit_terkini("a" * 40) == "a" * 40
 
 
-def test_every_recorded_run_commit_has_a_mapping():
+def test_every_recorded_run_commit_has_a_mapping_or_exists_in_the_current_history():
+    import subprocess
+
     mapping = json.loads(runinfo.COMMIT_MAP.read_text(encoding="utf-8"))["lama_ke_baru"]
     runs = sorted((runinfo.ROOT / "results").rglob("*.run.json"))
     assert runs
     for path in runs:
-        assert json.loads(path.read_text(encoding="utf-8"))["git_commit"] in mapping, path
+        commit = json.loads(path.read_text(encoding="utf-8"))["git_commit"]
+        exists = subprocess.run(["git", "cat-file", "-e", f"{commit}^{{commit}}"], cwd=runinfo.ROOT,
+                                capture_output=True).returncode == 0
+        assert commit in mapping or exists, path  # run sebelum penulisan ulang riwayat dipetakan; run sesudahnya ada

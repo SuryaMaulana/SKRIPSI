@@ -1,0 +1,66 @@
+# Leksikon indikator kelas untuk pemeriksaan "class-consistent" (manuskrip revisi §2.6 dan Tabel 11; 2026-10-13).
+# Sebuah item evidence class-consistent bila salah satu bentuk decode-nya (src/common/evidence.decoded_forms: URL-decode
+# sampai 3 lapis, dengan/tanpa '+' sebagai spasi, entity HTML) memuat salah satu pola kelas yang diprediksi. Pola adalah
+# regex Python, dicocokkan tanpa membedakan huruf besar/kecil. Hanya dipakai untuk prediksi kelas serangan.
+#
+# utama: kolom indikator Tabel 1 manuskrip (= TABLE_2_1 di src/llm/klasifikasi.py). Bila Tabel 1 menyebut kategori dengan
+#   contoh ("perintah shell", "metode non-standar", "berkas cadangan/VCS"), kategori itu diperluas ke anggota umumnya;
+#   contoh lain dipakai apa adanya.
+# tambahan_kb: bagian "catatan" configs/owasp_kb.yaml (basis pengetahuan agen). Hanya untuk analisis sensitivitas
+#   (utama + tambahan_kb), bukan angka utama.
+
+utama:
+  SQLI:
+    - '''\s*(or|and)\s'                 # ' OR 1=1 (tautologi setelah kutip)
+    - '\bunion\b.{0,30}?\bselect\b'     # UNION SELECT
+    - '\bsleep\s*\('                    # SLEEP(
+    - '--'                              # komentar --
+    - '#'                               # komentar #
+  XSS:
+    - '<\s*script'                      # <script>
+    - '\bonerror\s*='                   # onerror=
+    - 'javascript\s*:'                  # javascript:
+  PATH_TRAVERSAL:
+    - '\.\./'                           # ../ (..%2f setelah decode)
+    - '\.\.\\'                          # ..\ (varian Windows)
+    - '/etc/passwd'                     # /etc/passwd
+    - 'win\.ini'                        # win.ini
+    - '\b[a-z][a-z0-9+.-]*://'          # URL eksternal ber-skema (RFI)
+  CMD_INJECTION:
+    - '(;|\|\|?|&&)\s*(id|cat|sleep|ls|whoami|uname|wget|curl|ping|echo|nc|bash|sh|rm|chmod|perl|python|php)\b'  # pemisah + perintah shell
+    - '`'                               # substitusi perintah dengan backtick
+    - '\$\('                            # substitusi perintah $(...)
+    - '\(\)\s*\{'                       # Shellshock () {
+    - 'allow_url_include'               # argumen PHP-CGI -d allow_url_include
+  WEB_SCANNING:
+    - '\bnmap\b'                        # user agent pemindai
+    - 'zgrab'
+    - 'sqlmap'
+    - '\b(propfind|proppatch|mkcol|copy|move|lock|unlock|track|trace|search|debug)\b'  # metode non-standar
+    - '\.(bak|swp|old|orig)\b'          # berkas cadangan
+    - '\.(git|svn|hg)/'                 # berkas VCS
+    - '/\.env\b'                        # probe /.env
+    - '/wp-login\.php'                  # probe /wp-login.php
+
+tambahan_kb:
+  SQLI:
+    - '\b(or|and)\s+''?\d+''?\s*=\s*''?\d+'      # tautologi tanpa kutip pembuka
+    - ';\s*(select|insert|update|delete|drop)\b' # kueri bertumpuk
+    - '\b(benchmark|pg_sleep)\s*\('              # fungsi waktu
+    - 'waitfor\s+delay'
+    - '\b(extractvalue|updatexml)\s*\('          # fungsi galat
+    - 'concat\s*\(\s*0x'
+    - '/\*'                                       # komentar /**/
+  XSS:
+    - '\bon[a-z]+\s*='                  # atribut event
+    - '<\s*(img|svg|iframe)\b'          # tag img/svg/iframe
+    - '\b(alert|prompt|confirm)\s*\('   # fungsi dialog
+  PATH_TRAVERSAL:
+    - '/etc/shadow'
+    - '/proc/self/environ'
+    - 'boot\.ini'
+  CMD_INJECTION:
+    - '(\|\||&)\s*(id|cat|sleep|ping|wget|curl|uname)\b'
+    - 'auto_prepend_file'
+    - 'php://input'
+  WEB_SCANNING: []

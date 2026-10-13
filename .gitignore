@@ -24,3 +24,6 @@ results/**/*_calls*.jsonl
 
 # Draf naskah skripsi penulis (dikelola di luar repositori)
 Draft Skripsi*.docx
+
+# Arsip lokal penulis di akar repositori (bukan bagian repositori)
+/Archive.zip

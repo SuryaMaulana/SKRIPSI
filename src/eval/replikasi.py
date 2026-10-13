@@ -45,9 +45,10 @@ from .evaluate import (
 )
 
 REPLICATION_DIR = RESULTS_DIR  # run resmi: results/<nama>_r<n>.jsonl
-GROUPS = {"llm_single": "llm_single", "agent": "agent"}  # nama metode -> awalan berkas run
+GROUPS = {"llm_single": "llm_single", "agent": "agent",  # nama metode -> awalan berkas run
+          "llm_single_verified": "llm_single_verified"}  # ablasi revisi jurnal (LLM tunggal + loop verifikasi)
 CONFIG_KEYS = ("model", "model_version", "generation", "provider_routing", "prompt_sha256", "input_sha256", "input_file",
-               "ids_file", "row_ids_sha256")
+               "ids_file", "row_ids_sha256", "retry_prompt_sha256", "max_verification_rounds")  # dua terakhir: ablasi
 EXPECTED_RUNS = 3  # keputusan penulis: total 3 run per metode
 STATUSES = ("ok", "verification_failed", "verification_skipped", "PARSE_ERROR")
 SINGLE_RUN = ("regex", "regex_full")
@@ -100,27 +101,37 @@ def _calls_path(method: Method) -> Path | None:
     return path if path.exists() else None
 
 
-def call_records(method: Method) -> tuple[list[dict], list[dict]]:
-    """Rekaman panggilan LLM run ini (C: semua rekaman; E: jenis llm), dipisah menjadi (dipakai, dibatalkan).
-
-    Dibatalkan = panggilan dari percobaan baris yang terhenti oleh galat API (rekaman galat_api) sebelum --resume; baris
-    itu diulang penuh setelah resume, dan token/biaya/latensi barisnya hanya memuat percobaan akhir. Agar basis Tabel 4.4
-    konsisten, panggilan yang dibatalkan tidak ikut latensi per panggilan dan dilaporkan terpisah."""
+def _run_records(method: Method) -> tuple[list[dict], dict[str, str]]:
+    """Rekaman log panggilan run ini dan, per id baris, waktu penanda galat_api terakhir (percobaan yang dibatalkan)."""
     path = _calls_path(method)
     if path is None:
-        return [], []
+        return [], {}
     run_id = method.run.get("run_id")
     records = [r for r in map(json.loads, path.read_text(encoding="utf-8").splitlines()) if r.get("run_id") == run_id]
     aborted_at = {}
     for r in records:
         if r.get("jenis") == "galat_api":
             aborted_at[r["id"]] = max(aborted_at.get(r["id"], ""), r.get("timestamp_utc", ""))
+    return records, aborted_at
+
+
+def _aborted(record: dict, aborted_at: dict[str, str]) -> bool:
+    cut = aborted_at.get(record.get("id"))
+    return bool(cut) and record.get("timestamp_utc", "") <= cut
+
+
+def call_records(method: Method) -> tuple[list[dict], list[dict]]:
+    """Rekaman panggilan LLM run ini (C/ablasi: semua rekaman; E: jenis llm), dipisah menjadi (dipakai, dibatalkan).
+
+    Dibatalkan = panggilan dari percobaan baris yang terhenti oleh galat API (rekaman galat_api) sebelum --resume; baris
+    itu diulang penuh setelah resume, dan token/biaya/latensi barisnya hanya memuat percobaan akhir. Agar basis Tabel 4.4
+    konsisten, panggilan yang dibatalkan tidak ikut latensi per panggilan dan dilaporkan terpisah."""
+    records, aborted_at = _run_records(method)
     used, dropped = [], []
     for r in records:
         if r.get("jenis", "llm") != "llm" or r.get("latency_s") is None:
             continue
-        cut = aborted_at.get(r.get("id"))
-        (dropped if cut and r.get("timestamp_utc", "") <= cut else used).append(r)
+        (dropped if _aborted(r, aborted_at) else used).append(r)
     return used, dropped
 
 
@@ -130,18 +141,13 @@ def call_latencies(method: Method) -> list[float]:
 
 
 def truncated_in_log(method: Method) -> int | None:
-    """Jumlah panggilan TRUNCATED menurut log panggilan run (C: outcome; E: status_panggilan), untuk cek silang."""
-    path = _calls_path(method)
-    if path is None:
+    """Jumlah panggilan TRUNCATED menurut log panggilan run (C/ablasi: outcome; E: status_panggilan), untuk cek silang.
+    Panggilan dari percobaan baris yang dibatalkan galat API (sebelum --resume) tidak dihitung, seperti call_records."""
+    if _calls_path(method) is None:
         return None
-    count = 0
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            record = json.loads(line)
-            if record.get("run_id") == method.run.get("run_id") and "TRUNCATED" in (
-                    record.get("outcome"), record.get("status_panggilan")):
-                count += 1
-    return count
+    records, aborted_at = _run_records(method)
+    return sum("TRUNCATED" in (r.get("outcome"), r.get("status_panggilan")) and not _aborted(r, aborted_at)
+               for r in records)
 
 
 def degenerate(method: Method, truth) -> dict:
@@ -195,10 +201,11 @@ def run_metrics(method: Method, truth) -> dict:
                     "biaya_panggilan_dibatalkan_usd": sum(r.get("cost_usd") or 0.0 for r in dropped)})
     if rows and "truncated_calls" in rows[0]:
         out.update({f"degeneratif_{k}": v for k, v in degenerate(method, truth).items()})
+    if rows and "verifikasi" in rows[0]:  # deep agent dan ablasi (loop verifikasi)
+        out["verification_failed"] = sum(r["status"] == "verification_failed" for r in rows)
     if rows and "tool_calls" in rows[0]:  # deep agent
         out.update({
             "pemanggilan_alat_rerata": statistics.mean(r["tool_calls"] for r in rows),
-            "verification_failed": sum(r["status"] == "verification_failed" for r in rows),
             "delegasi_keempat_subagen": sum(bool((r.get("delegasi") or {}).get("keempat_subagen")) for r in rows),
         })
     return out
