@@ -1,9 +1,9 @@
 {
  "run": {
-  "run_id": "revisi-20261013T080802Z-b6c6a67",
+  "run_id": "revisi-20261013T094502Z-71c9347",
   "method": "revisi",
-  "date_utc": "2026-10-13T08:08:02+00:00",
-  "git_commit": "b6c6a67e6490662ee0427c114eca03fb3e16d70c",
+  "date_utc": "2026-10-13T09:45:02+00:00",
+  "git_commit": "71c9347ddfd0d86368f0c6870ee266e2ee083df4",
   "git_branch": "revisi-jurnal",
   "git_dirty": false,
   "git_dirty_paths": [],
