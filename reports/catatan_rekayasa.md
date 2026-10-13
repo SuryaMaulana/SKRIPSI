@@ -4,7 +4,8 @@ Semua run di bawah dipindah ke `results/archive/` atas keputusan penulis (2026-1
 evaluasi utama** (`reports/evaluasi.md`, 3 run per metode dengan konfigurasi final ber-batas `max_tokens` 4.096). Catatan
 ini mendokumentasikan riwayat rekayasa agar setiap keputusan dapat ditelusuri. Laporan lama yang dirujuk ada di
 `reports/archive/`. §7 memetakan hash commit yang tercatat di run ke riwayat git sekarang; §8 mencatat pemeriksaan
-prompt injection pada run resmi; §9 mencatat run ablasi revisi jurnal.
+prompt injection pada run resmi; §9 mencatat run ablasi revisi jurnal; §10 mencatat keputusan leksikon
+class-consistent.
 
 ## 1. Daftar run arsip
 
@@ -176,3 +177,12 @@ identik) dan selesai 500 baris tanpa PARSE_ERROR. Panggilan yang ditolak 402 dit
 sehingga tidak masuk latensi per panggilan maupun persentase token ter-cache. Sebelum run, kode ablasi ditinjau
 adversarial (kesesuaian dengan spesifikasi dan deep agent, keamanan run); temuan berderajat rendah diperbaiki di
 `22841cb`.
+
+## 10. Leksikon class-consistent (Tabel 11 manuskrip)
+
+Angka class-consistent LLM tunggal dan deep agent pada draf revisi manuskrip (item 0,591 dan 0,841; baris 0,723 dan
+0,830) dihitung di luar repositori dan tidak dapat direproduksi karena leksikonnya tidak tersedia. Atas keputusan penulis
+(2026-10-13), Tabel 11 kolom 3–4 memakai leksikon repositori `configs/leksikon_kelas.yaml` bagian `utama` (indikator
+Tabel 1) untuk ketiga metode LLM: LLM tunggal 0,485/0,625, deep agent 0,692/0,752, ablasi 0,602/0,693
+(`reports/revisi_ablasi.md`); angka C/E di manuskrip diganti sesuai nilai ini. Bagian `tambahan_kb` hanya untuk analisis
+sensitivitas. Tidak ada run yang diulang: metrik dihitung dari keluaran run yang sama.
