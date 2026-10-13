@@ -56,6 +56,7 @@ COLUMNS_A = ("no", "id", "raw_log_masked", "path_norm", "query_norm", "ua_norm",
 COLUMNS_B = ("no", "id", "raw_log_masked", "label_prediksi", "evidence_item", "skor", "catatan")
 SCORES = (0, 1, 2)
 DISCUSS = "perlu diskusi"
+EMPTY_ITEM = "[item kosong]"  # item evidence berupa string kosong/spasi; sel kosong di xlsx terbaca sebagai None
 
 # Tabel 1 manuskrip revisi (revisi_v2.docx), disalin apa adanya.
 TABLE_1 = (
@@ -96,6 +97,7 @@ HOWTO_B = (
     "Nilai setiap item evidence terhadap label_prediksi di baris yang sama, bukan terhadap label yang menurut Anda benar.",
     "Item dianggap ada bila muncul di baris log apa adanya atau setelah URL-decode (mis. ' OR 1=1 untuk %27%20OR%201=1).",
     "Pilih skor 0, 1, atau 2 di kolom skor (dropdown). Kolom catatan boleh dikosongkan.",
+    f"{EMPTY_ITEM} berarti model menulis item evidence kosong (tanpa isi).",
     "Jangan mengubah kolom lain dan jangan menghapus baris; mengurutkan ulang baris boleh. Kerjakan sendiri.",
 )
 # Dua contoh netral: baris rekaan (alamat IP dokumentasi RFC 5737), bukan dari dataset maupun keluaran metode.
@@ -229,10 +231,16 @@ def evidence_items(results: dict[str, Path], ids: list[str]) -> list[dict]:
     return items
 
 
+def shown_item(item: str) -> str:
+    """Teks item evidence di berkas anotator (item kosong diberi penanda agar tidak hilang menjadi sel kosong)."""
+    return _clean(item) if item.strip() else EMPTY_ITEM
+
+
 def build_phase_b(sample: pd.DataFrame, items: list[dict], seed: int, path: Path) -> list[str]:
     logs = dict(zip(sample["id"], sample["raw_log_masked"]))
     order = _shuffled(items, seed)
-    rows = [[k, x["id"], logs[x["id"]], x["label_prediksi"], x["evidence_item"], "", ""] for k, x in enumerate(order, 1)]
+    rows = [[k, x["id"], logs[x["id"]], x["label_prediksi"], shown_item(x["evidence_item"]), "", ""]
+            for k, x in enumerate(order, 1)]
     wb = Workbook()
     _sheet(wb, "Anotasi", COLUMNS_B, rows, ("skor", [str(s) for s in SCORES]),
            {"no": 6, "id": 24, "raw_log_masked": 70, "label_prediksi": 18, "evidence_item": 40, "skor": 8, "catatan": 30})
@@ -334,7 +342,7 @@ def scores_b(path: Path, key: dict, who: str) -> dict[str, int]:
             continue
         x = items[butir]
         if (str(r["id"]), str(r["label_prediksi"]), str(r["evidence_item"])) != \
-                (x["id"], x["label_prediksi"], str(_clean(x["evidence_item"]))):
+                (x["id"], x["label_prediksi"], shown_item(x["evidence_item"])):
             problems.append(f"no {r['no']}: isi baris tidak cocok dengan kunci")
             continue
         score = _score(r["skor"])

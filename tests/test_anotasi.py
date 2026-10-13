@@ -24,7 +24,7 @@ def _sample(tmp_path):
 def _results(tmp_path, rows):
     single, agent = [], []
     for r in rows:
-        single.append({"id": r["id"], "label": r["label"], "evidence": [f"/{r['id']}", "GET", 7]})
+        single.append({"id": r["id"], "label": r["label"], "evidence": [f"/{r['id']}", "GET", 7, ""]})
         agent.append({"id": r["id"], "label": "NORMAL" if r["label"] == "XSS" else r["label"], "evidence": [f"/{r['id']}"]})
     paths = {"llm_single": tmp_path / "llm_single_r1.jsonl", "agent": tmp_path / "agent_r1.jsonl"}
     for method, data in (("llm_single", single), ("agent", agent)):
@@ -122,9 +122,11 @@ def test_compute_reports_kappa_consensus_and_relevance_from_filled_files(package
     assert a["kappa_anotator1_vs_gerbang"] == pytest.approx(an.cohen_kappa_score(
         [gate[i] if i != both_wrong else "NORMAL" for i in ids], [gate[i] for i in ids]))
     single, agent = b["metode"]["llm_single"], b["metode"]["agent"]
-    assert single["item"] == 12 and agent["item"] == 6  # 6 baris x (path + GET) / 6 baris x path
-    assert single["rerata_anotator1"] == 2 and single["rerata_anotator2"] == pytest.approx(1.5)
-    assert single["distribusi_anotator2"] == {0: 0, 1: 6, 2: 6} and agent["rerata"] == 2
+    assert single["item"] == 18 and agent["item"] == 6  # 6 baris x (path + GET + item kosong) / 6 baris x path
+    shown = [r["evidence_item"] for r in _data(done["fase_b"]["anotator1"])[2]]
+    assert shown.count(an.EMPTY_ITEM) == 6 and None not in shown
+    assert single["rerata_anotator1"] == 2 and single["rerata_anotator2"] == pytest.approx((6 * 1 + 12 * 2) / 18)
+    assert single["distribusi_anotator2"] == {0: 0, 1: 6, 2: 12} and agent["rerata"] == 2
     assert agent["item_label_salah"] == 1 and single["item_label_salah"] == 0  # agent memberi NORMAL pada XSS
     assert "Cohen's κ antar anotator" in text and "κ berbobot kuadratik" in text
 
