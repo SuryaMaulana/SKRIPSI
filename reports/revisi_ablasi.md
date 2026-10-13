@@ -1,6 +1,6 @@
 # Revisi jurnal — angka Tabel 4–11 termasuk ablasi
 
-Laporan revisi-20261013T075026Z-a75bda8 (commit a75bda8, dirty=False)
+Laporan revisi-20261013T080802Z-b6c6a67 (commit b6c6a67, dirty=False)
 
 Format angka mengikuti manuskrip (titik desimal; metode LLM: rerata tiga run dengan rentang min–maks; † = identik di ketiga run). Definisi setiap kolom: docstring src/eval/revisi.py.
 
@@ -159,13 +159,21 @@ Sensitivitas leksikon (utama + tambahan_kb) dan porsi prediksi serangan tanpa it
 | Deep agent | 68.7 (65 / 65 / 76) | 1.19 (1.17–1.20) | 99.3 (100 / 93 / 105) | 24.0 (25 / 31 / 16) | 18.0 (18 / 23 / 13) | 5.7 (7 / 7 / 3) | 26 of 500 |
 | Single LLM + verifier loop (ablation) | 74.0 (72 / 75 / 75) | 1.32 (1.32–1.33) | 161.3 (160 / 163 / 161) | 1.0 (1 / 0 / 2) | 0.7 (1 / 0 / 1) | 0.0 (0 / 0 / 0) | 37 of 500 |
 
+Perubahan label setelah klasifikasi ulang (baris yang ditolak lalu diklasifikasi lagi; rerata per run, nilai per run dalam kurung):
+
+| Method | Re-classified lines | Label changed | Correct → wrong | Wrong → correct | Attack → NORMAL | First rejection only for empty evidence items |
+|---|---|---|---|---|---|---|
+| Deep agent | 100.3 (101 / 94 / 106) | 7.0 (7 / 5 / 9) | 6.7 (7 / 4 / 9) | 0.0 (0 / 0 / 0) | 6.7 (7 / 4 / 9) | 11.0 (13 / 9 / 11) |
+| Single LLM + verifier loop (ablation) | 161.3 (160 / 163 / 161) | 18.0 (20 / 16 / 18) | 15.7 (18 / 13 / 16) | 1.7 (1 / 2 / 2) | 16.3 (18 / 15 / 16) | 33.7 (33 / 37 / 31) |
+Perubahan = label klasifikasi pertama dibandingkan label akhir; benar/salah menurut label gerbang. Untuk deep agent, klasifikasi pertama bisa PARSE_ERROR (dihitung salah).
+
 ## Dekomposisi §3.4 — loop verifikasi vs orkestrasi
 
 | Metric | Single LLM | Ablation | Deep agent | Gap (agent − single) | Loop part (ablation − single) | Orchestration part (agent − ablation) |
 |---|---|---|---|---|---|---|
 | Literal-evidence rate | 0.762 | 0.892 | 0.897 | 0.135 | 0.130 (95.9%) | 0.006 (4.1%) |
 | Macro-F1 | 0.830 | 0.804 | 0.750 | −0.080 | −0.026 (32.4%) | −0.054 (67.6%) |
-Persen = bagian / selisih total, dihitung dari rerata tiga run sebelum pembulatan.
+Persen = bagian / selisih total, dihitung dari rerata tiga run sebelum pembulatan; karena setiap bagian dibulatkan sendiri, jumlah bagian yang tercetak bisa berbeda 0.001 dari selisih tercetak.
 
 ## Run yang dipakai
 

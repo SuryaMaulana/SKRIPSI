@@ -1,9 +1,9 @@
 {
  "run": {
-  "run_id": "revisi-20261013T075026Z-a75bda8",
+  "run_id": "revisi-20261013T080802Z-b6c6a67",
   "method": "revisi",
-  "date_utc": "2026-10-13T07:50:26+00:00",
-  "git_commit": "a75bda804bd5c02de9687945a11d867153dd817a",
+  "date_utc": "2026-10-13T08:08:02+00:00",
+  "git_commit": "b6c6a67e6490662ee0427c114eca03fb3e16d70c",
   "git_branch": "revisi-jurnal",
   "git_dirty": false,
   "git_dirty_paths": [],
@@ -1613,6 +1613,66 @@
       93,
       105
      ]
+    },
+    "klasifikasi_ulang_baris": {
+     "mean": 100.33333333333333,
+     "min": 94.0,
+     "max": 106.0,
+     "values": [
+      101,
+      94,
+      106
+     ]
+    },
+    "label_berubah": {
+     "mean": 7.0,
+     "min": 5.0,
+     "max": 9.0,
+     "values": [
+      7,
+      5,
+      9
+     ]
+    },
+    "benar_ke_salah": {
+     "mean": 6.666666666666667,
+     "min": 4.0,
+     "max": 9.0,
+     "values": [
+      7,
+      4,
+      9
+     ]
+    },
+    "salah_ke_benar": {
+     "mean": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "values": [
+      0,
+      0,
+      0
+     ]
+    },
+    "serangan_ke_normal": {
+     "mean": 6.666666666666667,
+     "min": 4.0,
+     "max": 9.0,
+     "values": [
+      7,
+      4,
+      9
+     ]
+    },
+    "ditolak_hanya_item_kosong": {
+     "mean": 11.0,
+     "min": 9.0,
+     "max": 13.0,
+     "values": [
+      13,
+      9,
+      11
+     ]
     }
    },
    "ik_macro_f1": {
@@ -2222,6 +2282,66 @@
       160,
       163,
       161
+     ]
+    },
+    "klasifikasi_ulang_baris": {
+     "mean": 161.33333333333334,
+     "min": 160.0,
+     "max": 163.0,
+     "values": [
+      160,
+      163,
+      161
+     ]
+    },
+    "label_berubah": {
+     "mean": 18.0,
+     "min": 16.0,
+     "max": 20.0,
+     "values": [
+      20,
+      16,
+      18
+     ]
+    },
+    "benar_ke_salah": {
+     "mean": 15.666666666666666,
+     "min": 13.0,
+     "max": 18.0,
+     "values": [
+      18,
+      13,
+      16
+     ]
+    },
+    "salah_ke_benar": {
+     "mean": 1.6666666666666667,
+     "min": 1.0,
+     "max": 2.0,
+     "values": [
+      1,
+      2,
+      2
+     ]
+    },
+    "serangan_ke_normal": {
+     "mean": 16.333333333333332,
+     "min": 15.0,
+     "max": 18.0,
+     "values": [
+      18,
+      15,
+      16
+     ]
+    },
+    "ditolak_hanya_item_kosong": {
+     "mean": 33.666666666666664,
+     "min": 31.0,
+     "max": 37.0,
+     "values": [
+      33,
+      37,
+      31
      ]
     }
    },

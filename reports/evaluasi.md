@@ -1,4 +1,4 @@
-Agregasi replikasi replikasi-20261013T075008Z-a75bda8 (commit a75bda8, dirty=False)
+Agregasi replikasi replikasi-20261013T080744Z-b6c6a67 (commit b6c6a67, dirty=False)
 
 Nilai sel: rerata atas run (min–maks bila run lebih dari satu dan nilainya berbeda). Tabel utama memakai rerata.
 Run lama, run yang dihentikan, dan run yang diganti (C tanpa batas token, pilot E v1, validasi v2, E 500 tanpa batas parsial, run E 1693ae3, set C 56b9e2c, run C dengan run_id sama) ada di results/archive/ dan tidak masuk tabel; lihat reports/catatan_rekayasa.md.
