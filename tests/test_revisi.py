@@ -144,3 +144,17 @@ def test_revision_report_reproduces_the_published_single_llm_and_agent_values():
     assert [q["a_benar_b_salah"] for q in mc["pasangan"]] == [50, 53, 50]
     assert [q["b_benar_a_salah"] for q in mc["pasangan"]] == [9, 9, 10]
     json.dumps(result)  # laporan JSON harus bisa diserialkan
+
+
+def test_relabel_metrics_count_changes_after_a_rejection():
+    labels = {"a": "XSS", "b": "SQLI", "c": "NORMAL", "d": "PATH_TRAVERSAL"}
+    verdict = lambda ok, missing=(): {"lolos": ok, "skema_valid": True, "evidence_hilang": list(missing)}
+    rows = [
+        {"id": "a", "label": "NORMAL", "riwayat_label": ["XSS", "NORMAL"], "verifikasi": {"putusan": [verdict(False, [""])]}},
+        {"id": "b", "label": "SQLI", "riwayat_label": ["PARSE_ERROR", "SQLI"], "verifikasi": {"putusan": [verdict(False, ["x"])]}},
+        {"id": "c", "label": "NORMAL", "riwayat_label": ["NORMAL"], "verifikasi": {"putusan": [verdict(True)]}},
+        {"id": "d", "label": "XSS", "riwayat_label": ["XSS", "XSS"], "verifikasi": {"putusan": [verdict(False, [" ", "y"])]}},
+    ]
+    out = rv.relabel_metrics(rows, _truth(labels))
+    assert out == {"klasifikasi_ulang_baris": 3, "label_berubah": 2, "benar_ke_salah": 1, "salah_ke_benar": 1,
+                   "serangan_ke_normal": 1, "ditolak_hanya_item_kosong": 1}

@@ -144,7 +144,33 @@ def extra_metrics(method, truth, lexicons: dict[str, dict]) -> dict:
         out["verification_failed"] = sum(r["status"] == "verification_failed" for r in rows)
         out["putaran_rerata"] = statistics.mean(r["verifikasi"]["putaran"] for r in rows)
         out["baris_ditolak"] = sum(r["verifikasi"]["penolakan"] > 0 for r in rows)
+        out.update(relabel_metrics(rows, truth))
     return out
+
+
+def relabel_metrics(rows: list[dict], truth) -> dict:
+    """Perubahan label antara klasifikasi pertama dan label akhir pada baris yang diklasifikasi ulang setelah penolakan
+    (riwayat_label punya >= 2 entri), serta baris yang penolakan pertamanya hanya disebabkan item evidence kosong."""
+    again = [r for r in rows if len(r.get("riwayat_label") or []) >= 2]
+    changed = [r for r in again if r["riwayat_label"][0] != r["label"]]
+    first = lambda r: r["riwayat_label"][0]
+    gold = lambda r: truth.labels[r["id"]]
+    return {
+        "klasifikasi_ulang_baris": len(again),
+        "label_berubah": len(changed),
+        "benar_ke_salah": sum(first(r) == gold(r) and r["label"] != gold(r) for r in changed),
+        "salah_ke_benar": sum(first(r) != gold(r) and r["label"] == gold(r) for r in changed),
+        "serangan_ke_normal": sum(first(r) in ATTACK and r["label"] == "NORMAL" for r in changed),
+        "ditolak_hanya_item_kosong": sum(1 for r in rows if _rejected_only_for_empty_items(r)),
+    }
+
+
+def _rejected_only_for_empty_items(row: dict) -> bool:
+    verdicts = row["verifikasi"]["putusan"]
+    if not verdicts or verdicts[0]["lolos"] or not verdicts[0].get("skema_valid", True):
+        return False
+    missing = verdicts[0].get("evidence_hilang") or []
+    return bool(missing) and all(not str(e).strip() for e in missing)
 
 
 # ------------------------------------------------------------------------------------------------- uji berpasangan
@@ -298,6 +324,13 @@ def cell(stat: dict | None, digits: int = 3, space: bool = False, thousands: boo
     return f"{mean}{' ' if space else ''}({_n(stat['min'], digits, thousands)}–{_n(stat['max'], digits, thousands)})"
 
 
+def per_run_cell(stat: dict | None) -> str:
+    """Rerata dan nilai tiap run, mis. "74.0 (72 / 75 / 75)"."""
+    if not stat or stat.get("mean") is None:
+        return "–"
+    return f"{_n(stat['mean'], 1)} ({' / '.join(_n(v, 0) for v in stat['values'])})"
+
+
 def _p(p: float) -> str:
     return "<0.001" if p < 0.001 else f"{p:.3f}"
 
@@ -395,19 +428,25 @@ def render(result: dict) -> str:
         for n in llm:
             x = m[n]["metrik_revisi"]
 
-            def per_run(key):
-                stat = x.get(key)
-                if not stat or stat.get("mean") is None:
-                    return "–"
-                return f"{_n(stat['mean'], 1)} ({' / '.join(_n(v, 0) for v in stat['values'])})"
-
-            rows.append([NAMES[n], per_run("verification_failed"),
-                         cell(x.get("putaran_rerata"), 2, space=True, runs=runs[n]), per_run("baris_ditolak"),
-                         per_run("truncated_kejadian"), per_run("truncated_baris"), per_run("parse_error"),
+            rows.append([NAMES[n], per_run_cell(x.get("verification_failed")),
+                         cell(x.get("putaran_rerata"), 2, space=True, runs=runs[n]), per_run_cell(x.get("baris_ditolak")),
+                         per_run_cell(x.get("truncated_kejadian")), per_run_cell(x.get("truncated_baris")),
+                         per_run_cell(x.get("parse_error")),
                          f"{m[n]['baris_label_berubah_antar_run']} of 500"])
         out.append(_table(["Method", "verification_failed lines (r1 / r2 / r3)", "Verification rounds/line",
                            "Lines with ≥ 1 rejection", "TRUNCATED calls", "Lines with TRUNCATED", "PARSE_ERROR",
                            "Lines whose label changed across runs"], rows))
+        verified = [n for n in llm if m[n]["metrik_revisi"].get("klasifikasi_ulang_baris")]
+        if verified:
+            out += ["", "Perubahan label setelah klasifikasi ulang (baris yang ditolak lalu diklasifikasi lagi; rerata per run, "
+                        "nilai per run dalam kurung):", ""]
+            keys = ("klasifikasi_ulang_baris", "label_berubah", "benar_ke_salah", "salah_ke_benar", "serangan_ke_normal",
+                    "ditolak_hanya_item_kosong")
+            out.append(_table(["Method", "Re-classified lines", "Label changed", "Correct → wrong", "Wrong → correct",
+                               "Attack → NORMAL", "First rejection only for empty evidence items"],
+                              [[NAMES[n], *(per_run_cell(m[n]["metrik_revisi"].get(k)) for k in keys)] for n in verified]))
+            out.append("Perubahan = label klasifikasi pertama dibandingkan label akhir; benar/salah menurut label gerbang. "
+                       "Untuk deep agent, klasifikasi pertama bisa PARSE_ERROR (dihitung salah).")
 
     if result["dekomposisi"]:
         out += ["", "## Dekomposisi §3.4 — loop verifikasi vs orkestrasi", ""]
@@ -419,7 +458,8 @@ def render(result: dict) -> str:
                          f"{_n(d['bagian_orkestrasi'])} ({_n(d['persen_orkestrasi'], 1)}%)"])
         out.append(_table(["Metric", "Single LLM", "Ablation", "Deep agent", "Gap (agent − single)",
                            "Loop part (ablation − single)", "Orchestration part (agent − ablation)"], rows))
-        out.append("Persen = bagian / selisih total, dihitung dari rerata tiga run sebelum pembulatan.")
+        out.append("Persen = bagian / selisih total, dihitung dari rerata tiga run sebelum pembulatan; karena setiap "
+                   "bagian dibulatkan sendiri, jumlah bagian yang tercetak bisa berbeda 0.001 dari selisih tercetak.")
 
     out += ["", "## Run yang dipakai", ""]
     out.append(_table(["Method", "run_id", "commit"], [[NAMES[n], str(r["run_id"]), str(r["git_commit"])[:7]]
