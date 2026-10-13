@@ -1,24 +1,29 @@
 # Panduan anotasi audit manusia
 
 Panduan ini untuk dua anotator (anotator 1 dan anotator 2). Anotator tidak perlu membaca kode.
-Lembar **Panduan** di dalam berkas xlsx dibuat lebih dulu. Bila keduanya berbeda, yang berlaku adalah panduan ini
+Lembar **Panduan** di dalam berkas anotasi dibuat lebih dulu. Bila keduanya berbeda, yang berlaku adalah panduan ini
 (lihat bagian 6).
 
 ## 1. Berkas dan urutan kerja
 
 | Anotator | Fase A: label kelas (100 baris) | Fase B: relevansi bukti (277 butir) |
 |---|---|---|
-| 1 | `anotasi_A_anotator1.xlsx` | `anotasi_B_anotator1.xlsx` |
-| 2 | `anotasi_A_anotator2.xlsx` | `anotasi_B_anotator2.xlsx` |
+| 1 | Google Sheet `anotasi_A_anotator1` | Google Sheet `anotasi_B_anotator1` |
+| 2 | Google Sheet `anotasi_A_anotator2` | Google Sheet `anotasi_B_anotator2` |
 
-- Setiap anotator hanya menerima dua berkasnya dan panduan ini, tanpa akses ke repositori.
+- Anotasi dikerjakan di Google Sheets milik akun penulis. Setiap anotator hanya mendapat akses edit ke dua Sheet
+  miliknya dan panduan ini, tanpa akses ke repositori maupun ke Sheet anotator lain.
 - Kedua anotator mendapat 100 baris log yang sama dalam urutan acak yang berbeda. Isi hanya lembar **Anotasi**.
-- Kerjakan **Fase A sampai selesai dan simpan, baru buka Fase B.** Fase B menampilkan prediksi model untuk baris yang
-  sama, jadi melihatnya lebih dulu akan memengaruhi label Fase A. Setelah membuka Fase B, jangan mengubah Fase A lagi.
-- Kerjakan sendiri. Jangan berdiskusi dengan anotator lain sampai keempat berkas diserahkan.
-- Berkas yang sudah diserahkan tidak diubah lagi; kappa dihitung dari berkas itu. Diskusi sesudahnya hanya memakai
-  daftar baris "perlu diskusi" (berisi id dan label kedua anotator, tanpa label dataset), dan hasil diskusi dicatat
-  terpisah. Rincian per baris hasil perhitungan (di `results/`) memuat label dataset dan tidak dibagikan ke anotator.
+- Kerjakan **Fase A sampai selesai, lalu beri tahu penulis.** Sheet Fase B baru dibagikan setelah itu. Fase B
+  menampilkan prediksi model untuk baris yang sama, jadi melihatnya lebih dulu akan memengaruhi label Fase A. Setelah
+  membuka Fase B, jangan mengubah Fase A lagi.
+- Kerjakan sendiri. Jangan berdiskusi dengan anotator lain sampai kedua anotator selesai mengisi keempat Sheet.
+- Riwayat versi Google Sheets mencatat siapa mengubah sel apa dan kapan. Riwayat ini dipakai sebagai bukti bahwa setiap
+  Sheet diisi oleh anotatornya sendiri; penulis tidak mengedit Sheet anotator.
+- Sheet yang sudah dinyatakan selesai tidak diubah lagi; kappa dihitung dari isinya saat itu. Diskusi sesudahnya hanya
+  memakai daftar baris "perlu diskusi" (berisi id dan label kedua anotator, tanpa label dataset), dan hasil diskusi
+  dicatat terpisah. Rincian per baris hasil perhitungan (di `results/`) memuat label dataset dan tidak dibagikan ke
+  anotator.
 
 ## 2. Aturan umum untuk Fase A dan Fase B
 
@@ -32,12 +37,13 @@ Lembar **Panduan** di dalam berkas xlsx dibuat lebih dulu. Bila keduanya berbeda
     tempel teksnya, lalu tekan Ctrl-D;
   - dokumentasi umum untuk arti istilah, misalnya nama metode HTTP;
   - fitur pencarian (Ctrl+F) untuk memeriksa item yang panjang.
-- **Tidak boleh**, sampai keempat berkas diserahkan:
-  - ChatGPT atau LLM lain, maupun alat klasifikasi otomatis;
+- **Tidak boleh**, sampai keempat Sheet selesai:
+  - ChatGPT, Gemini (termasuk fitur AI di Google Sheets), atau LLM lain, maupun alat klasifikasi
+    otomatis;
   - folder `results/`, `reports/`, atau `data/` di repositori, baik lokal maupun di GitHub. Isinya menunjukkan label
     dataset dan metode asal setiap butir;
   - berkas kunci (`audit_B_key.json`, `audit_100_ids.json`);
-  - berkas anotator lain.
+  - Sheet atau berkas anotator lain.
 
 ### Membaca baris log
 
@@ -254,25 +260,38 @@ tidak disebutkan.
 - `skor`: **`0`**
 - Alasannya: item ini uraian, tidak ada di baris log.
 
-## 5. Aturan kerja, penyimpanan, dan pemeriksaan skrip
+## 5. Aturan kerja di Google Sheets dan pemeriksaan skrip
 
+- Kerjakan langsung di Google Sheet yang dibagikan penulis. Google Sheets menyimpan otomatis. Jangan mengunduh lalu
+  mengunggah ulang, jangan membuat salinan (File > Make a copy), dan jangan memindahkan isian ke aplikasi lain.
 - Isi hanya `label_anotator` (Fase A) atau `skor` (Fase B), ditambah `catatan` bila perlu.
 - Jangan mengubah:
-  - urutan baris (jangan memakai Sort atau Filter);
+  - urutan baris (jangan memakai Sort range, filter, atau filter view);
   - `no` atau `id`;
-  - isi kolom lain, nama kolom, atau nama lembar `Anotasi`.
+  - isi kolom lain, nama kolom, atau nama lembar `Anotasi`;
+  - format sel atau angka (menu Format).
 - Jangan menambah atau menghapus baris maupun kolom, dan jangan menulis apa pun di luar tabel.
-- Pilih nilai dari dropdown, atau ketik persis sama. Jangan menempel nilai dari luar, karena tempelan bisa melewati
-  validasi dropdown.
-- Abaikan peringatan Excel seperti segitiga hijau "number stored as text". Jangan mengonversi isi sel.
-- Pakai Microsoft Excel atau LibreOffice Calc. Hindari Google Sheets, karena konversi bolak-balik bisa mengubah teks
-  payload.
-- Simpan dengan **File > Save** sebagai `.xlsx` dengan **nama berkas yang sama**. Jangan simpan sebagai `.csv`, `.xls`,
-  atau `.ods`.
+- Pilih nilai dari dropdown di setiap sel. Jangan menyalin-tempel nilai atau mengisi banyak sel sekaligus (misalnya
+  menempel satu kolom atau menyeret isian ke bawah), karena tempelan bisa melewati validasi dropdown dan isian yang
+  masuk sekaligus tidak bisa dibedakan dari isian otomatis di riwayat versi.
+- Jangan mengubah izin berbagi dan jangan membagikan Sheet ke orang lain.
+- Setelah selesai, beri tahu penulis. Akses Anda lalu diubah menjadi hanya-lihat.
+
+### Persiapan oleh penulis
+
+- Unggah empat lembar kosong (`audit/anotasi_*.xlsx`) ke Google Drive akun penulis, lalu ubah masing-masing menjadi
+  Google Sheets (File > Save as Google Sheets). Periksa bahwa dropdown masih berfungsi.
+- Bagikan setiap Sheet hanya ke anotatornya sebagai Editor: anotator 1 untuk `anotasi_A_anotator1` dan
+  `anotasi_B_anotator1`, anotator 2 untuk `anotasi_A_anotator2` dan `anotasi_B_anotator2`. Sheet Fase B dibagikan
+  setelah anotator menyatakan Fase A selesai.
+- Penulis tidak mengedit Sheet anotator. Setelah anotator selesai, ubah aksesnya menjadi hanya-lihat dan simpan
+  tangkapan layar riwayat versi setiap Sheet (File > Version history > See version history).
 
 ### Saat penulis menjalankan perhitungan
 
-Perintahnya `python -m src.eval.anotasi hitung --a1 ... --a2 ... --b1 ... --b2 ...`, dan keempat berkas wajib ada.
+Setiap Sheet diunduh lewat File > Download > Microsoft Excel (.xlsx) tanpa diubah. Perintahnya
+`python -m src.eval.anotasi hitung --a1 ... --a2 ... --b1 ... --b2 ...`, dan keempat berkas wajib ada. Ekspor Google
+Sheets menyimpan `no` dan skor sebagai angka desimal (misalnya `1.0`); skrip menerimanya.
 
 Yang diperiksa skrip:
 
@@ -286,7 +305,7 @@ Bila ada masalah, **tidak ada sel yang dilewati: perhitungan ditolak seluruhnya*
 
 - Pesan galat menyebut nomor barisnya, misalnya `no 37 (...): label kosong/tidak sah None`,
   `no 12: isi baris tidak cocok dengan kunci`, atau `no 5: skor kosong/tidak sah '3'`.
-- Berkas diperbaiki, lalu perhitungan dijalankan ulang.
+- Anotator memperbaiki Sheet-nya, lalu Sheet diunduh ulang dan perhitungan dijalankan ulang.
 - Saat meneruskan galat ke anotator, sebutkan nomor `no` saja. Kode butir seperti `B0007` jangan diteruskan, karena
   urutannya mengikuti pengelompokan kelas.
 - Hanya baris yang semua selnya kosong yang diabaikan. Karena itu, baris data yang terhapus isinya akan terdeteksi
@@ -294,7 +313,7 @@ Bila ada masalah, **tidak ada sel yang dilewati: perhitungan ditolak seluruhnya*
 - Label dibaca tanpa spasi dan tanpa membedakan huruf besar/kecil. Skor diterima sebagai angka atau teks `0`, `1`, `2`
   (`2.0` juga diterima). Isi `catatan` tidak dipakai dalam perhitungan.
 
-## 6. Perbedaan dengan lembar Panduan di dalam xlsx
+## 6. Perbedaan dengan lembar Panduan di dalam berkas anotasi
 
 - **Pengurutan.** Lembar Panduan menulis "mengurutkan ulang baris boleh". Panduan ini melarang Sort dan Filter, karena
   pengurutan satu kolom saja bisa memindahkan label atau skor ke baris lain tanpa terdeteksi.
