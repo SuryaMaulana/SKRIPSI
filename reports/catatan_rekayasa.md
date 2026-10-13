@@ -4,7 +4,7 @@ Semua run di bawah dipindah ke `results/archive/` atas keputusan penulis (2026-1
 evaluasi utama** (`reports/evaluasi.md`, 3 run per metode dengan konfigurasi final ber-batas `max_tokens` 4.096). Catatan
 ini mendokumentasikan riwayat rekayasa agar setiap keputusan dapat ditelusuri. Laporan lama yang dirujuk ada di
 `reports/archive/`. §7 memetakan hash commit yang tercatat di run ke riwayat git sekarang; §8 mencatat pemeriksaan
-prompt injection pada run resmi.
+prompt injection pada run resmi; §9 mencatat run ablasi revisi jurnal.
 
 ## 1. Daftar run arsip
 
@@ -165,3 +165,14 @@ Pemeriksaan 2026-10-08 pada sampel uji dan log panggilan lokal keenam run resmi:
   (instruksi konfigurasi PHP atau eksekusi perintah di parameter) dan 1 kali di teks delegasi orkestrator sendiri.
 - Kesimpulan: tidak ada kejadian prompt injection, tetapi sampel juga tidak memuat percobaannya, sehingga ketahanan
   terhadap prompt injection belum teruji oleh data ini (keterbatasan).
+
+## 9. Revisi jurnal: run ablasi LLM tunggal + loop verifikasi
+
+Run resmi `llm_single_verified_r{1,2,3}-20261013T072431Z-22841cb` (3 run paralel, 500 baris uji, konfigurasi model sama
+dengan C dan E) dimulai pada commit `22841cb` dengan pohon kerja bersih. Ketiganya berhenti di baris pertama karena
+OpenRouter menolak dengan HTTP 402 (kredit habis); belum ada baris yang dinilai. Setelah kredit diisi, ketiganya
+dilanjutkan dengan `--resume` pada commit `272ce7e` (pohon bersih; commit itu hanya menambah paket audit, kode ablasi
+identik) dan selesai 500 baris tanpa PARSE_ERROR. Panggilan yang ditolak 402 ditandai `galat_api` di log panggilan,
+sehingga tidak masuk latensi per panggilan maupun persentase token ter-cache. Sebelum run, kode ablasi ditinjau
+adversarial (kesesuaian dengan spesifikasi dan deep agent, keamanan run); temuan berderajat rendah diperbaiki di
+`22841cb`.

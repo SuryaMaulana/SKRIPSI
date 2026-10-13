@@ -26,7 +26,10 @@ make regex        # pembanding regex utama -> results/regex.jsonl
 make regex-full   # varian sekunder regex_full (CRS PL1 semua kategori, post hoc) -> results/regex_full.jsonl
 make llm_single   # LLM tunggal, 3 run pada 500 baris yang sama -> results/llm_single_r{1,2,3}.jsonl
 make agent        # deep agent, 3 run pada 500 baris yang sama -> results/agent_r{1,2,3}.jsonl
-make eval         # reports/evaluasi.md (rerata dan rentang min-maks) dan reports/evaluasi_per_run.md
+make llm_single_verified  # ablasi revisi jurnal: LLM tunggal + loop verifikasi, 3 run
+                  #   -> results/llm_single_verified_r{1,2,3}.jsonl
+make eval         # reports/evaluasi.md (rerata dan rentang min-maks), reports/evaluasi_per_run.md, dan
+                  #   reports/revisi_ablasi.md (Tabel 4-11 manuskrip revisi, uji berpasangan)
 make test         # unit test
 ```
 
@@ -89,11 +92,13 @@ dihitung dengan bootstrap klaster per templat (1.000×) atas macro-F1 rerata run
 | `results/agent_r{1,2,3}.jsonl` (+ `.run.json`) | deep agent, 3 run resmi: label akhir, status verifikasi, delegasi, token, biaya, latensi |
 | `results/tuning/` | run regex_full di srbh_val untuk penyesuaian pemetaan |
 | `results/crs_regression.json`, `results/crs_regression_regex_full.json` | verifikasi emulasi CRS terhadap uji regresi resmi CRS |
+| `results/llm_single_verified_r{1,2,3}.jsonl` (+ `.run.json`) | ablasi revisi jurnal (LLM tunggal + loop verifikasi), 3 run: label, status dan putusan verifikasi per putaran, riwayat klasifikasi, token, biaya, latensi |
 | `results/check_openrouter.json` | hasil cek API dan konfigurasi model |
 | `results/pemetaan_commit.json` | pemetaan commit lama (tercatat di `*.run.json` dan `run_id`) ke riwayat git sekarang |
 | `results/archive/` | run yang tidak masuk tabel (lihat Catatan rekayasa) |
 | `reports/evaluasi.md` (+ `.json`) | laporan evaluasi utama: Tabel 4.2–4.5, F1 per kelas, confusion matrix rerata, keluaran degeneratif |
 | `reports/evaluasi_per_run.md` (+ `.json`) | rincian evaluasi per run dan aturan pendorong salah kelas regex |
+| `reports/revisi_ablasi.md` (+ `.json`) | revisi jurnal: angka Tabel 4-11 manuskrip untuk kelima metode termasuk ablasi, uji berpasangan, dekomposisi loop vs orkestrasi |
 | `reports/ringkasan_sidang.md` | ringkasan sidang: angka kunci, tiga klaim utama, 17 pertanyaan penguji dengan jawaban berbasis angka |
 | `reports/catatan_rekayasa.md` | riwayat run yang tidak masuk tabel beserta alasannya, pemetaan hash commit, pemeriksaan prompt injection |
 | `reports/data_report.md` | statistik dataset per tahap, sampel uji, dan daftar keputusan praproses |
@@ -101,6 +106,19 @@ dihitung dengan bootstrap klaster per templat (1.000×) atas macro-F1 rerata run
 | `reports/label_mapping_proposal.md` | usulan dan bukti pemetaan label CAPEC ke 6 kelas |
 | `reports/catatan_pembanding_regex.md` | catatan pembanding regex dan regex_full |
 | `reports/archive/` | laporan run lama (pilot, validasi, evaluasi tanpa batas token, evaluasi regex awal) |
+
+## Revisi jurnal (cabang `revisi-jurnal`)
+
+- **Ablasi** `src/baselines/llm_single_verified.py`: panggilan pertama identik dengan LLM tunggal; bila evidence tidak
+  literal atau skema salah, model dipanggil sekali lagi dengan alasan penolakan memakai bagian MASUKAN prompt
+  Klasifikasi tanpa keluaran alat (paling banyak 2 putaran verifikasi, sama dengan deep agent). Verifikasi memakai
+  fungsi deep agent apa adanya.
+- **Laporan** `src/eval/revisi.py` (bagian dari `make eval`): definisi setiap kolom ada di docstring-nya; leksikon
+  class-consistent di `configs/leksikon_kelas.yaml`.
+- **Audit manusia** `src/eval/anotasi.py`: `python -m src.eval.anotasi siapkan` membuat `audit/anotasi_A_anotator{1,2}.xlsx`
+  (label kelas) dan `audit/anotasi_B_anotator{1,2}.xlsx` (relevansi bukti, metode disamarkan); daftar id dan kunci
+  disimpan di `data/processed/` dan tidak dibagikan. Setelah diisi: `python -m src.eval.anotasi hitung --a1 ... --a2 ...
+  --b1 ... --b2 ...` -> `reports/revisi_anotasi.md`.
 
 ## Data
 
@@ -123,10 +141,11 @@ src/data/     pipeline dataset (unduh, label, rekonstruksi, parsing, normalisasi
 src/baselines/ pembanding regex (emulasi CRS/ModSecurity, Baş Seyyar dkk.) dan LLM tunggal
 src/llm/      klien OpenRouter dan klasifikasi terstruktur (dipakai LLM tunggal dan deep agent)
 src/agent/    deep agent: orkestrator deepagents, sub-agen, alat, prompt, runner
-src/eval/     evaluasi per run, agregasi rerata 3 run, pemilihan pilot, perbandingan per baris
+src/eval/     evaluasi per run, agregasi rerata 3 run, laporan revisi, audit manusia, pemilihan pilot
 src/common/   masukan metode, metadata run, pemeriksa evidence literal
 scripts/      cek API OpenRouter (make check-api) dan pembuat golden ModSecurity (make golden-check)
 tools/        harness C ModSecurity 2.9.15 untuk verifikasi emulasi
+audit/        berkas anotasi audit manusia (revisi jurnal)
 tests/        unit test (pytest)
 ```
 
