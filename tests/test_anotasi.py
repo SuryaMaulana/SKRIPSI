@@ -129,6 +129,16 @@ def test_compute_reports_kappa_consensus_and_relevance_from_filled_files(package
     assert single["distribusi_anotator2"] == {0: 0, 1: 6, 2: 12} and agent["rerata"] == 2
     assert agent["item_label_salah"] == 1 and single["item_label_salah"] == 0  # agent memberi NORMAL pada XSS
     assert "Cohen's κ antar anotator" in text and "κ berbobot kuadratik" in text
+    # label gerbang per id hanya di results/: laporan reports/ memuat agregat dan daftar "perlu diskusi" saja
+    assert both_wrong not in text and disagree in text and "results/revisi_anotasi_per_baris.json" in text
+    an.write_outputs(a, b, text, tmp / "reports" / "anotasi.md", tmp / "results" / "per_baris.json")
+    public = json.loads((tmp / "reports" / "anotasi.json").read_text())
+    assert "konsensus" not in public["fase_a"] and "konsensus_beda_gerbang" not in public["fase_a"]
+    assert both_wrong not in json.dumps(public) and public["fase_a"]["jumlah_konsensus_beda_gerbang"] == 1
+    assert public["fase_a"]["konsensus_beda_gerbang_per_kelas"] == {f"{gate[both_wrong]} -> NORMAL": 1}
+    per_row = json.loads((tmp / "results" / "per_baris.json").read_text())
+    assert per_row["konsensus_beda_gerbang"] == a["konsensus_beda_gerbang"] and len(per_row["konsensus"]) == 6
+    assert "asal" not in json.dumps(per_row) and "metode" not in json.dumps(per_row)  # kunci Fase B tidak ikut
 
 
 def test_compute_refuses_incomplete_or_edited_files(package):

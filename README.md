@@ -125,7 +125,8 @@ dihitung dengan bootstrap klaster per templat (1.000×) atas macro-F1 rerata run
 - **Audit manusia** `src/eval/anotasi.py`: `python -m src.eval.anotasi siapkan` membuat `audit/anotasi_A_anotator{1,2}.xlsx`
   (label kelas) dan `audit/anotasi_B_anotator{1,2}.xlsx` (relevansi bukti, metode disamarkan); daftar id dan kunci
   disimpan di `data/processed/` dan tidak dibagikan. Setelah diisi: `python -m src.eval.anotasi hitung --a1 ... --a2 ...
-  --b1 ... --b2 ...` -> `reports/revisi_anotasi.md`.
+  --b1 ... --b2 ...` -> `reports/revisi_anotasi.md` (agregat) dan `results/revisi_anotasi_per_baris.json` (konsensus per id
+  dan label gerbang pada baris yang berbeda).
 
 ## Data
 

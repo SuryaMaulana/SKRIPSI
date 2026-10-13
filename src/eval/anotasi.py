@@ -14,9 +14,11 @@ siapkan:
   kolom metode, urutan acak berbeda per anotator (seed 11 dan 12). Kolom: no, id, raw_log_masked, label_prediksi,
   evidence_item, skor (dropdown 0/1/2), catatan. Pemetaan butir -> metode disimpan terpisah di
   data/processed/audit_B_key.json, yang tidak dibagikan ke anotator.
-hitung: membaca keempat berkas terisi -> reports/revisi_anotasi.md (+ .json):
-- Fase A: kappa Cohen tak berbobot antar anotator dan persen setuju; kappa tiap anotator vs label gerbang bukti; label
-  konsensus (setuju) atau "perlu diskusi" beserta daftar barisnya; baris yang konsensusnya berbeda dari label gerbang.
+hitung: membaca keempat berkas terisi -> reports/revisi_anotasi.md (+ .json) dan results/revisi_anotasi_per_baris.json:
+- Fase A: kappa Cohen tak berbobot antar anotator dan persen setuju; kappa tiap anotator vs label gerbang bukti; daftar
+  baris "perlu diskusi" (id dan label kedua anotator); jumlah baris yang konsensusnya berbeda dari label gerbang per
+  pasangan kelas. Label konsensus per id dan label gerbang per id pada baris yang berbeda hanya ditulis ke
+  results/revisi_anotasi_per_baris.json (keputusan penulis: label gerbang sampel uji tidak ditulis di luar results/).
 - Fase B: rerata skor relevansi per metode setelah kunci dibuka, kappa berbobot kuadratik antar anotator, distribusi skor
   0/1/2 per metode, dan rerata skor pada baris yang labelnya benar vs salah.
 Jalankan: python -m src.eval.anotasi siapkan | python -m src.eval.anotasi hitung --a1 ... --a2 ... --b1 ... --b2 ...
@@ -47,6 +49,7 @@ from ..data.config import CLASSES, RANDOM_STATE, ROOT
 QUOTA = {"SQLI": 17, "XSS": 17, "PATH_TRAVERSAL": 17, "CMD_INJECTION": 17, "WEB_SCANNING": 16, "NORMAL": 16}
 IDS_PATH = ROOT / "data" / "processed" / "audit_100_ids.json"
 KEY_PATH = ROOT / "data" / "processed" / "audit_B_key.json"
+PER_ROW_PATH = ROOT / "results" / "revisi_anotasi_per_baris.json"
 OUT_DIR = ROOT / "audit"
 RESULTS = ROOT / "results"
 METHOD_RUNS = {"llm_single": "llm_single_r1", "agent": "agent_r1"}
@@ -415,12 +418,9 @@ def render(a: dict, b: dict, files: dict[str, Path]) -> str:
                 "| id | anotator 1 | anotator 2 |", "|---|---|---|",
                 *[f"| {x['id']} | {x['anotator1']} | {x['anotator2']} |" for x in a["perlu_diskusi"]], ""]
     if a["konsensus_beda_gerbang"]:
-        out += ["Baris yang konsensusnya berbeda dari label gerbang:", "", "| id | konsensus | label gerbang |",
-                "|---|---|---|", *[f"| {x['id']} | {x['konsensus']} | {x['gerbang']} |" for x in a["konsensus_beda_gerbang"]],
-                ""]
-        counts = Counter((x["gerbang"], x["konsensus"]) for x in a["konsensus_beda_gerbang"])
-        out += ["Ringkasan per kelas (gerbang -> konsensus): " + "; ".join(f"{g} -> {c}: {n}" for (g, c), n in
-                                                                          sorted(counts.items())), ""]
+        out += ["Ringkasan per kelas (gerbang -> konsensus): " + "; ".join(
+            f"{pair}: {n}" for pair, n in differing_by_class(a).items()) + ". Rincian per id di "
+            "results/revisi_anotasi_per_baris.json.", ""]
     out += ["## Fase B — relevansi bukti (skala 0–2)", "",
             f"- Butir unik: {b['butir']}; κ berbobot kuadratik antar anotator: {_f(b['kappa_berbobot_kuadratik'])}.", "",
             "| metode | item | baris | rerata (2 anotator) | rerata anotator 1 | rerata anotator 2 | skor 0/1/2 anotator 1 "
@@ -435,6 +435,33 @@ def render(a: dict, b: dict, files: dict[str, Path]) -> str:
     out += ["", "Rerata (2 anotator) = rerata atas item dari skor rata-rata kedua anotator. Item yang identik di kedua "
             "metode dinilai sekali dan dihitung untuk keduanya. Label benar/salah menurut label gerbang bukti."]
     return "\n".join(out) + "\n"
+
+
+def differing_by_class(a: dict) -> dict[str, int]:
+    counts = Counter((x["gerbang"], x["konsensus"]) for x in a["konsensus_beda_gerbang"])
+    return {f"{g} -> {c}": n for (g, c), n in sorted(counts.items())}
+
+
+def split_report(a: dict) -> tuple[dict, dict]:
+    """Fase A untuk reports/ (tanpa label gerbang dan konsensus per id) dan untuk results/ (per id)."""
+    public = {k: v for k, v in a.items() if k not in ("konsensus", "konsensus_beda_gerbang")}
+    public["jumlah_konsensus_beda_gerbang"] = len(a["konsensus_beda_gerbang"])
+    public["konsensus_beda_gerbang_per_kelas"] = differing_by_class(a)
+    per_row = {"keterangan": "Rincian per id audit Fase A: label konsensus kedua anotator (atau 'perlu diskusi') dan "
+                             "label gerbang pada baris yang konsensusnya berbeda. Ringkasan agregat di "
+                             "reports/revisi_anotasi.md.",
+               "konsensus": a["konsensus"], "konsensus_beda_gerbang": a["konsensus_beda_gerbang"]}
+    return public, per_row
+
+
+def write_outputs(a: dict, b: dict, text: str, out: Path, per_row_path: Path = PER_ROW_PATH) -> None:
+    public, per_row = split_report(a)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    out.with_suffix(".json").write_text(json.dumps({"fase_a": public, "fase_b": b}, ensure_ascii=False, indent=1) + "\n",
+                                        encoding="utf-8")
+    per_row_path.parent.mkdir(parents=True, exist_ok=True)
+    per_row_path.write_text(json.dumps(per_row, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
 
 def compute(files: dict[str, Path], ids_path: Path = IDS_PATH, key_path: Path = KEY_PATH,
@@ -456,6 +483,7 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("a1", "a2", "b1", "b2"):
         count.add_argument(f"--{name}", type=Path, required=True)
     count.add_argument("--out", type=Path, default=ROOT / "reports" / "revisi_anotasi.md")
+    count.add_argument("--per-baris", type=Path, default=PER_ROW_PATH, help="rincian per id (label gerbang) di results/")
     args = parser.parse_args(argv)
     if args.perintah == "siapkan":
         done = prepare()
@@ -466,10 +494,7 @@ def main(argv: list[str] | None = None) -> int:
     files = {"A1": args.a1, "A2": args.a2, "B1": args.b1, "B2": args.b2}
     a, b, text = compute(files)
     print(text)
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(text, encoding="utf-8")
-    args.out.with_suffix(".json").write_text(json.dumps({"fase_a": a, "fase_b": b}, ensure_ascii=False, indent=1) + "\n",
-                                             encoding="utf-8")
+    write_outputs(a, b, text, args.out, args.per_baris)
     return 0
 
 
