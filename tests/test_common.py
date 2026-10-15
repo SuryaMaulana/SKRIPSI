@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -104,8 +105,13 @@ def test_every_recorded_run_commit_has_a_mapping_or_exists_in_the_current_histor
     mapping = json.loads(runinfo.COMMIT_MAP.read_text(encoding="utf-8"))["lama_ke_baru"]
     runs = sorted((runinfo.ROOT / "results").rglob("*.run.json"))
     assert runs
-    for path in runs:
+    unmapped = [path for path in runs if json.loads(path.read_text(encoding="utf-8"))["git_commit"] not in mapping]
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=runinfo.ROOT, capture_output=True, text=True)
+    if unmapped and (top.returncode != 0 or Path(top.stdout.strip()).resolve() != runinfo.ROOT.resolve()):
+        # salinan tanpa .git (mis. zip lampiran): run sesudah penulisan ulang riwayat tidak bisa dicek ke riwayat
+        pytest.skip("butuh riwayat git repositori ini untuk run yang tidak ada di pemetaan commit")
+    for path in unmapped:
         commit = json.loads(path.read_text(encoding="utf-8"))["git_commit"]
         exists = subprocess.run(["git", "cat-file", "-e", f"{commit}^{{commit}}"], cwd=runinfo.ROOT,
                                 capture_output=True).returncode == 0
-        assert commit in mapping or exists, path  # run sebelum penulisan ulang riwayat dipetakan; run sesudahnya ada
+        assert exists, path  # run sebelum penulisan ulang riwayat dipetakan; run sesudahnya ada di riwayat
