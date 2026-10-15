@@ -5,7 +5,7 @@ evaluasi utama** (`reports/evaluasi.md`, 3 run per metode dengan konfigurasi fin
 ini mendokumentasikan riwayat rekayasa agar setiap keputusan dapat ditelusuri. Laporan lama yang dirujuk ada di
 `reports/archive/`. §7 memetakan hash commit yang tercatat di run ke riwayat git sekarang; §8 mencatat pemeriksaan
 prompt injection pada run resmi; §9 mencatat run ablasi revisi jurnal; §10 mencatat keputusan leksikon
-class-consistent.
+class-consistent; §11 mencatat pelaksanaan audit manusia.
 
 ## 1. Daftar run arsip
 
@@ -186,3 +186,73 @@ Angka class-consistent LLM tunggal dan deep agent pada draf revisi manuskrip (it
 Tabel 1) untuk ketiga metode LLM: LLM tunggal 0,485/0,625, deep agent 0,692/0,752, ablasi 0,602/0,693
 (`reports/revisi_ablasi.md`); angka C/E di manuskrip diganti sesuai nilai ini. Bagian `tambahan_kb` hanya untuk analisis
 sensitivitas. Tidak ada run yang diulang: metrik dihitung dari keluaran run yang sama.
+
+## 11. Audit manusia (Fase A dan B)
+
+Audit manusia mengikuti `audit/PANDUAN_ANOTASI.md`. Di Fase A anotator memberi label kelas pada 100 baris uji tanpa
+melihat prediksi, dan di Fase B menilai relevansi 277 butir bukti LLM tunggal dan deep agent (skala 0–2). Pada ronde
+yang dipakai (ronde kedua), kedua slot (anotator 1 dan anotator 2) diisi dua analis SOC L3 yang berbeda, bukan penulis;
+nama analis tidak dicatat di repositori. Hasilnya ada di `reports/revisi_anotasi.md`. Semua waktu di bawah dalam WIB.
+
+**Ronde pertama (13 Oktober 2026, ditolak).** Lembar terisi pertama yang diterima ditulis dengan pustaka Python
+openpyxl, bukan disimpan dari aplikasi lembar kerja; menurut keterangan yang diterima penulis, jawaban ditranskripsi ke
+lembar dari media lain. Isi kedua slot identik (100 dari 100 label Fase A dan 277 dari 277 skor Fase B), dan kiriman
+ulang pada hari yang sama berisi sel yang identik dengan kiriman pertama. Karena tidak dapat dipastikan bahwa setiap
+slot berisi jawaban satu analis yang bekerja terpisah, ronde ini ditolak. Ekspor Google Sheets milik kedua analis dari
+ronde ini, yang isinya tidak identik antar-analis, juga tidak dipakai: penulis memilih mengulang audit di Google Sheets
+milik akun penulis agar riwayat versinya dapat diperiksa. Tidak ada berkas atau hasil ronde pertama yang di-commit.
+
+**Ronde kedua (13–15 Oktober 2026).**
+
+- Panduan: `audit/PANDUAN_ANOTASI.md` versi commit `dfe85da` (13 Oktober 23.26), tidak berubah selama pengisian.
+- Penyiapan: empat Google Sheets dibuat di akun penulis pada 13 Oktober 23.28–23.29 dari lembar kosong
+  `audit/anotasi_*.xlsx`, satu per fase per analis. Nama Sheet di Drive memakai nama analis; slot ditentukan dari isi
+  lembar (id pada `no` 1) dan konsisten untuk Fase A dan B. Sheet dibuat di folder Drive yang juga dipakai di ronde
+  pertama; saat itu folder dan keempat Sheet menampilkan ikon berbagi, dan daftar penerimanya tidak tercatat. Paling
+  lambat pukul 23.31 berbagi lewat folder sudah tidak ada, dan setiap Sheet dibagikan per berkas sebagai Editor hanya ke
+  analisnya, dengan akses umum Restricted. Sheet A dibagikan sekitar pukul 23.31. Kedua Sheet B ikut dibagikan pada
+  23.31 dan aksesnya dicabut pada 23.32. Activity dashboard kedua Sheet B pada 23.33–23.34 (setelah akses dicabut) hanya
+  menampilkan "You're currently the only viewer", sehingga tidak menunjukkan apakah Sheet B sempat dibuka sebelumnya.
+- Fase A: anotator 2 mengisi pada 13 Oktober 23.32 sampai 14 Oktober 00.18. Anotator 1 mengisi pada 14 Oktober (grup
+  versi 16.07, 16.51, dan 17.41) dan melapor selesai pukul 17.42.
+- Setelah Fase A selesai, akses analis ke Sheet A dicabut seluruhnya, lalu Sheet B dibagikan: untuk anotator 2, Sheet A
+  dicabut 14 Oktober 15.38 dan Sheet B dibagikan sekitar 15.39; untuk anotator 1, keduanya sekitar pukul 17.43. Panduan
+  §5 menyebut akses diubah menjadi hanya-lihat; pencabutan penuh lebih ketat. Sheet B anotator 1 awalnya dibagikan ke
+  alamat email lain atas nama analis yang sama, lalu dialihkan ke alamat yang dipakai di Sheet A pada 17.51, sebelum
+  pengisian dimulai.
+- Fase B: anotator 1 mengisi pada 15 Oktober 10.00–10.23. Isian anotator 2 yang dipakai berasal dari Sheet ulang (lihat
+  di bawah).
+- Riwayat versi menjadi jejak pengisian. Di setiap Sheet, satu-satunya versi atas akun penulis adalah versi pembuatan,
+  dan semua isian tercatat atas akun analis yang ditugaskan ke Sheet itu.
+- Paparan sebelumnya: kedua analis juga mengisi ronde pertama, jadi baris yang sama, termasuk prediksi model di Fase B,
+  sudah pernah mereka lihat. Pada 13 Oktober 22.57–22.58, sebelum Sheet ronde kedua dibuat, penulis mengirim kepada
+  anotator 1 tautan dan tangkapan layar folder Drive yang berisi empat lembar ronde pertama kedua analis. Anotator 1
+  membalas sudah mengeceknya (23.01); berkas yang dibuka tidak tercatat.
+
+**Sheet B pertama anotator 2 (tidak dipakai).** Sheet ini dibagikan sekitar 14 Oktober 15.39 dan diisi 15.49–16.02. `no`
+1–102 (kecuali `no` 40) masuk bertahap dalam sekitar 20 versi, rata-rata ±7 detik per butir. Riwayat versi menandai blok
+`no` 103–277 (175 skor) sebagai berubah pada versi 16.02, paling lama 78 detik setelah versi sebelumnya (16.01; Drive
+mencatat perubahan terakhir hari itu pukul 16.02.18). Panduan §5 meminta nilai dipilih dari dropdown di setiap sel dan
+melarang mengisi banyak sel sekaligus, karena isian yang masuk sekaligus tidak bisa dibedakan dari isian otomatis di
+riwayat versi. Satu sel (`no` 40) masih kosong pada unduhan pertama dan diisi analis pada 15 Oktober 10.45 atas
+permintaan penulis. Karena riwayat versi tidak dapat menunjukkan bahwa 175 skor itu dipilih satu per satu, pada 15
+Oktober penulis memutuskan seluruh Fase B anotator 2 diulang di Sheet baru dari lembar kosong yang sama
+(`audit/anotasi_B_anotator2.xlsx`, urutan butir sama), tanpa menyimpulkan bagaimana blok itu diisi. Ini menyimpang dari
+Panduan §1 (κ dihitung dari Sheet yang sudah dinyatakan selesai). Keputusan diambil sebelum κ dan rerata relevansi untuk
+laporan dihitung; pemeriksaan sebelumnya hanya membandingkan isian antar-slot. Sheet pertama tidak dihapus: namanya
+diganti, hanya akun penulis yang dapat membukanya, dan riwayat versinya disimpan sebagai bukti.
+
+**Sheet B ulang anotator 2 (dipakai).** Sheet ini dibuat 15 Oktober 11.38, dibagikan sekitar pukul 11.39, dan diisi
+13.44–13.49 serta 16.01–16.35. Riwayat versi menandai seluruh kolom `skor` pada versi terakhir (16.35), tetapi riwayat
+edit per sel menunjukkan isian masuk bertahap selama sesi (misalnya `no` 100 pukul 16.05 dan `no` 118 pukul 16.11), dan
+salinan versi 16.34 menunjukkan bahwa 267 dari 277 skor sudah ada pada 16.34; versi 16.35 hanya mengisi `no` 1 dan `no`
+269–277 yang sebelumnya kosong. Karena itu Sheet ulang dipakai. Sheet ini diisi setelah anotator 1 selesai Fase B, dan
+anotator 2 sudah menilai butir yang sama di Sheet pertama sehari sebelumnya. Dibanding Sheet pertama (setelah `no` 40
+diisi), skornya berbeda pada 10 dari 277 butir, semuanya di `no` 103–277; `no` 1–102 sama semua.
+
+**Berkas dan pemeriksaan.** Keempat Sheet yang dipakai diunduh sebagai .xlsx dan disalin tanpa diubah ke `audit/terisi/`
+dengan nama slot. Sebelum dihitung, setiap berkas diperiksa: slot menurut urutan baris, kelengkapan isian, validasi
+`src/eval/anotasi.py`, tidak ada sel yang berubah di luar kolom isian (ekspor Google Sheets menyimpan `no` sebagai angka
+desimal), dan tidak ada nama atau alamat email di dalam berkas. Nama berkas unduhan asli dan salinan versi 16.34 memuat
+nama analis, dan tangkapan layar (riwayat versi, dialog berbagi, pesan analis) memuat nama serta alamat email analis;
+semuanya disimpan penulis di luar repositori.

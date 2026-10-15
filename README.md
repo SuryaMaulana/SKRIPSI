@@ -104,7 +104,7 @@ dihitung dengan bootstrap klaster per templat (1.000×) atas macro-F1 rerata run
 | `reports/revisi_tambahan.md` (+ `.json`) | revisi jurnal: angka di teks naskah di luar Tabel 4-11 (470 baris tanpa pilot, kaskade regex → LLM tunggal, recall sub-tipe WEB_SCANNING, label berubah antar run per kelas, letak payload SQLI yang terlewat regex, kontrafaktual dedup persis) |
 | `sampel/test_sample_500_masukan.jsonl` | sampel uji 500 baris: id opak + kolom masukan metode saja, tanpa label gerbang dan `template_key` (lihat Data) |
 | `reports/ringkasan_sidang.md` | ringkasan sidang: angka kunci, tiga klaim utama, 17 pertanyaan penguji dengan jawaban berbasis angka |
-| `reports/catatan_rekayasa.md` | riwayat run yang tidak masuk tabel beserta alasannya, pemetaan hash commit, pemeriksaan prompt injection |
+| `reports/catatan_rekayasa.md` | riwayat run yang tidak masuk tabel beserta alasannya, pemetaan hash commit, pemeriksaan prompt injection, pelaksanaan audit manusia (§11) |
 | `reports/data_report.md` | statistik dataset per tahap, sampel uji, dan daftar keputusan praproses |
 | `reports/srbh_inspection.md` | inspeksi awal SR-BH 2020 |
 | `reports/label_mapping_proposal.md` | usulan dan bukti pemetaan label CAPEC ke 6 kelas |
@@ -129,7 +129,8 @@ dihitung dengan bootstrap klaster per templat (1.000×) atas macro-F1 rerata run
   --b1 ... --b2 ...` -> `reports/revisi_anotasi.md` (agregat, termasuk IK bootstrap selisih relevansi antar-metode per
   item dan per baris log) dan `results/revisi_anotasi_per_baris.json` (konsensus per id dan label gerbang pada baris
   yang berbeda). `make eval` menghitungnya dari lembar terisi di `audit/terisi/`; daftar id dan kunci dibangun ulang
-  dengan `python -m src.eval.anotasi kunci` bila belum ada.
+  dengan `python -m src.eval.anotasi kunci` bila belum ada. Pelaksanaan dan kronologi audit:
+  `reports/catatan_rekayasa.md` §11.
 
 ## Data
 
