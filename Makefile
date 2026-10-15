@@ -21,6 +21,7 @@ help:
 	@echo "make eval      D: Tabel 4.2/4.3, F1 per kelas, confusion matrix, IK 95% untuk semua results/*.jsonl"
 	@echo "               + reports/revisi_ablasi.md: Tabel 4-11 manuskrip revisi (termasuk ablasi), uji berpasangan"
 	@echo "               + reports/revisi_tambahan.md: angka teks naskah (tanpa pilot, kaskade, sub-tipe WS, dedup persis, ...)"
+	@echo "               + reports/revisi_anotasi.md: audit manusia dari audit/terisi/ (kappa, relevansi bukti, bootstrap)"
 	@echo "make llm-single-pilot C: LLM tunggal pada 30 baris pilot (5 per kelas) -> results/pilot/"
 	@echo "make run-c R=n   C: run resmi ke-n (1-3) pada 500 baris -> results/llm_single_rn.jsonl (+ _calls.jsonl)"
 	@echo "make agent-pilot E: deep agent pada 30 baris pilot yang sama dengan C -> results/pilot/"
@@ -86,6 +87,9 @@ eval:
 	$(PY) -m src.eval.evaluate --rules --out reports/evaluasi_per_run.md
 	$(PY) -m src.eval.revisi --out reports/revisi_ablasi.md
 	$(PY) -m src.eval.revisi_tambahan --out reports/revisi_tambahan.md
+	@test -f data/processed/audit_100_ids.json -a -f data/processed/audit_B_key.json || $(PY) -m src.eval.anotasi kunci
+	$(PY) -m src.eval.anotasi hitung --a1 audit/terisi/anotasi_A_anotator1.xlsx --a2 audit/terisi/anotasi_A_anotator2.xlsx \
+		--b1 audit/terisi/anotasi_B_anotator1.xlsx --b2 audit/terisi/anotasi_B_anotator2.xlsx
 
 llm-single-pilot:
 	$(PY) -m src.eval.pilot

@@ -30,7 +30,8 @@ make llm_single_verified  # ablasi revisi jurnal: LLM tunggal + loop verifikasi,
                   #   -> results/llm_single_verified_r{1,2,3}.jsonl
 make eval         # reports/evaluasi.md (rerata dan rentang min-maks), reports/evaluasi_per_run.md,
                   #   reports/revisi_ablasi.md (Tabel 4-11 manuskrip revisi, uji berpasangan), dan
-                  #   reports/revisi_tambahan.md (angka di teks naskah; kontrafaktual dedup membaca data/raw)
+                  #   reports/revisi_tambahan.md (angka di teks naskah; kontrafaktual dedup membaca data/raw), dan
+                  #   reports/revisi_anotasi.md (audit manusia dari lembar terisi di audit/terisi/)
 make test         # unit test
 ```
 
@@ -125,8 +126,10 @@ dihitung dengan bootstrap klaster per templat (1.000×) atas macro-F1 rerata run
 - **Audit manusia** `src/eval/anotasi.py`: `python -m src.eval.anotasi siapkan` membuat `audit/anotasi_A_anotator{1,2}.xlsx`
   (label kelas) dan `audit/anotasi_B_anotator{1,2}.xlsx` (relevansi bukti, metode disamarkan); daftar id dan kunci
   disimpan di `data/processed/` dan tidak dibagikan. Setelah diisi: `python -m src.eval.anotasi hitung --a1 ... --a2 ...
-  --b1 ... --b2 ...` -> `reports/revisi_anotasi.md` (agregat) dan `results/revisi_anotasi_per_baris.json` (konsensus per id
-  dan label gerbang pada baris yang berbeda).
+  --b1 ... --b2 ...` -> `reports/revisi_anotasi.md` (agregat, termasuk IK bootstrap selisih relevansi antar-metode per
+  item dan per baris log) dan `results/revisi_anotasi_per_baris.json` (konsensus per id dan label gerbang pada baris
+  yang berbeda). `make eval` menghitungnya dari lembar terisi di `audit/terisi/`; daftar id dan kunci dibangun ulang
+  dengan `python -m src.eval.anotasi kunci` bila belum ada.
 
 ## Data
 

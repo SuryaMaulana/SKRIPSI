@@ -21,10 +21,18 @@ hitung: membaca keempat berkas terisi -> reports/revisi_anotasi.md (+ .json) dan
   (agregat); jumlah baris dengan catatan berawalan RAGU per anotator. Label konsensus per id dan label gerbang per id
   pada baris yang berbeda hanya ditulis ke results/revisi_anotasi_per_baris.json (keputusan penulis: label gerbang
   sampel uji tidak ditulis di luar results/).
-- Fase B: rerata skor relevansi per metode setelah kunci dibuka, kappa berbobot kuadratik antar anotator, distribusi skor
-  0/1/2 per metode, rerata skor pada baris yang labelnya benar vs salah, dan rerata serta distribusi per metode dan
-  label prediksi.
-Jalankan: python -m src.eval.anotasi siapkan | python -m src.eval.anotasi hitung --a1 ... --a2 ... --b1 ... --b2 ...
+- Fase B: rerata skor relevansi per metode setelah kunci dibuka, kappa berbobot kuadratik dan kesepakatan mentah antar
+  anotator (berikut tabel silang skor dan jumlah butir yang berselisih 1 atau 2), distribusi skor 0/1/2 per metode,
+  rerata skor pada baris yang labelnya benar vs salah, rerata serta distribusi per metode dan label prediksi, dan
+  selisih rerata skor deep agent - LLM tunggal, per item (rerata atas item seperti tabel per metode) dan per baris log
+  (rerata atas baris dari selisih rerata kedua metode pada baris yang sama, setiap baris berbobot sama), dengan IK 95%
+  bootstrap klaster per baris log: baris audit diurut menurut id, 10.000 draw dengan default_rng(42), tiap draw
+  mengambil baris sebanyak jumlah baris dengan pengembalian, dan indeks yang sama dipakai untuk kedua pembobotan, skor
+  rata-rata dua anotator, dan skor tiap anotator; IK = persentil 2,5/97,5; p = 2 x porsi terkecil draw dengan selisih
+  <= 0 atau >= 0 (seperti src/eval/revisi.py).
+kunci: daftar id dan kunci Fase B saja, tanpa berkas anotasi, identik dengan keluaran siapkan; make eval memanggilnya
+  bila data/processed/audit_*.json belum ada, lalu menghitung dari lembar terisi di audit/terisi/.
+Jalankan: python -m src.eval.anotasi siapkan | kunci | hitung --a1 ... --a2 ... --b1 ... --b2 ...  (atau make eval)
 """
 
 from __future__ import annotations
@@ -58,6 +66,7 @@ RESULTS = ROOT / "results"
 METHOD_RUNS = {"llm_single": "llm_single_r1", "agent": "agent_r1"}
 SEEDS_A = {"anotator1": 1, "anotator2": 2}
 SEEDS_B = {"anotator1": 11, "anotator2": 12}
+N_DRAW = 10_000
 COLUMNS_A = ("no", "id", "raw_log_masked", "path_norm", "query_norm", "ua_norm", "label_anotator", "catatan")
 COLUMNS_B = ("no", "id", "raw_log_masked", "label_prediksi", "evidence_item", "skor", "catatan")
 SCORES = (0, 1, 2)
@@ -264,16 +273,29 @@ def build_phase_b(sample: pd.DataFrame, items: list[dict], seed: int, path: Path
     return [x["butir"] for x in order]
 
 
-def prepare(sample_path: Path = SAMPLE_PATH, out_dir: Path = OUT_DIR, ids_path: Path = IDS_PATH,
-            key_path: Path = KEY_PATH, results: dict[str, Path] | None = None, quota: dict[str, int] = QUOTA) -> dict:
-    sample = load_sample(sample_path)
-    ids = select_ids(sample, quota)
+def _save_ids(ids: list[str], quota: dict[str, int], sample_path: Path, ids_path: Path) -> None:
     source_sha = hashlib.sha256(sample_path.read_bytes()).hexdigest()
     ids_path.parent.mkdir(parents=True, exist_ok=True)
     ids_path.write_text(json.dumps({"ids": ids, "kuota": quota, "random_state": RANDOM_STATE,
                                     "sumber": str(sample_path.relative_to(ROOT)) if sample_path.is_relative_to(ROOT)
                                     else str(sample_path), "sumber_sha256": source_sha}, indent=1) + "\n",
                         encoding="utf-8")
+
+
+def _save_key(items: list[dict], orders: dict[str, list[str]], results: dict[str, Path], key_path: Path) -> None:
+    key = {"keterangan": "Kunci Fase B: jangan dibagikan ke anotator. 'urutan' memberi butir untuk setiap nomor baris "
+                         "(no = posisi + 1) di berkas anotator.",
+           "seed_fase_a": SEEDS_A, "seed_fase_b": SEEDS_B, "run": {m: p.stem for m, p in results.items()},
+           "butir": items, "urutan": orders}
+    key_path.parent.mkdir(parents=True, exist_ok=True)
+    key_path.write_text(json.dumps(key, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+
+
+def prepare(sample_path: Path = SAMPLE_PATH, out_dir: Path = OUT_DIR, ids_path: Path = IDS_PATH,
+            key_path: Path = KEY_PATH, results: dict[str, Path] | None = None, quota: dict[str, int] = QUOTA) -> dict:
+    sample = load_sample(sample_path)
+    ids = select_ids(sample, quota)
+    _save_ids(ids, quota, sample_path, ids_path)
     files_a = {who: out_dir / f"anotasi_A_{who}.xlsx" for who in SEEDS_A}
     for who, path in files_a.items():
         build_phase_a(sample, ids, SEEDS_A[who], path)
@@ -281,12 +303,22 @@ def prepare(sample_path: Path = SAMPLE_PATH, out_dir: Path = OUT_DIR, ids_path: 
     items = evidence_items(results, ids)
     files_b = {who: out_dir / f"anotasi_B_{who}.xlsx" for who in SEEDS_B}
     orders = {who: build_phase_b(sample, items, SEEDS_B[who], path) for who, path in files_b.items()}
-    key = {"keterangan": "Kunci Fase B: jangan dibagikan ke anotator. 'urutan' memberi butir untuk setiap nomor baris "
-                         "(no = posisi + 1) di berkas anotator.",
-           "seed_fase_a": SEEDS_A, "seed_fase_b": SEEDS_B, "run": {m: p.stem for m, p in results.items()},
-           "butir": items, "urutan": orders}
-    key_path.write_text(json.dumps(key, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    _save_key(items, orders, results, key_path)
     return {"ids": ids, "fase_a": files_a, "fase_b": files_b, "kunci": key_path, "butir": len(items)}
+
+
+def prepare_key(sample_path: Path = SAMPLE_PATH, ids_path: Path = IDS_PATH, key_path: Path = KEY_PATH,
+                results: dict[str, Path] | None = None, quota: dict[str, int] = QUOTA) -> dict:
+    """Seperti prepare, tetapi hanya daftar id dan kunci (tanpa berkas anotasi); urutan butir dari _shuffled yang sama
+    dengan build_phase_b, sehingga kedua berkas JSON identik dengan keluaran prepare."""
+    sample = load_sample(sample_path)
+    ids = select_ids(sample, quota)
+    _save_ids(ids, quota, sample_path, ids_path)
+    results = results or {m: RESULTS / f"{run}.jsonl" for m, run in METHOD_RUNS.items()}
+    items = evidence_items(results, ids)
+    _save_key(items, {who: [x["butir"] for x in _shuffled(items, seed)] for who, seed in SEEDS_B.items()}, results,
+              key_path)
+    return {"ids": ids, "kunci": key_path, "butir": len(items)}
 
 
 # ------------------------------------------------------------------------------------------------- hitung
@@ -423,11 +455,68 @@ def _relevance(inst: list[tuple[dict, dict]], s1: dict[str, int], s2: dict[str, 
     }
 
 
-def phase_b_report(key: dict, s1: dict[str, int], s2: dict[str, int], gate: dict[str, str]) -> dict:
+def score_agreement(s1: dict[str, int], s2: dict[str, int]) -> dict:
+    """Kesepakatan mentah Fase B, jumlah butir per besar selisih, dan tabel silang skor (baris = anotator 1,
+    kolom = anotator 2)."""
     butir = list(s1)
+    gap = Counter(abs(s1[b] - s2[b]) for b in butir)
+    return {"setuju": gap[0], "dari": len(butir), "persen": 100 * gap[0] / len(butir), "selisih_1": gap[1],
+            "selisih_2": gap[2],
+            "tabel_silang": {a: {c: sum(s1[b] == a and s2[b] == c for b in butir) for c in SCORES} for a in SCORES}}
+
+
+def method_difference(key: dict, s1: dict[str, int], s2: dict[str, int], ids: list[str], n: int = N_DRAW,
+                      random_state: int = RANDOM_STATE) -> dict | None:
+    """Selisih rerata skor deep agent - LLM tunggal dengan dua pembobotan: per item (rerata atas item seperti tabel per
+    metode) dan per baris log (rerata atas baris dari selisih rerata skor kedua metode pada baris yang sama; hanya baris
+    yang punya item dari kedua metode). IK bootstrap klaster per baris log seperti docstring modul; draw yang sama untuk
+    kedua pembobotan dan ketiga skor. None bila salah satu metode tidak ada di kunci."""
+    methods = ("agent", "llm_single")
+    if not all(any(a["metode"] == m for x in key["butir"] for a in x["asal"]) for m in methods):
+        return None
+    rows = sorted(set(ids))
+    pos = {r: k for k, r in enumerate(rows)}
+    count = np.zeros((len(methods), len(rows)))
+    total = np.zeros((len(methods), 3, len(rows)))  # metode x (rata-rata dua anotator, anotator 1, anotator 2) x baris
+    for x in key["butir"]:
+        scores = ((s1[x["butir"]] + s2[x["butir"]]) / 2, s1[x["butir"]], s2[x["butir"]])
+        for a in x["asal"]:
+            if a["metode"] in methods:
+                m, r = methods.index(a["metode"]), pos[x["id"]]
+                count[m, r] += 1
+                total[m, :, r] += scores
+    paired = (count > 0).all(axis=0)
+    per_row = total[:, :, paired] / count[:, None, paired]
+    row_difference = per_row[0] - per_row[1]  # skor x baris berpasangan
+
+    def difference(weights: np.ndarray) -> np.ndarray:
+        mean = (total @ weights) / (count @ weights)[:, None]
+        rows_drawn = weights[paired]
+        return np.concatenate([mean[0] - mean[1], row_difference @ rows_drawn / rows_drawn.sum()])
+
+    rng = np.random.default_rng(random_state)
+    draws = np.array([difference(np.bincount(rng.integers(0, len(rows), len(rows)), minlength=len(rows)))
+                      for _ in range(n)])
+    draws[np.abs(draws) < 1e-9] = 0.0  # selisih yang nol secara aritmetika bisa tersisa ±1e-17 (pembulatan); p memakai nol
+    observed = difference(np.ones(len(rows)))
+    out = {"arah": "deep agent - LLM tunggal", "klaster": len(rows), "baris_berpasangan": int(paired.sum()),
+           "n_draw": n, "per_item": {}, "per_baris": {}}
+    cells = [(w, s) for w in ("per_item", "per_baris") for s in ("rata_rata_dua_anotator", "anotator1", "anotator2")]
+    for k, (weighting, name) in enumerate(cells):
+        low, high = np.percentile(draws[:, k], [2.5, 97.5])
+        p = min(1.0, 2 * min(float((draws[:, k] <= 0).mean()), float((draws[:, k] >= 0).mean())))
+        out[weighting][name] = {"selisih": float(observed[k]), "ik_bawah": float(low), "ik_atas": float(high), "p": p}
+    return out
+
+
+def phase_b_report(key: dict, s1: dict[str, int], s2: dict[str, int], gate: dict[str, str],
+                   ids: list[str] | None = None) -> dict:
+    butir = list(s1)
+    ids = ids if ids is not None else sorted({x["id"] for x in key["butir"]})
     out = {"butir": len(butir), "kappa_berbobot_kuadratik": float(cohen_kappa_score(
         [s1[b] for b in butir], [s2[b] for b in butir], weights="quadratic", labels=list(SCORES))),
-        "run": key.get("run", {}), "metode": {}, "metode_per_label": {}}
+        "kesepakatan_mentah": score_agreement(s1, s2), "run": key.get("run", {}), "metode": {}, "metode_per_label": {},
+        "selisih_metode": method_difference(key, s1, s2, ids)}
     found = {a["metode"] for x in key["butir"] for a in x["asal"]}
     for method in [m for m in METHOD_RUNS if m in found] + sorted(found - set(METHOD_RUNS)):
         inst = [(x, a) for x in key["butir"] for a in x["asal"] if a["metode"] == method]
@@ -452,8 +541,18 @@ def _scores(x: dict) -> str:
             f"{_f(x['rerata_anotator2'], 2)} | {_dist(x['distribusi_anotator1'])} | {_dist(x['distribusi_anotator2'])}")
 
 
+def _p(p: float) -> str:
+    return "<0.001" if p < 0.001 else _f(p)  # seperti src/eval/revisi.py
+
+
+def _shown(path: Path) -> str:
+    path = path.resolve()
+    return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else path.name
+
+
 def render(a: dict, b: dict, files: dict[str, Path]) -> str:
-    out = ["# Audit manusia — hasil anotasi", "", "Berkas: " + ", ".join(f"{k} = {v.name}" for k, v in files.items()), "",
+    out = ["# Audit manusia — hasil anotasi", "",
+           "Berkas: " + ", ".join(f"{k} = {_shown(v)}" for k, v in files.items()), "",
            "## Fase A — label kelas (100 baris)", ""]
     ragu = a.get("ragu", {})
     out += [f"- Kesepakatan mentah antar anotator: {_f(a['persen_setuju'], 1)}% ({a['n'] - len(a['perlu_diskusi'])} dari "
@@ -482,9 +581,14 @@ def render(a: dict, b: dict, files: dict[str, Path]) -> str:
               for g, row in matrix.items()],
             "| total | " + " | ".join(str(sum(row[c] for row in matrix.values())) for c in columns)
             + f" | {sum(sum(row.values()) for row in matrix.values())} |", ""]
+    agree = b.get("kesepakatan_mentah")
     out += ["## Fase B — relevansi bukti (skala 0–2)", "",
-            f"- Butir unik: {b['butir']}; κ berbobot kuadratik antar anotator: {_f(b['kappa_berbobot_kuadratik'])}.",
-            "- Run: " + "; ".join(f"{METHOD_NAMES.get(m, m)} = {run}" for m, run in b.get("run", {}).items()) + ".", "",
+            f"- Butir unik: {b['butir']}; κ berbobot kuadratik antar anotator: {_f(b['kappa_berbobot_kuadratik'])}."]
+    if agree:
+        out.append(f"- Kesepakatan mentah antar anotator: {_f(agree['persen'], 1)}% ({agree['setuju']} dari "
+                   f"{agree['dari']} butir); dari {agree['dari'] - agree['setuju']} butir yang berbeda, "
+                   f"{agree['selisih_1']} berselisih 1 dan {agree['selisih_2']} berselisih 2.")
+    out += ["- Run: " + "; ".join(f"{METHOD_NAMES.get(m, m)} = {run}" for m, run in b.get("run", {}).items()) + ".", "",
             "Per metode:", "",
             "| metode | item | baris | rerata (2 anotator) | rerata anotator 1 | rerata anotator 2 | skor 0/1/2 anotator 1 "
             "| skor 0/1/2 anotator 2 | rerata, label benar (item) | rerata, label salah (item) |",
@@ -497,6 +601,31 @@ def render(a: dict, b: dict, files: dict[str, Path]) -> str:
             "| skor 0/1/2 anotator 1 | skor 0/1/2 anotator 2 |", "|---|---|---|---|---|---|---|---|---|"]
     for method, by_label in b.get("metode_per_label", {}).items():
         out += [f"| {METHOD_NAMES.get(method, method)} | {label} | {_scores(x)} |" for label, x in by_label.items()]
+    if agree:
+        table = agree["tabel_silang"]
+        out += ["", "Tabel silang skor per butir (baris = anotator 1, kolom = anotator 2):", "",
+                "| anotator 1 / anotator 2 | " + " | ".join(map(str, SCORES)) + " | total |",
+                "|---" * (len(SCORES) + 2) + "|",
+                *[f"| {s} | " + " | ".join(str(table[s][t]) for t in SCORES) + f" | {sum(table[s].values())} |"
+                  for s in SCORES],
+                "| total | " + " | ".join(str(sum(table[s][t] for s in SCORES)) for t in SCORES)
+                + f" | {agree['dari']} |"]
+    diff = b.get("selisih_metode")
+    if diff:
+        def cell(x: dict) -> str:
+            return f"{_f(x['selisih'])} | [{_f(x['ik_bawah'])}; {_f(x['ik_atas'])}] | {_p(x['p'])}"
+
+        out += ["", f"Selisih rerata skor relevansi deep agent − LLM tunggal, IK 95% bootstrap klaster per baris log "
+                f"({diff['klaster']} baris, {diff['n_draw']} draw, default_rng({RANDOM_STATE}), draw yang sama untuk "
+                "semua sel; IK = persentil 2,5/97,5; p = 2 × porsi terkecil draw dengan selisih ≤ 0 atau ≥ 0). "
+                "Per item = rerata atas item evidence seperti tabel per metode; per baris log = rerata atas baris dari "
+                "selisih rerata skor kedua metode pada baris yang sama, setiap baris berbobot sama "
+                f"({diff['baris_berpasangan']} baris memiliki item dari kedua metode):", "",
+                "| skor | per item: selisih | IK 95% | p | per baris log: selisih | IK 95% | p |",
+                "|---|---|---|---|---|---|---|",
+                *[f"| {label} | {cell(diff['per_item'][k])} | {cell(diff['per_baris'][k])} |"
+                  for k, label in (("rata_rata_dua_anotator", "rata-rata dua anotator"), ("anotator1", "anotator 1"),
+                                   ("anotator2", "anotator 2"))]]
     out += ["", "Item = kemunculan item evidence pada keluaran metode; item yang identik di kedua metode dinilai sekali dan "
             "dihitung untuk keduanya, dan item yang muncul dua kali pada keluaran yang sama dihitung dua kali. Rerata "
             "(2 anotator) = rerata atas item dari skor rata-rata kedua anotator. Skor 0/1/2 = jumlah item per skor. Label "
@@ -539,7 +668,7 @@ def compute(files: dict[str, Path], ids_path: Path = IDS_PATH, key_path: Path = 
     gate = dict(zip(sample["id"], sample["label"]))
     a = phase_a_report(labels_a(files["A1"], ids), labels_a(files["A2"], ids), gate, ids,
                        {"anotator1": ragu_rows(files["A1"]), "anotator2": ragu_rows(files["A2"])})
-    b = phase_b_report(key, scores_b(files["B1"], key, "anotator1"), scores_b(files["B2"], key, "anotator2"), gate)
+    b = phase_b_report(key, scores_b(files["B1"], key, "anotator1"), scores_b(files["B2"], key, "anotator2"), gate, ids)
     return a, b, render(a, b, files)
 
 
@@ -547,6 +676,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Paket audit manusia (Fase A label, Fase B relevansi bukti)")
     sub = parser.add_subparsers(dest="perintah", required=True)
     sub.add_parser("siapkan", help="buat daftar id, empat berkas anotasi, dan kunci Fase B")
+    sub.add_parser("kunci", help="buat daftar id dan kunci Fase B saja (tanpa berkas anotasi)")
     count = sub.add_parser("hitung", help="hitung hasil dari berkas yang sudah diisi")
     for name in ("a1", "a2", "b1", "b2"):
         count.add_argument(f"--{name}", type=Path, required=True)
@@ -558,6 +688,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[anotasi] {len(done['ids'])} baris, {done['butir']} butir Fase B; berkas: "
               + ", ".join(str(p.relative_to(ROOT)) for p in [*done["fase_a"].values(), *done["fase_b"].values()])
               + f"; kunci {done['kunci'].relative_to(ROOT)}")
+        return 0
+    if args.perintah == "kunci":
+        done = prepare_key()
+        print(f"[anotasi] {len(done['ids'])} baris, {done['butir']} butir Fase B; daftar id "
+              f"{IDS_PATH.relative_to(ROOT)}, kunci {done['kunci'].relative_to(ROOT)}")
         return 0
     files = {"A1": args.a1, "A2": args.a2, "B1": args.b1, "B2": args.b2}
     a, b, text = compute(files)

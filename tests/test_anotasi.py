@@ -1,5 +1,6 @@
 import json
 
+import numpy as np
 import pytest
 from openpyxl import load_workbook
 
@@ -150,6 +151,23 @@ def test_compute_reports_kappa_consensus_and_relevance_from_filled_files(package
     assert "Matriks konfusi" in text and "catatan RAGU" in text and "anotator 1 2, anotator 2 0" in text
     assert "| LLM tunggal | SQLI | 3 | 1 | 1.83 | 2.00 | 1.67 | 0/0/3 | 0/1/2 |" in text
     assert "LLM tunggal = llm_single_r1; deep agent = agent_r1" in text
+    # 19 butir: 6 baris x 3 item LLM tunggal + 1 item agent (label NORMAL pada baris XSS); 6 butir "GET" berselisih 1
+    assert b["kesepakatan_mentah"] == {"setuju": 13, "dari": 19, "persen": pytest.approx(100 * 13 / 19), "selisih_1": 6,
+                                       "selisih_2": 0, "tabel_silang": {0: {0: 0, 1: 0, 2: 0}, 1: {0: 0, 1: 0, 2: 0},
+                                                                        2: {0: 0, 1: 6, 2: 13}}}
+    assert ("Kesepakatan mentah antar anotator: 68.4% (13 dari 19 butir); dari 6 butir yang berbeda, 6 berselisih 1 "
+            "dan 0 berselisih 2.") in text and "| 2 | 0 | 6 | 13 | 19 |" in text
+    diff = b["selisih_metode"]  # tiap baris berkomposisi sama, jadi semua draw bernilai sama dengan selisih teramati
+    assert diff["klaster"] == diff["baris_berpasangan"] == 6 and diff["n_draw"] == an.N_DRAW
+    assert diff["arah"] == "deep agent - LLM tunggal"
+    item, row = diff["per_item"], diff["per_baris"]
+    assert item["rata_rata_dua_anotator"]["selisih"] == pytest.approx(agent["rerata"] - single["rerata"])
+    assert item["anotator2"]["selisih"] == pytest.approx(agent["rerata_anotator2"] - single["rerata_anotator2"])
+    assert item["anotator1"] == {"selisih": 0, "ik_bawah": 0, "ik_atas": 0, "p": 1.0}
+    assert item["anotator2"]["ik_bawah"] == pytest.approx(item["anotator2"]["ik_atas"]) and item["anotator2"]["p"] == 0
+    assert all(row[k] == pytest.approx(item[k]) for k in item)  # komposisi sama per baris: kedua bobot sama
+    assert "| rata-rata dua anotator | 0.167 | [0.167; 0.167] | <0.001 | 0.167 | [0.167; 0.167] | <0.001 |" in text
+    assert "| anotator 1 | 0.000 | [0.000; 0.000] | 1.000 | 0.000 | [0.000; 0.000] | 1.000 |" in text
     # label gerbang per id hanya di results/: laporan reports/ memuat agregat dan daftar "perlu diskusi" saja
     assert both_wrong not in text and disagree in text and "results/revisi_anotasi_per_baris.json" in text
     an.write_outputs(a, b, text, tmp / "reports" / "anotasi.md", tmp / "results" / "per_baris.json")
@@ -160,6 +178,81 @@ def test_compute_reports_kappa_consensus_and_relevance_from_filled_files(package
     per_row = json.loads((tmp / "results" / "per_baris.json").read_text())
     assert per_row["konsensus_beda_gerbang"] == a["konsensus_beda_gerbang"] and len(per_row["konsensus"]) == 6
     assert "asal" not in json.dumps(per_row) and "metode" not in json.dumps(per_row)  # kunci Fase B tidak ikut
+
+
+def _key_for_bootstrap():
+    """5 baris dengan jumlah item berbeda; butir B0 milik kedua metode, B5 muncul dua kali di keluaran agent."""
+    asal = {"L": [{"metode": "llm_single"}], "A": [{"metode": "agent"}],
+            "LA": [{"metode": "llm_single"}, {"metode": "agent"}], "AA": [{"metode": "agent"}, {"metode": "agent"}]}
+    spec = [("r0", "LA"), ("r0", "L"), ("r1", "A"), ("r1", "L"), ("r1", "L"), ("r2", "AA"), ("r2", "L"), ("r3", "A"),
+            ("r3", "L"), ("r4", "LA"), ("r4", "A"), ("r4", "L")]
+    butir = [{"butir": f"B{k}", "id": i, "asal": asal[a]} for k, (i, a) in enumerate(spec)]
+    s1 = dict(zip((x["butir"] for x in butir), (2, 1, 2, 0, 1, 2, 1, 2, 2, 1, 2, 0)))
+    s2 = dict(zip((x["butir"] for x in butir), (2, 2, 1, 0, 1, 2, 0, 2, 1, 1, 2, 1)))
+    return {"butir": butir}, s1, s2
+
+
+def test_method_difference_is_a_cluster_bootstrap_over_log_rows():
+    key, s1, s2 = _key_for_bootstrap()
+    ids = ["r3", "r1", "r4", "r0", "r2"]
+    out = an.method_difference(key, s1, s2, ids, n=300)
+    scorers = {"rata_rata_dua_anotator": lambda b: (s1[b] + s2[b]) / 2, "anotator1": s1.get, "anotator2": s2.get}
+
+    def mean(rows, method, score):
+        values = [score(x["butir"]) for r in rows for x in key["butir"] if x["id"] == r for a in x["asal"]
+                  if a["metode"] == method]
+        return sum(values) / len(values)
+
+    def per_item(rows, score):  # rerata atas item dari baris terambil (baris ganda ikut berulang)
+        return mean(rows, "agent", score) - mean(rows, "llm_single", score)
+
+    def per_row(rows, score):  # rerata atas baris terambil dari selisih rerata kedua metode pada baris itu
+        return sum(per_item([r], score) for r in rows) / len(rows)
+
+    rows = sorted(ids)  # klaster diurut menurut id, lalu satu rng.integers atas semua baris per draw (tanpa strata)
+    rng = np.random.default_rng(an.RANDOM_STATE)
+    draws = [[rows[k] for k in rng.integers(0, len(rows), len(rows))] for _ in range(300)]
+    for name, score in scorers.items():
+        for weighting, estimate in (("per_item", per_item), ("per_baris", per_row)):
+            expected = np.array([estimate(d, score) for d in draws])
+            expected[np.abs(expected) < 1e-9] = 0.0  # seperti modul: nol aritmetika tidak bergantung pembulatan
+            low, high = np.percentile(expected, [2.5, 97.5])
+            p = min(1.0, 2 * min(np.mean(expected <= 0), np.mean(expected >= 0)))
+            got = out[weighting][name]
+            assert got["selisih"] == pytest.approx(estimate(rows, score))
+            assert (got["ik_bawah"], got["ik_atas"], got["p"]) == pytest.approx((low, high, p))
+    assert out["per_item"]["anotator1"]["selisih"] != pytest.approx(out["per_baris"]["anotator1"]["selisih"])
+    assert out["klaster"] == out["baris_berpasangan"] == 5 and out["n_draw"] == 300
+    assert out == an.method_difference(key, s1, s2, list(reversed(ids)), n=300)  # urutan masukan tidak berpengaruh
+    same = an.method_difference(key, s1, dict(s1), ids, n=300)  # draw yang sama untuk ketiga skor
+    for weighting in ("per_item", "per_baris"):
+        assert same[weighting]["anotator1"] == same[weighting]["anotator2"] == same[weighting]["rata_rata_dua_anotator"]
+    only_llm = {"butir": [x for x in key["butir"] if all(a["metode"] == "llm_single" for a in x["asal"])]}
+    assert an.method_difference(only_llm, s1, s2, ids) is None
+
+
+def test_score_agreement_counts_absolute_gaps_in_both_directions():
+    s1 = {"a": 2, "b": 0, "c": 1, "d": 2, "e": 0, "f": 1}
+    s2 = {"a": 0, "b": 2, "c": 1, "d": 1, "e": 1, "f": 1}
+    out = an.score_agreement(s1, s2)
+    assert (out["setuju"], out["dari"], out["selisih_1"], out["selisih_2"]) == (2, 6, 2, 2)
+    assert out["persen"] == pytest.approx(100 * 2 / 6)
+    assert out["tabel_silang"] == {0: {0: 0, 1: 1, 2: 1}, 1: {0: 0, 1: 2, 2: 0}, 2: {0: 1, 1: 1, 2: 0}}
+
+
+def test_prepare_key_writes_the_same_ids_and_key_as_prepare(package, monkeypatch):
+    tmp = package["tmp"]
+    results = {"llm_single": tmp / "llm_single_r1.jsonl", "agent": tmp / "agent_r1.jsonl"}
+
+    def no_sheets(*args, **kwargs):
+        raise AssertionError("prepare_key tidak boleh membuat berkas anotasi")
+
+    monkeypatch.setattr(an, "build_phase_a", no_sheets)
+    monkeypatch.setattr(an, "build_phase_b", no_sheets)
+    done = an.prepare_key(package["sample"], tmp / "ids2.json", tmp / "key2.json", results, QUOTA)
+    assert (tmp / "ids2.json").read_bytes() == (tmp / "ids.json").read_bytes()
+    assert (tmp / "key2.json").read_bytes() == (tmp / "key.json").read_bytes()
+    assert done["butir"] == package["done"]["butir"]
 
 
 def test_compute_refuses_incomplete_or_edited_files(package):
