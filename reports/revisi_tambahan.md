@@ -1,6 +1,6 @@
 # Revisi jurnal — analisis tambahan untuk angka di teks naskah
 
-Laporan revisi_tambahan-20261013T104338Z-e9361d4 (commit e9361d4, dirty=False)
+Laporan revisi_tambahan-20261015T225218Z-0cb7965 (commit 0cb7965, dirty=False)
 
 Format angka mengikuti manuskrip (titik desimal; metode LLM: rerata tiga run dengan rentang min–maks; † = identik di ketiga run pada presisi yang ditampilkan). Definisi: docstring src/eval/revisi_tambahan.py. Laporan hanya memuat jumlah agregat (tanpa id per baris).
 

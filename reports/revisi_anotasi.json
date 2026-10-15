@@ -1,0 +1,497 @@
+{
+ "fase_a": {
+  "n": 100,
+  "kappa_antar_anotator": 0.9038692621965874,
+  "persen_setuju": 92.0,
+  "kappa_anotator1_vs_gerbang": 0.9639942390782525,
+  "kappa_anotator2_vs_gerbang": 0.9040422214225741,
+  "persen_setuju_anotator1_vs_gerbang": 97.0,
+  "persen_setuju_anotator2_vs_gerbang": 92.0,
+  "perlu_diskusi": [
+   {
+    "id": "srbh-76d0ab9d7a09264f",
+    "anotator1": "PATH_TRAVERSAL",
+    "anotator2": "WEB_SCANNING"
+   },
+   {
+    "id": "srbh-1bb98d10fd188122",
+    "anotator1": "CMD_INJECTION",
+    "anotator2": "WEB_SCANNING"
+   },
+   {
+    "id": "srbh-2f98bdb3957467c5",
+    "anotator1": "PATH_TRAVERSAL",
+    "anotator2": "WEB_SCANNING"
+   },
+   {
+    "id": "srbh-5634e53daf68cb58",
+    "anotator1": "PATH_TRAVERSAL",
+    "anotator2": "WEB_SCANNING"
+   },
+   {
+    "id": "srbh-aa6f521ddcd8548c",
+    "anotator1": "CMD_INJECTION",
+    "anotator2": "WEB_SCANNING"
+   },
+   {
+    "id": "srbh-3867d4a93c0e2198",
+    "anotator1": "SQLI",
+    "anotator2": "CMD_INJECTION"
+   },
+   {
+    "id": "srbh-b90bd4ea89d4b716",
+    "anotator1": "NORMAL",
+    "anotator2": "WEB_SCANNING"
+   },
+   {
+    "id": "srbh-adb08421bbbbd8ef",
+    "anotator1": "NORMAL",
+    "anotator2": "WEB_SCANNING"
+   }
+  ],
+  "matriks_konfusi_konsensus_vs_gerbang": {
+   "SQLI": {
+    "SQLI": 17,
+    "XSS": 0,
+    "PATH_TRAVERSAL": 0,
+    "CMD_INJECTION": 0,
+    "WEB_SCANNING": 0,
+    "NORMAL": 0,
+    "perlu diskusi": 0
+   },
+   "XSS": {
+    "SQLI": 0,
+    "XSS": 17,
+    "PATH_TRAVERSAL": 0,
+    "CMD_INJECTION": 0,
+    "WEB_SCANNING": 0,
+    "NORMAL": 0,
+    "perlu diskusi": 0
+   },
+   "PATH_TRAVERSAL": {
+    "SQLI": 0,
+    "XSS": 0,
+    "PATH_TRAVERSAL": 13,
+    "CMD_INJECTION": 0,
+    "WEB_SCANNING": 0,
+    "NORMAL": 0,
+    "perlu diskusi": 4
+   },
+   "CMD_INJECTION": {
+    "SQLI": 0,
+    "XSS": 0,
+    "PATH_TRAVERSAL": 0,
+    "CMD_INJECTION": 15,
+    "WEB_SCANNING": 0,
+    "NORMAL": 0,
+    "perlu diskusi": 2
+   },
+   "WEB_SCANNING": {
+    "SQLI": 0,
+    "XSS": 0,
+    "PATH_TRAVERSAL": 0,
+    "CMD_INJECTION": 0,
+    "WEB_SCANNING": 16,
+    "NORMAL": 0,
+    "perlu diskusi": 0
+   },
+   "NORMAL": {
+    "SQLI": 0,
+    "XSS": 0,
+    "PATH_TRAVERSAL": 0,
+    "CMD_INJECTION": 0,
+    "WEB_SCANNING": 1,
+    "NORMAL": 13,
+    "perlu diskusi": 2
+   }
+  },
+  "ragu": {
+   "anotator1": 0,
+   "anotator2": 0
+  },
+  "jumlah_konsensus_beda_gerbang": 1,
+  "konsensus_beda_gerbang_per_kelas": {
+   "NORMAL -> WEB_SCANNING": 1
+  }
+ },
+ "fase_b": {
+  "butir": 277,
+  "kappa_berbobot_kuadratik": 0.49791157695641897,
+  "kesepakatan_mentah": {
+   "setuju": 222,
+   "dari": 277,
+   "persen": 80.14440433212997,
+   "selisih_1": 35,
+   "selisih_2": 20,
+   "tabel_silang": {
+    "0": {
+     "0": 13,
+     "1": 1,
+     "2": 2
+    },
+    "1": {
+     "0": 2,
+     "1": 27,
+     "2": 1
+    },
+    "2": {
+     "0": 18,
+     "1": 31,
+     "2": 182
+    }
+   }
+  },
+  "run": {
+   "llm_single": "llm_single_r1",
+   "agent": "agent_r1"
+  },
+  "metode": {
+   "llm_single": {
+    "item": 157,
+    "baris": 100,
+    "rerata_anotator1": 1.7197452229299364,
+    "rerata_anotator2": 1.4968152866242037,
+    "rerata": 1.60828025477707,
+    "distribusi_anotator1": {
+     "0": 15,
+     "1": 14,
+     "2": 128
+    },
+    "distribusi_anotator2": {
+     "0": 25,
+     "1": 29,
+     "2": 103
+    },
+    "rerata_label_benar": 1.669291338582677,
+    "item_label_benar": 127,
+    "rerata_label_salah": 1.35,
+    "item_label_salah": 30
+   },
+   "agent": {
+    "item": 155,
+    "baris": 100,
+    "rerata_anotator1": 1.8516129032258064,
+    "rerata_anotator2": 1.6516129032258065,
+    "rerata": 1.7516129032258065,
+    "distribusi_anotator1": {
+     "0": 2,
+     "1": 19,
+     "2": 134
+    },
+    "distribusi_anotator2": {
+     "0": 9,
+     "1": 36,
+     "2": 110
+    },
+    "rerata_label_benar": 1.8865546218487395,
+    "item_label_benar": 119,
+    "rerata_label_salah": 1.3055555555555556,
+    "item_label_salah": 36
+   }
+  },
+  "metode_per_label": {
+   "llm_single": {
+    "SQLI": {
+     "item": 32,
+     "baris": 18,
+     "rerata_anotator1": 1.8125,
+     "rerata_anotator2": 1.46875,
+     "rerata": 1.640625,
+     "distribusi_anotator1": {
+      "0": 1,
+      "1": 4,
+      "2": 27
+     },
+     "distribusi_anotator2": {
+      "0": 4,
+      "1": 9,
+      "2": 19
+     },
+     "rerata_label_benar": 1.6612903225806452,
+     "item_label_benar": 31,
+     "rerata_label_salah": 1.0,
+     "item_label_salah": 1
+    },
+    "XSS": {
+     "item": 21,
+     "baris": 17,
+     "rerata_anotator1": 2,
+     "rerata_anotator2": 1.8095238095238095,
+     "rerata": 1.9047619047619047,
+     "distribusi_anotator1": {
+      "0": 0,
+      "1": 0,
+      "2": 21
+     },
+     "distribusi_anotator2": {
+      "0": 2,
+      "1": 0,
+      "2": 19
+     },
+     "rerata_label_benar": 1.9047619047619047,
+     "item_label_benar": 21,
+     "rerata_label_salah": null,
+     "item_label_salah": 0
+    },
+    "PATH_TRAVERSAL": {
+     "item": 25,
+     "baris": 20,
+     "rerata_anotator1": 1.68,
+     "rerata_anotator2": 1.24,
+     "rerata": 1.46,
+     "distribusi_anotator1": {
+      "0": 4,
+      "1": 0,
+      "2": 21
+     },
+     "distribusi_anotator2": {
+      "0": 9,
+      "1": 1,
+      "2": 15
+     },
+     "rerata_label_benar": 1.4444444444444444,
+     "item_label_benar": 18,
+     "rerata_label_salah": 1.5,
+     "item_label_salah": 7
+    },
+    "CMD_INJECTION": {
+     "item": 15,
+     "baris": 13,
+     "rerata_anotator1": 2,
+     "rerata_anotator2": 1.6666666666666667,
+     "rerata": 1.8333333333333333,
+     "distribusi_anotator1": {
+      "0": 0,
+      "1": 0,
+      "2": 15
+     },
+     "distribusi_anotator2": {
+      "0": 0,
+      "1": 5,
+      "2": 10
+     },
+     "rerata_label_benar": 1.8333333333333333,
+     "item_label_benar": 15,
+     "rerata_label_salah": null,
+     "item_label_salah": 0
+    },
+    "WEB_SCANNING": {
+     "item": 10,
+     "baris": 7,
+     "rerata_anotator1": 1,
+     "rerata_anotator2": 0.7,
+     "rerata": 0.85,
+     "distribusi_anotator1": {
+      "0": 4,
+      "1": 2,
+      "2": 4
+     },
+     "distribusi_anotator2": {
+      "0": 6,
+      "1": 1,
+      "2": 3
+     },
+     "rerata_label_benar": 0.85,
+     "item_label_benar": 10,
+     "rerata_label_salah": null,
+     "item_label_salah": 0
+    },
+    "NORMAL": {
+     "item": 54,
+     "baris": 25,
+     "rerata_anotator1": 1.6296296296296295,
+     "rerata_anotator2": 1.6111111111111112,
+     "rerata": 1.6203703703703705,
+     "distribusi_anotator1": {
+      "0": 6,
+      "1": 8,
+      "2": 40
+     },
+     "distribusi_anotator2": {
+      "0": 4,
+      "1": 13,
+      "2": 37
+     },
+     "rerata_label_benar": 1.828125,
+     "item_label_benar": 32,
+     "rerata_label_salah": 1.3181818181818181,
+     "item_label_salah": 22
+    }
+   },
+   "agent": {
+    "SQLI": {
+     "item": 21,
+     "baris": 17,
+     "rerata_anotator1": 1.9523809523809523,
+     "rerata_anotator2": 1.7619047619047619,
+     "rerata": 1.8571428571428572,
+     "distribusi_anotator1": {
+      "0": 0,
+      "1": 1,
+      "2": 20
+     },
+     "distribusi_anotator2": {
+      "0": 2,
+      "1": 1,
+      "2": 18
+     },
+     "rerata_label_benar": 1.8571428571428572,
+     "item_label_benar": 21,
+     "rerata_label_salah": null,
+     "item_label_salah": 0
+    },
+    "XSS": {
+     "item": 35,
+     "baris": 17,
+     "rerata_anotator1": 2,
+     "rerata_anotator2": 1.7428571428571429,
+     "rerata": 1.8714285714285714,
+     "distribusi_anotator1": {
+      "0": 0,
+      "1": 0,
+      "2": 35
+     },
+     "distribusi_anotator2": {
+      "0": 0,
+      "1": 9,
+      "2": 26
+     },
+     "rerata_label_benar": 1.8714285714285714,
+     "item_label_benar": 35,
+     "rerata_label_salah": null,
+     "item_label_salah": 0
+    },
+    "PATH_TRAVERSAL": {
+     "item": 36,
+     "baris": 22,
+     "rerata_anotator1": 1.9722222222222223,
+     "rerata_anotator2": 1.7222222222222223,
+     "rerata": 1.8472222222222223,
+     "distribusi_anotator1": {
+      "0": 0,
+      "1": 1,
+      "2": 35
+     },
+     "distribusi_anotator2": {
+      "0": 2,
+      "1": 6,
+      "2": 28
+     },
+     "rerata_label_benar": 1.9,
+     "item_label_benar": 20,
+     "rerata_label_salah": 1.78125,
+     "item_label_salah": 16
+    },
+    "CMD_INJECTION": {
+     "item": 16,
+     "baris": 10,
+     "rerata_anotator1": 2,
+     "rerata_anotator2": 1.9375,
+     "rerata": 1.96875,
+     "distribusi_anotator1": {
+      "0": 0,
+      "1": 0,
+      "2": 16
+     },
+     "distribusi_anotator2": {
+      "0": 0,
+      "1": 1,
+      "2": 15
+     },
+     "rerata_label_benar": 1.96875,
+     "item_label_benar": 16,
+     "rerata_label_salah": null,
+     "item_label_salah": 0
+    },
+    "WEB_SCANNING": {
+     "item": 4,
+     "baris": 4,
+     "rerata_anotator1": 2,
+     "rerata_anotator2": 2,
+     "rerata": 2.0,
+     "distribusi_anotator1": {
+      "0": 0,
+      "1": 0,
+      "2": 4
+     },
+     "distribusi_anotator2": {
+      "0": 0,
+      "1": 0,
+      "2": 4
+     },
+     "rerata_label_benar": 2.0,
+     "item_label_benar": 4,
+     "rerata_label_salah": null,
+     "item_label_salah": 0
+    },
+    "NORMAL": {
+     "item": 43,
+     "baris": 30,
+     "rerata_anotator1": 1.5116279069767442,
+     "rerata_anotator2": 1.3255813953488371,
+     "rerata": 1.4186046511627908,
+     "distribusi_anotator1": {
+      "0": 2,
+      "1": 17,
+      "2": 24
+     },
+     "distribusi_anotator2": {
+      "0": 5,
+      "1": 19,
+      "2": 19
+     },
+     "rerata_label_benar": 1.8478260869565217,
+     "item_label_benar": 23,
+     "rerata_label_salah": 0.925,
+     "item_label_salah": 20
+    }
+   }
+  },
+  "selisih_metode": {
+   "arah": "deep agent - LLM tunggal",
+   "klaster": 100,
+   "baris_berpasangan": 100,
+   "n_draw": 10000,
+   "per_item": {
+    "rata_rata_dua_anotator": {
+     "selisih": 0.1433326484487365,
+     "ik_bawah": 0.04252301337481021,
+     "ik_atas": 0.2483448180289228,
+     "p": 0.0044
+    },
+    "anotator1": {
+     "selisih": 0.13186768029587004,
+     "ik_bawah": 0.03961018704137188,
+     "ik_atas": 0.23093012217341113,
+     "p": 0.0068
+    },
+    "anotator2": {
+     "selisih": 0.15479761660160274,
+     "ik_bawah": 0.014768026390157061,
+     "ik_atas": 0.2984242514483729,
+     "p": 0.0318
+    }
+   },
+   "per_baris": {
+    "rata_rata_dua_anotator": {
+     "selisih": 0.09333333333333334,
+     "ik_bawah": -0.012083333333333321,
+     "ik_atas": 0.20334374999999982,
+     "p": 0.0838
+    },
+    "anotator1": {
+     "selisih": 0.0575,
+     "ik_bawah": -0.028333333333333332,
+     "ik_atas": 0.1525,
+     "p": 0.1972
+    },
+    "anotator2": {
+     "selisih": 0.12916666666666665,
+     "ik_bawah": -0.02668749999999999,
+     "ik_atas": 0.29083333333333333,
+     "p": 0.1064
+    }
+   }
+  }
+ }
+}
