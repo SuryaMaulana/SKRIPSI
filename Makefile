@@ -132,5 +132,13 @@ runs-cv:
 
 llm_single_verified: runs-cv
 
+run-ct:
+	$(PY) -m src.baselines.llm_single_toolctx --name llm_single_toolctx_r$(R) --calls results/llm_single_toolctx_r$(R)_calls.jsonl
+
+runs-ct:
+	for r in 1 2 3; do $(MAKE) run-ct R=$$r || exit 1; done
+
+llm_single_toolctx: runs-ct
+
 sampel-publik:
 	$(PY) -m src.data.sampel_publik
