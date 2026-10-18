@@ -22,8 +22,8 @@ __pycache__/
 # tidak di-commit.
 results/**/*_calls*.jsonl
 
-# Draf naskah skripsi penulis (dikelola di luar repositori)
-Draft Skripsi*.docx
+# Draf naskah penulis & berkas editor jurnal (.docx dikelola di luar repositori, tidak pernah di-commit)
+*.docx
 
 # Arsip lokal penulis di akar repositori (bukan bagian repositori)
 /Archive.zip
