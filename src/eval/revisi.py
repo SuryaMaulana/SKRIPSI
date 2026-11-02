@@ -59,17 +59,19 @@ LLM_CONFIG = ROOT / "configs" / "llm.yaml"
 N_PAIRED = 10_000
 ATTACK = tuple(c for c in CLASSES if c != "NORMAL")
 CLASS_SET = set(CLASSES)
-ORDER = ("regex", "regex_full", "llm_single", "agent", "llm_single_verified")
+ORDER = ("regex", "regex_full", "llm_single", "agent", "llm_single_verified", "llm_single_toolctx")
 NAMES = {"regex": "Regex (CRS PL1, 6 categories)", "regex_full": "Full regex (all categories; post hoc)",
          "llm_single": "Single LLM (zero-shot)", "agent": "Deep agent",
-         "llm_single_verified": "Single LLM + verifier loop (ablation)"}
+         "llm_single_verified": "Single LLM + verifier loop (ablation)",
+         "llm_single_toolctx": "Single LLM + tool context (ablation)"}
 SHORT = {"regex": "regex", "regex_full": "full regex (post hoc)", "llm_single": "single LLM", "agent": "deep agent",
-         "llm_single_verified": "ablation"}  # nama di Tabel 6 manuskrip, sebagai suku kedua
+         "llm_single_verified": "loop ablation", "llm_single_toolctx": "tool-context ablation"}  # suku kedua Tabel 6
 FIRST = {"regex": "Regex", "regex_full": "Full regex (post hoc)", "llm_single": "Single LLM", "agent": "Deep agent",
-         "llm_single_verified": "Ablation"}  # sebagai suku pertama
+         "llm_single_verified": "Loop ablation", "llm_single_toolctx": "Tool-context ablation"}  # suku pertama
 PAIRS = (("llm_single", "agent"), ("llm_single", "regex"), ("agent", "regex"), ("llm_single", "regex_full"),
-         ("agent", "regex_full"), ("llm_single_verified", "llm_single"), ("llm_single_verified", "agent"))
-MCNEMAR_PAIRS = (("llm_single", "agent"), ("llm_single_verified", "llm_single"), ("llm_single_verified", "agent"))
+         ("agent", "regex_full"), ("llm_single_verified", "llm_single"), ("llm_single_verified", "agent"),
+         ("llm_single_toolctx", "llm_single"), ("agent", "llm_single_toolctx"))  # dua terakhir: ablasi konteks alat (revisi 2)
+MCNEMAR_PAIRS = ()  # revisi 2 (tanggapan reviewer): McNemar dihapus — tidak valid di bawah klaster templat
 
 
 # ------------------------------------------------------------------------------------------------- leksikon
@@ -231,6 +233,18 @@ def paired_permutation(t: np.ndarray, a: list[np.ndarray], b: list[np.ndarray], 
     return {"selisih": observed, "p": hits / n, "n_permutasi": n}
 
 
+def holm(pvalues: list[float]) -> list[float]:
+    """Koreksi Holm–Bonferroni (step-down) untuk keluarga uji berpasangan (tanggapan reviewer, revisi 2)."""
+    m = len(pvalues)
+    order = sorted(range(m), key=lambda i: pvalues[i])
+    adjusted = [0.0] * m
+    running = 0.0
+    for rank, i in enumerate(order):
+        running = max(running, min(1.0, (m - rank) * pvalues[i]))
+        adjusted[i] = running
+    return adjusted
+
+
 def mcnemar_pairs(t: np.ndarray, a: list[np.ndarray], b: list[np.ndarray]) -> list[dict]:
     out = []
     for k, (pa, pb) in enumerate(zip(a, b), 1):
@@ -280,6 +294,8 @@ def build(truth, data: dict, n_paired: int = N_PAIRED) -> dict:
             boot = paired_bootstrap(t, preds[a], preds[b], clusters, n_paired)
             perm = paired_permutation(t, preds[a], preds[b], clusters, n_paired)
             tests.append({"a": a, "b": b, **boot, "p_permutasi": perm["p"], "n_permutasi": perm["n_permutasi"]})
+    for x, p_adj in zip(tests, holm([x["p"] for x in tests])):
+        x["p_holm"] = p_adj
     mcnemar = [{"a": a, "b": b, "pasangan": mcnemar_pairs(t, preds[a], preds[b])} for a, b in MCNEMAR_PAIRS
                if a in preds and b in preds]
     return {"metode": {name: {"runs": entry["group"]["runs"], "metrik": entry["group"]["metrics"],
@@ -291,18 +307,30 @@ def build(truth, data: dict, n_paired: int = N_PAIRED) -> dict:
 
 
 def decomposition(data: dict) -> dict:
+    """Urai selisih agent - LLM tunggal. Bila ablasi konteks alat ada (revisi 2), bagian "orkestrasi" lama (agent -
+    ablasi loop) dipisah menjadi konteks alat (toolctx - single) dan orkestrasi murni (agent - toolctx); jika tidak,
+    dekomposisi dua arah lama (loop + orkestrasi) dipakai."""
     need = ("llm_single", "agent", "llm_single_verified")
     if not all(n in data for n in need):
         return {}
+    has_tc = "llm_single_toolctx" in data
     out = {}
     for key, source in (("evidence_literal", "metrics"), ("macro_f1", "metrics")):
         single, agent, ablation = (data[n]["group"][source][key]["mean"] for n in need)
         total = agent - single
-        loop, orchestration = ablation - single, agent - ablation
-        out[key] = {"llm_single": single, "agent": agent, "ablasi": ablation, "selisih_total": total,
-                    "bagian_loop": loop, "bagian_orkestrasi": orchestration,
-                    "persen_loop": 100 * loop / total if total else None,
-                    "persen_orkestrasi": 100 * orchestration / total if total else None}
+        loop = ablation - single
+        entry = {"llm_single": single, "agent": agent, "ablasi": ablation, "selisih_total": total,
+                 "bagian_loop": loop, "persen_loop": 100 * loop / total if total else None}
+        if has_tc:
+            toolctx = data["llm_single_toolctx"]["group"][source][key]["mean"]
+            konteks, orkestrasi = toolctx - single, agent - toolctx
+            entry.update({"toolctx": toolctx, "bagian_konteks_alat": konteks, "bagian_orkestrasi": orkestrasi,
+                          "persen_konteks_alat": 100 * konteks / total if total else None,
+                          "persen_orkestrasi": 100 * orkestrasi / total if total else None})
+        else:
+            orkestrasi = agent - ablation
+            entry.update({"bagian_orkestrasi": orkestrasi, "persen_orkestrasi": 100 * orkestrasi / total if total else None})
+        out[key] = entry
     return out
 
 
@@ -364,10 +392,12 @@ def render(result: dict) -> str:
     out.append(_table(["Method", "Accuracy", "Macro-P", "Macro-R", "Macro-F1", "95% CI of macro-F1"], rows))
 
     out += ["", "## Tabel 6 — Paired comparisons of mean-of-runs macro-F1 (10,000 template-level draws)", ""]
-    out.append(_table(["Comparison (A − B)", "Difference", "95% CI", "p, bootstrap", "p, permutation"],
+    out.append(_table(["Comparison (A − B)", "Difference", "95% CI", "p, bootstrap", "p, Holm", "p, permutation"],
                       [[f"{FIRST[x['a']]} − {SHORT[x['b']]}", _n(x["selisih"]),
-                        f"[{_n(x['ik_bawah'])}, {_n(x['ik_atas'])}]", _p(x["p"]), _p(x["p_permutasi"])]
-                       for x in result["uji_berpasangan"]]))
+                        f"[{_n(x['ik_bawah'])}, {_n(x['ik_atas'])}]", _p(x["p"]), _p(x.get("p_holm", x["p"])),
+                        _p(x["p_permutasi"])] for x in result["uji_berpasangan"]]))
+    out.append(f"p, Holm = p bootstrap dikoreksi Holm–Bonferroni atas keluarga {len(result['uji_berpasangan'])} "
+               "perbandingan; hanya single LLM − deep agent (H1) yang konfirmatori, sisanya eksploratori.")
     if result["mcnemar"]:
         out += ["", "Suplemen — McNemar eksak per pasangan run berindeks sama (mengabaikan klaster templat):", ""]
         out.append(_table(["A − B", "run", "A benar, B salah", "B benar, A salah", "p eksak"],
@@ -449,17 +479,31 @@ def render(result: dict) -> str:
                        "Untuk deep agent, klasifikasi pertama bisa PARSE_ERROR (dihitung salah).")
 
     if result["dekomposisi"]:
-        out += ["", "## Dekomposisi §3.4 — loop verifikasi vs orkestrasi", ""]
+        has_tc = "bagian_konteks_alat" in result["dekomposisi"]["macro_f1"]
+        out += ["", "## Dekomposisi §3.4 — loop verifikasi, konteks alat, dan orkestrasi", ""]
         rows = []
         for key, title in (("evidence_literal", "Literal-evidence rate"), ("macro_f1", "Macro-F1")):
             d = result["dekomposisi"][key]
-            rows.append([title, _n(d["llm_single"]), _n(d["ablasi"]), _n(d["agent"]), _n(d["selisih_total"]),
-                         f"{_n(d['bagian_loop'])} ({_n(d['persen_loop'], 1)}%)",
-                         f"{_n(d['bagian_orkestrasi'])} ({_n(d['persen_orkestrasi'], 1)}%)"])
-        out.append(_table(["Metric", "Single LLM", "Ablation", "Deep agent", "Gap (agent − single)",
-                           "Loop part (ablation − single)", "Orchestration part (agent − ablation)"], rows))
-        out.append("Persen = bagian / selisih total, dihitung dari rerata tiga run sebelum pembulatan; karena setiap "
-                   "bagian dibulatkan sendiri, jumlah bagian yang tercetak bisa berbeda 0.001 dari selisih tercetak.")
+            if has_tc:
+                rows.append([title, _n(d["llm_single"]), _n(d["toolctx"]), _n(d["ablasi"]), _n(d["agent"]),
+                             _n(d["selisih_total"]), f"{_n(d['bagian_loop'])} ({_n(d['persen_loop'], 1)}%)",
+                             f"{_n(d['bagian_konteks_alat'])} ({_n(d['persen_konteks_alat'], 1)}%)",
+                             f"{_n(d['bagian_orkestrasi'])} ({_n(d['persen_orkestrasi'], 1)}%)"])
+            else:
+                rows.append([title, _n(d["llm_single"]), _n(d["ablasi"]), _n(d["agent"]), _n(d["selisih_total"]),
+                             f"{_n(d['bagian_loop'])} ({_n(d['persen_loop'], 1)}%)",
+                             f"{_n(d['bagian_orkestrasi'])} ({_n(d['persen_orkestrasi'], 1)}%)"])
+        if has_tc:
+            out.append(_table(["Metric", "Single LLM", "+ tool context", "+ verifier loop", "Deep agent",
+                               "Gap (agent − single)", "Loop part (loop abl. − single)",
+                               "Tool-context part (toolctx abl. − single)", "Orchestration part (agent − toolctx abl.)"],
+                              rows))
+            out.append("Loop and tool-context parts are each measured against the single LLM and are not additive; "
+                       "orchestration = deep agent − tool-context ablation. 95% CIs for all three differences are in Table 6.")
+        else:
+            out.append(_table(["Metric", "Single LLM", "Ablation", "Deep agent", "Gap (agent − single)",
+                               "Loop part (ablation − single)", "Orchestration part (agent − ablation)"], rows))
+        out.append("Persen = bagian / selisih total, dihitung dari rerata tiga run sebelum pembulatan.")
 
     out += ["", "## Run yang dipakai", ""]
     out.append(_table(["Method", "run_id", "commit"], [[NAMES[n], str(r["run_id"]), str(r["git_commit"])[:7]]

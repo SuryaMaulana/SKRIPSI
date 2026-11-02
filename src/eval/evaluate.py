@@ -32,7 +32,7 @@ from ..data.config import CLASSES, RANDOM_STATE, ROOT
 from ..common.inputs import SAMPLE_PATH, split_path
 
 RESULTS_DIR = ROOT / "results"
-N_BOOTSTRAP = 1000
+N_BOOTSTRAP = 10_000  # revisi 2 (tanggapan reviewer): samakan dengan uji berpasangan (N_PAIRED = 10.000)
 K = len(CLASSES)
 CLASS_INDEX = {c: i for i, c in enumerate(CLASSES)}
 OTHER = K  # indeks untuk prediksi di luar 6 kelas (PARSE_ERROR dsb.)

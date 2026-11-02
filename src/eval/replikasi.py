@@ -46,7 +46,8 @@ from .evaluate import (
 
 REPLICATION_DIR = RESULTS_DIR  # run resmi: results/<nama>_r<n>.jsonl
 GROUPS = {"llm_single": "llm_single", "agent": "agent",  # nama metode -> awalan berkas run
-          "llm_single_verified": "llm_single_verified"}  # ablasi revisi jurnal (LLM tunggal + loop verifikasi)
+          "llm_single_verified": "llm_single_verified",  # ablasi revisi jurnal (LLM tunggal + loop verifikasi)
+          "llm_single_toolctx": "llm_single_toolctx"}  # ablasi revisi 2: LLM tunggal + konteks alat (tanpa orkestrasi)
 CONFIG_KEYS = ("model", "model_version", "generation", "provider_routing", "prompt_sha256", "input_sha256", "input_file",
                "ids_file", "row_ids_sha256", "retry_prompt_sha256", "max_verification_rounds")  # dua terakhir: ablasi
 EXPECTED_RUNS = 3  # keputusan penulis: total 3 run per metode
