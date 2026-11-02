@@ -1,4 +1,4 @@
-Evaluasi evaluate-20261015T225052Z-0cb7965 (commit 0cb7965, dirty=False)
+Evaluasi evaluate-20261102T061638Z-3279757 (commit 3279757, dirty=False)
 
 Sumber label: data/processed/test_sample_500.jsonl. Prediksi di luar 6 kelas dihitung salah.
 
@@ -12,6 +12,9 @@ Tabel 4.2 — deteksi biner (serangan vs NORMAL)
 | llm_single_r1 | 500/500 | 0,902 | 0,992 | 0,888 | 0,937 | 0,034 |
 | llm_single_r2 | 500/500 | 0,898 | 0,992 | 0,883 | 0,935 | 0,034 |
 | llm_single_r3 | 500/500 | 0,906 | 0,995 | 0,891 | 0,940 | 0,023 |
+| llm_single_toolctx_r1 | 500/500 | 0,860 | 0,997 | 0,833 | 0,907 | 0,011 |
+| llm_single_toolctx_r2 | 500/500 | 0,860 | 0,997 | 0,833 | 0,907 | 0,011 |
+| llm_single_toolctx_r3 | 500/500 | 0,862 | 0,997 | 0,835 | 0,909 | 0,011 |
 | llm_single_verified_r1 | 500/500 | 0,864 | 0,991 | 0,842 | 0,911 | 0,034 |
 | llm_single_verified_r2 | 500/500 | 0,874 | 0,994 | 0,852 | 0,918 | 0,023 |
 | llm_single_verified_r3 | 500/500 | 0,876 | 0,994 | 0,854 | 0,919 | 0,023 |
@@ -22,17 +25,20 @@ Tabel 4.3 — klasifikasi 6 kelas
 
 | metode | cakupan | accuracy | macro-P | macro-R | macro-F1 | IK 95% macro-F1 |
 |---|---|---|---|---|---|---|
-| agent_r1 | 500/500 | 0,750 | 0,857 | 0,766 | 0,751 | [0,642; 0,818] |
-| agent_r2 | 500/500 | 0,740 | 0,850 | 0,756 | 0,745 | [0,638; 0,810] |
-| agent_r3 | 500/500 | 0,752 | 0,853 | 0,768 | 0,753 | [0,651; 0,817] |
-| llm_single_r1 | 500/500 | 0,832 | 0,859 | 0,843 | 0,832 | [0,754; 0,881] |
-| llm_single_r2 | 500/500 | 0,828 | 0,862 | 0,839 | 0,828 | [0,748; 0,878] |
+| agent_r1 | 500/500 | 0,750 | 0,857 | 0,766 | 0,751 | [0,644; 0,817] |
+| agent_r2 | 500/500 | 0,740 | 0,850 | 0,756 | 0,745 | [0,640; 0,808] |
+| agent_r3 | 500/500 | 0,752 | 0,853 | 0,768 | 0,753 | [0,650; 0,816] |
+| llm_single_r1 | 500/500 | 0,832 | 0,859 | 0,843 | 0,832 | [0,754; 0,879] |
+| llm_single_r2 | 500/500 | 0,828 | 0,862 | 0,839 | 0,828 | [0,748; 0,877] |
 | llm_single_r3 | 500/500 | 0,832 | 0,859 | 0,843 | 0,830 | [0,750; 0,878] |
+| llm_single_toolctx_r1 | 500/500 | 0,770 | 0,860 | 0,785 | 0,770 | [0,664; 0,833] |
+| llm_single_toolctx_r2 | 500/500 | 0,772 | 0,861 | 0,786 | 0,772 | [0,667; 0,835] |
+| llm_single_toolctx_r3 | 500/500 | 0,772 | 0,860 | 0,786 | 0,772 | [0,665; 0,836] |
 | llm_single_verified_r1 | 500/500 | 0,794 | 0,844 | 0,802 | 0,796 | [0,715; 0,848] |
-| llm_single_verified_r2 | 500/500 | 0,810 | 0,854 | 0,817 | 0,810 | [0,729; 0,862] |
-| llm_single_verified_r3 | 500/500 | 0,808 | 0,853 | 0,815 | 0,806 | [0,724; 0,858] |
-| regex | 500/500 | 0,698 | 0,889 | 0,717 | 0,717 | [0,622; 0,779] |
-| regex_full (post hoc) | 500/500 | 0,828 | 0,912 | 0,839 | 0,820 | [0,752; 0,859] |
+| llm_single_verified_r2 | 500/500 | 0,810 | 0,854 | 0,817 | 0,810 | [0,728; 0,859] |
+| llm_single_verified_r3 | 500/500 | 0,808 | 0,853 | 0,815 | 0,806 | [0,725; 0,857] |
+| regex | 500/500 | 0,698 | 0,889 | 0,717 | 0,717 | [0,621; 0,778] |
+| regex_full (post hoc) | 500/500 | 0,828 | 0,912 | 0,839 | 0,820 | [0,755; 0,858] |
 
 F1 per kelas
 
@@ -44,6 +50,9 @@ F1 per kelas
 | llm_single_r1 | 0,972 | 0,949 | 0,854 | 0,844 | 0,594 | 0,776 |
 | llm_single_r2 | 0,967 | 0,957 | 0,835 | 0,844 | 0,597 | 0,769 |
 | llm_single_r3 | 0,961 | 0,949 | 0,860 | 0,844 | 0,578 | 0,785 |
+| llm_single_toolctx_r1 | 0,983 | 0,991 | 0,705 | 0,797 | 0,425 | 0,716 |
+| llm_single_toolctx_r2 | 0,983 | 0,991 | 0,709 | 0,797 | 0,439 | 0,713 |
+| llm_single_toolctx_r3 | 0,983 | 0,991 | 0,705 | 0,797 | 0,439 | 0,716 |
 | llm_single_verified_r1 | 0,967 | 0,911 | 0,785 | 0,844 | 0,554 | 0,714 |
 | llm_single_verified_r2 | 0,972 | 0,887 | 0,832 | 0,844 | 0,591 | 0,732 |
 | llm_single_verified_r3 | 0,972 | 0,895 | 0,825 | 0,852 | 0,558 | 0,735 |
@@ -60,6 +69,9 @@ Tabel 4.5 — evidence literal (item evidence yang ada harfiah di raw_log_masked
 | llm_single_r1 | 500 | 500 | 801 | 601 | 0,750 | 331 |
 | llm_single_r2 | 500 | 500 | 799 | 614 | 0,768 | 339 |
 | llm_single_r3 | 500 | 500 | 801 | 615 | 0,768 | 345 |
+| llm_single_toolctx_r1 | 499 | 499 | 841 | 696 | 0,828 | 381 |
+| llm_single_toolctx_r2 | 500 | 500 | 847 | 693 | 0,818 | 379 |
+| llm_single_toolctx_r3 | 500 | 500 | 848 | 716 | 0,844 | 389 |
 | llm_single_verified_r1 | 500 | 500 | 708 | 634 | 0,895 | 428 |
 | llm_single_verified_r2 | 500 | 500 | 703 | 624 | 0,888 | 425 |
 | llm_single_verified_r3 | 500 | 500 | 713 | 636 | 0,892 | 425 |
@@ -130,6 +142,39 @@ Confusion matrix — llm_single_r3
 | CMD_INJECTION | 5 | 0 | 13 | 65 | 5 | 1 |
 | WEB_SCANNING | 0 | 2 | 8 | 0 | 39 | 40 |
 | NORMAL | 0 | 2 | 0 | 0 | 0 | 86 |
+
+Confusion matrix — llm_single_toolctx_r1
+
+| benar \ prediksi | SQLI | XSS | PATH_TRAVERSAL | CMD_INJECTION | WEB_SCANNING | NORMAL | tidak valid |
+|---|---|---|---|---|---|---|---|
+| SQLI | 86 | 0 | 1 | 0 | 0 | 2 | 0 |
+| XSS | 0 | 56 | 0 | 0 | 0 | 0 | 0 |
+| PATH_TRAVERSAL | 0 | 0 | 73 | 0 | 0 | 16 | 0 |
+| CMD_INJECTION | 0 | 0 | 30 | 59 | 0 | 0 | 0 |
+| WEB_SCANNING | 0 | 0 | 14 | 0 | 24 | 50 | 1 |
+| NORMAL | 0 | 1 | 0 | 0 | 0 | 87 | 0 |
+
+Confusion matrix — llm_single_toolctx_r2
+
+| benar \ prediksi | SQLI | XSS | PATH_TRAVERSAL | CMD_INJECTION | WEB_SCANNING | NORMAL |
+|---|---|---|---|---|---|---|
+| SQLI | 86 | 0 | 1 | 0 | 0 | 2 |
+| XSS | 0 | 56 | 0 | 0 | 0 | 0 |
+| PATH_TRAVERSAL | 0 | 0 | 73 | 0 | 0 | 16 |
+| CMD_INJECTION | 0 | 0 | 30 | 59 | 0 | 0 |
+| WEB_SCANNING | 0 | 0 | 13 | 0 | 25 | 51 |
+| NORMAL | 0 | 1 | 0 | 0 | 0 | 87 |
+
+Confusion matrix — llm_single_toolctx_r3
+
+| benar \ prediksi | SQLI | XSS | PATH_TRAVERSAL | CMD_INJECTION | WEB_SCANNING | NORMAL |
+|---|---|---|---|---|---|---|
+| SQLI | 86 | 0 | 1 | 0 | 0 | 2 |
+| XSS | 0 | 56 | 0 | 0 | 0 | 0 |
+| PATH_TRAVERSAL | 0 | 0 | 73 | 0 | 0 | 16 |
+| CMD_INJECTION | 0 | 0 | 30 | 59 | 0 | 0 |
+| WEB_SCANNING | 0 | 0 | 14 | 0 | 25 | 50 |
+| NORMAL | 0 | 1 | 0 | 0 | 0 | 87 |
 
 Confusion matrix — llm_single_verified_r1
 

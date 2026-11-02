@@ -1,9 +1,9 @@
 {
  "run": {
-  "run_id": "replikasi-20261015T225051Z-0cb7965",
+  "run_id": "replikasi-20261102T061633Z-3279757",
   "method": "replikasi",
-  "date_utc": "2026-10-15T22:50:51+00:00",
-  "git_commit": "0cb7965a5db9d6049714cc61dfcfbf0d6ec3c321",
+  "date_utc": "2026-11-02T06:16:33+00:00",
+  "git_commit": "3279757d6a4515e65ce604207609ecaf7fb70039",
   "git_branch": "revisi-jurnal",
   "git_dirty": false,
   "git_dirty_paths": [],
@@ -30,6 +30,11 @@
     "results/llm_single_verified_r1.jsonl",
     "results/llm_single_verified_r2.jsonl",
     "results/llm_single_verified_r3.jsonl"
+   ],
+   "llm_single_toolctx": [
+    "results/llm_single_toolctx_r1.jsonl",
+    "results/llm_single_toolctx_r2.jsonl",
+    "results/llm_single_toolctx_r3.jsonl"
    ]
   },
   "configs": {
@@ -106,6 +111,29 @@
     "row_ids_sha256": "10000d6bd5e13c2ed003adeda1a2813015f4ead2c5e127ba1c2133cc8bc101ae",
     "retry_prompt_sha256": "5b770681747c607b8bc71f5974b6d9a67c21b837e3bb6acc18643cd212c9bbc2",
     "max_verification_rounds": 2
+   },
+   "llm_single_toolctx": {
+    "model": "openai/gpt-4.1-nano",
+    "model_version": "openai/gpt-4.1-nano-2025-04-14",
+    "generation": {
+     "temperature": 0,
+     "seed": 42,
+     "max_tokens": 4096
+    },
+    "provider_routing": {
+     "order": [
+      "openai"
+     ],
+     "allow_fallbacks": false,
+     "require_parameters": true
+    },
+    "prompt_sha256": "702145b0697798cc2eade7ab3d6da01225fd54a65f97ea6807c4f6763f1842bf",
+    "input_sha256": "950a93e1cdf5941ff85388c9624010a0c9f69445bde2b01a0bd79821c8104232",
+    "input_file": "data/processed/test_sample_500.jsonl",
+    "ids_file": null,
+    "row_ids_sha256": "10000d6bd5e13c2ed003adeda1a2813015f4ead2c5e127ba1c2133cc8bc101ae",
+    "retry_prompt_sha256": null,
+    "max_verification_rounds": null
    }
   }
  },
@@ -307,10 +335,10 @@
    ],
    "rows": 500,
    "macro_f1_ci95": {
-    "low": 0.6224029215800236,
-    "high": 0.7792694772750653,
-    "mean": 0.708628878535812,
-    "n_bootstrap": 1000,
+    "low": 0.6206341137866763,
+    "high": 0.7781634728360058,
+    "mean": 0.7069973423990966,
+    "n_bootstrap": 10000,
     "runs": 1
    },
    "baris_label_berubah_antar_run": 0
@@ -512,10 +540,10 @@
    ],
    "rows": 500,
    "macro_f1_ci95": {
-    "low": 0.751974328219282,
-    "high": 0.859377291410102,
-    "mean": 0.814071708669869,
-    "n_bootstrap": 1000,
+    "low": 0.7554350648624352,
+    "high": 0.8577626747529618,
+    "mean": 0.8149542317903684,
+    "n_bootstrap": 10000,
     "runs": 1
    },
    "baris_label_berubah_antar_run": 0
@@ -951,10 +979,10 @@
    ],
    "rows": 500,
    "macro_f1_ci95": {
-    "low": 0.7517945086387818,
-    "high": 0.878124937361027,
-    "mean": 0.8202005525780853,
-    "n_bootstrap": 1000,
+    "low": 0.7512169997919238,
+    "high": 0.8774307674239762,
+    "mean": 0.8192416205184749,
+    "n_bootstrap": 10000,
     "runs": 3
    },
    "baris_label_berubah_antar_run": 16
@@ -1420,10 +1448,10 @@
    ],
    "rows": 500,
    "macro_f1_ci95": {
-    "low": 0.6437698292167797,
-    "high": 0.8140661557289754,
-    "mean": 0.7350905355041548,
-    "n_bootstrap": 1000,
+    "low": 0.644648503648139,
+    "high": 0.8138090038606417,
+    "mean": 0.7336829809490673,
+    "n_bootstrap": 10000,
     "runs": 3
    },
    "baris_label_berubah_antar_run": 26
@@ -1869,13 +1897,452 @@
    ],
    "rows": 500,
    "macro_f1_ci95": {
-    "low": 0.721623032185113,
-    "high": 0.8547827725829639,
-    "mean": 0.7941666768188042,
-    "n_bootstrap": 1000,
+    "low": 0.7235561284663224,
+    "high": 0.8541839575957535,
+    "mean": 0.7929113837157659,
+    "n_bootstrap": 10000,
     "runs": 3
    },
    "baris_label_berubah_antar_run": 37
+  },
+  "llm_single_toolctx": {
+   "runs": [
+    {
+     "file": "results/llm_single_toolctx_r1.jsonl",
+     "run_id": "llm_single_toolctx_r1-20261018T021304Z-245ccc0",
+     "git_commit": "245ccc0f4b8917359a6b7a0307c95f960741887d",
+     "git_dirty": false
+    },
+    {
+     "file": "results/llm_single_toolctx_r2.jsonl",
+     "run_id": "llm_single_toolctx_r2-20261018T022519Z-245ccc0",
+     "git_commit": "245ccc0f4b8917359a6b7a0307c95f960741887d",
+     "git_dirty": false
+    },
+    {
+     "file": "results/llm_single_toolctx_r3.jsonl",
+     "run_id": "llm_single_toolctx_r3-20261018T023633Z-245ccc0",
+     "git_commit": "245ccc0f4b8917359a6b7a0307c95f960741887d",
+     "git_dirty": false
+    }
+   ],
+   "metrics": {
+    "biner_accuracy": {
+     "mean": 0.8606666666666666,
+     "min": 0.86,
+     "max": 0.862,
+     "values": [
+      0.86,
+      0.86,
+      0.862
+     ]
+    },
+    "biner_precision": {
+     "mean": 0.9970958319289968,
+     "min": 0.997093023255814,
+     "max": 0.9971014492753624,
+     "values": [
+      0.997093023255814,
+      0.997093023255814,
+      0.9971014492753624
+     ]
+    },
+    "biner_recall": {
+     "mean": 0.8333333333333334,
+     "min": 0.8325242718446602,
+     "max": 0.8349514563106796,
+     "values": [
+      0.8325242718446602,
+      0.8325242718446602,
+      0.8349514563106796
+     ]
+    },
+    "biner_f1": {
+     "mean": 0.9078885137889982,
+     "min": 0.9074074074074073,
+     "max": 0.9088507265521797,
+     "values": [
+      0.9074074074074073,
+      0.9074074074074073,
+      0.9088507265521797
+     ]
+    },
+    "biner_fpr": {
+     "mean": 0.011363636363636362,
+     "min": 0.011363636363636364,
+     "max": 0.011363636363636364,
+     "values": [
+      0.011363636363636364,
+      0.011363636363636364,
+      0.011363636363636364
+     ]
+    },
+    "accuracy": {
+     "mean": 0.7713333333333333,
+     "min": 0.77,
+     "max": 0.772,
+     "values": [
+      0.77,
+      0.772,
+      0.772
+     ]
+    },
+    "macro_precision": {
+     "mean": 0.8604922851906153,
+     "min": 0.8603984217880222,
+     "max": 0.8606800119958015,
+     "values": [
+      0.8603984217880222,
+      0.8606800119958015,
+      0.8603984217880222
+     ]
+    },
+    "macro_recall": {
+     "mean": 0.7858713539893315,
+     "min": 0.7846229145386449,
+     "max": 0.7864955737146748,
+     "values": [
+      0.7846229145386449,
+      0.7864955737146748,
+      0.7864955737146748
+     ]
+    },
+    "macro_f1": {
+     "mean": 0.7711369885748244,
+     "min": 0.7695745060120247,
+     "max": 0.7719589986727362,
+     "values": [
+      0.7695745060120247,
+      0.7719589986727362,
+      0.771877461039712
+     ]
+    },
+    "f1_SQLI": {
+     "mean": 0.9828571428571428,
+     "min": 0.9828571428571428,
+     "max": 0.9828571428571428,
+     "values": [
+      0.9828571428571428,
+      0.9828571428571428,
+      0.9828571428571428
+     ]
+    },
+    "f1_XSS": {
+     "mean": 0.9911504424778762,
+     "min": 0.9911504424778761,
+     "max": 0.9911504424778761,
+     "values": [
+      0.9911504424778761,
+      0.9911504424778761,
+      0.9911504424778761
+     ]
+    },
+    "f1_PATH_TRAVERSAL": {
+     "mean": 0.7064552944671139,
+     "min": 0.7053140096618358,
+     "max": 0.7087378640776699,
+     "values": [
+      0.7053140096618358,
+      0.7087378640776699,
+      0.7053140096618358
+     ]
+    },
+    "f1_CMD_INJECTION": {
+     "mean": 0.7972972972972973,
+     "min": 0.7972972972972973,
+     "max": 0.7972972972972973,
+     "values": [
+      0.7972972972972973,
+      0.7972972972972973,
+      0.7972972972972973
+     ]
+    },
+    "f1_WEB_SCANNING": {
+     "mean": 0.4339905811726958,
+     "min": 0.4247787610619469,
+     "max": 0.4385964912280702,
+     "values": [
+      0.4247787610619469,
+      0.4385964912280702,
+      0.4385964912280702
+     ]
+    },
+    "f1_NORMAL": {
+     "mean": 0.7150711731768199,
+     "min": 0.7131147540983607,
+     "max": 0.7160493827160495,
+     "values": [
+      0.7160493827160495,
+      0.7131147540983607,
+      0.7160493827160495
+     ]
+    },
+    "prediksi_tidak_valid": {
+     "mean": 0.3333333333333333,
+     "min": 0.0,
+     "max": 1.0,
+     "values": [
+      1,
+      0,
+      0
+     ]
+    },
+    "evidence_literal": {
+     "mean": 0.8300358825732932,
+     "min": 0.8181818181818182,
+     "max": 0.8443396226415094,
+     "values": [
+      0.8275862068965517,
+      0.8181818181818182,
+      0.8443396226415094
+     ]
+    },
+    "token_masukan_rerata": {
+     "mean": 1657.0366666666669,
+     "min": 1654.064,
+     "max": 1659.862,
+     "values": [
+      1659.862,
+      1654.064,
+      1657.184
+     ]
+    },
+    "token_keluaran_rerata": {
+     "mean": 110.46333333333332,
+     "min": 99.47,
+     "max": 124.782,
+     "values": [
+      124.782,
+      99.47,
+      107.138
+     ]
+    },
+    "latensi_median_s": {
+     "mean": 1.2951666666666668,
+     "min": 1.2675,
+     "max": 1.322,
+     "values": [
+      1.296,
+      1.2675,
+      1.322
+     ]
+    },
+    "latensi_p95_s": {
+     "mean": 1.8270833333333332,
+     "min": 1.7464499999999996,
+     "max": 1.8913499999999996,
+     "values": [
+      1.8434499999999996,
+      1.7464499999999996,
+      1.8913499999999996
+     ]
+    },
+    "biaya_total_usd": {
+     "mean": 0.0711813,
+     "min": 0.053579600000000005,
+     "max": 0.10466630000000002,
+     "values": [
+      0.10466630000000002,
+      0.05529799999999999,
+      0.053579600000000005
+     ]
+    },
+    "biaya_per_1000_baris_usd": {
+     "mean": 0.1423626,
+     "min": 0.10715920000000001,
+     "max": 0.20933260000000004,
+     "values": [
+      0.20933260000000004,
+      0.11059599999999999,
+      0.10715920000000001
+     ]
+    },
+    "panggilan_llm_rerata": {
+     "mean": 1.002,
+     "min": 1.0,
+     "max": 1.004,
+     "values": [
+      1.004,
+      1,
+      1.002
+     ]
+    },
+    "latensi_panggilan_median_s": {
+     "mean": 1.2956666666666667,
+     "min": 1.2675,
+     "max": 1.322,
+     "values": [
+      1.2974999999999999,
+      1.2675,
+      1.322
+     ]
+    },
+    "latensi_panggilan_p95_s": {
+     "mean": 1.8296666666666666,
+     "min": 1.7464499999999996,
+     "max": 1.891,
+     "values": [
+      1.85155,
+      1.7464499999999996,
+      1.891
+     ]
+    },
+    "panggilan_dibatalkan_galat_api": {
+     "mean": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "values": [
+      0,
+      0,
+      0
+     ]
+    },
+    "biaya_panggilan_dibatalkan_usd": {
+     "mean": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "values": [
+      0,
+      0,
+      0
+     ]
+    },
+    "degeneratif_kejadian": {
+     "mean": 1.3333333333333333,
+     "min": 0.0,
+     "max": 3.0,
+     "values": [
+      3,
+      0,
+      1
+     ]
+    },
+    "degeneratif_baris_terdampak": {
+     "mean": 1.0,
+     "min": 0.0,
+     "max": 2.0,
+     "values": [
+      2,
+      0,
+      1
+     ]
+    },
+    "degeneratif_terdampak_ok": {
+     "mean": 0.6666666666666666,
+     "min": 0.0,
+     "max": 1.0,
+     "values": [
+      1,
+      0,
+      1
+     ]
+    },
+    "degeneratif_terdampak_verification_failed": {
+     "mean": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "values": [
+      0,
+      0,
+      0
+     ]
+    },
+    "degeneratif_terdampak_verification_skipped": {
+     "mean": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "values": [
+      0,
+      0,
+      0
+     ]
+    },
+    "degeneratif_terdampak_parse_error": {
+     "mean": 0.3333333333333333,
+     "min": 0.0,
+     "max": 1.0,
+     "values": [
+      1,
+      0,
+      0
+     ]
+    },
+    "degeneratif_terdampak_label_benar": {
+     "mean": 0.3333333333333333,
+     "min": 0.0,
+     "max": 1.0,
+     "values": [
+      1,
+      0,
+      0
+     ]
+    }
+   },
+   "confusion_mean": [
+    [
+     86.0,
+     0.0,
+     1.0,
+     0.0,
+     0.0,
+     2.0,
+     0.0
+    ],
+    [
+     0.0,
+     56.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     73.0,
+     0.0,
+     0.0,
+     16.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     30.0,
+     59.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     13.666666666666666,
+     0.0,
+     24.666666666666668,
+     50.333333333333336,
+     0.3333333333333333
+    ],
+    [
+     0.0,
+     1.0,
+     0.0,
+     0.0,
+     0.0,
+     87.0,
+     0.0
+    ]
+   ],
+   "rows": 500,
+   "macro_f1_ci95": {
+    "low": 0.6655725252810174,
+    "high": 0.8343386181113706,
+    "mean": 0.7563517416916322,
+    "n_bootstrap": 10000,
+    "runs": 3
+   },
+   "baris_label_berubah_antar_run": 6
   }
  }
 }
